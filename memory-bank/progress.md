@@ -1,16 +1,14 @@
 # Progress
 
 ## Current milestone
-**M5 — Notifications & lifecycle (smoke test pending).** M0–M4 + onboarding polish ✅ on `origin/main` through commit `631603f`. M5.1–M5.5 ✅ code; M5.6 smoke test in flight.
+**M6 — OTP proof of work (smoke test pending).** M0–M5 + onboarding polish + M5 polish ✅ on `main` through `1456778`. M6.1–M6.3 ✅ code; M6.4 smoke test in flight.
 
-M5 in-app (real FCM web push deferred to a follow-up slice):
-- `dispatchOffers` Firestore onCreate trigger fans out top-10 offers per task.
-- `acceptOffer` callable runs a race-safe transaction; sibling offers become 'superseded' outside the txn.
-- `rejectOffer` callable flips one offer state.
-- Volunteer `/app` shows `OfferInbox` (collection group query). Accept/Reject buttons call the callables.
-- Customer `/tasks/{id}` is now live-subscribed (onSnapshot) to the task and its offers subcollection. Different UI for searching / accepted / cancelled / expired states.
-- Firestore: tasks/{id}/offers rules opened (read by volunteerId or task customer; writes server-only). Composite index added: `(offers) volunteerId ASC, state ASC, offeredAt DESC` (collection-group scope).
-- Radius expansion scheduler: not implemented (emulator can't auto-fire schedulers); deferred to a follow-up slice.
+M6 in-app (no real SMS — Task Start/End OTPs are app-generated):
+- `generateStartOtp` / `generateEndOtp` callables (customer-only). 6-digit code from `crypto.randomInt`, per-task salt, SHA-256 hash stored on the task doc with 10-min TTL. Plaintext returned ONCE in the callable response; never persisted; never logged.
+- `verifyStartOtp` / `verifyEndOtp` callables (accepted-volunteer-only). Constant-time hash compare; flips task.status from `accepted` → `in_progress` → `completed`. Clears OTP material on success. Awards `points`, `verifiedTaskCount`, `verifiedHours`, and per-skill `skillPoints` on completion.
+- `submitCustomerRating` callable (1–5 stars + optional comment ≤ 280 chars). Idempotent.
+- Audit trail: `tasks/{id}/events` subcollection populated by every transition (`start_otp_generated`, `started`, `end_otp_generated`, `completed`, `rated`). Append-only; rules allow read by customer + accepted volunteer; writes denied.
+- New UI components: `CustomerOtpPanel`, `VolunteerOtpPanel`, `CustomerRatingPanel`. Wired into `TaskDetailPage` by status + viewer role.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)

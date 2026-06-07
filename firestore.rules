@@ -167,6 +167,19 @@ service cloud.firestore {
              == get(/databases/$(database)/documents/tasks/$(taskId)).data.customerId;
         allow write: if false;
       }
+
+      // Append-only audit trail. Cloud Functions write via Admin SDK
+      // (bypasses these rules). Customer and accepted volunteer can read;
+      // everyone else denied.
+      match /events/{eventId} {
+        allow read: if isSignedIn() && (
+          request.auth.uid
+            == get(/databases/$(database)/documents/tasks/$(taskId)).data.customerId
+          || request.auth.uid
+            == get(/databases/$(database)/documents/tasks/$(taskId)).data.acceptedVolunteerId
+        );
+        allow write: if false;
+      }
     }
 
     // Volunteer reading their own offers via collection-group query.
