@@ -1,6 +1,6 @@
 {
   "_comment": "Starter seed for catalog/categories and catalog/skills. Reviewed and edited pre-launch. M8 admin UI replaces hand-editing this file. Region-specific languages should be added by Nishanth before deploy.",
-  "_seedVersion": 1,
+  "_seedVersion": 2,
   "categories": [
     { "key": "errands", "label": "Errands", "description": "Groceries, post office, package pickup, simple shopping help.", "defaultRisk": "low" },
     { "key": "tutoring", "label": "Tutoring", "description": "Help with school/college subjects or language learning.", "defaultRisk": "low" },
@@ -11,17 +11,30 @@
     { "key": "community-delivery", "label": "Community delivery help", "description": "Carrying community food share or neighbour-to-neighbour parcels.", "defaultRisk": "low" }
   ],
   "skills": [
-    { "key": "smartphone-literacy", "label": "Smartphone literacy" },
-    { "key": "computer-literacy", "label": "Computer literacy" },
-    { "key": "form-filling", "label": "Form filling" },
-    { "key": "tutoring-math", "label": "Math tutoring" },
-    { "key": "tutoring-science", "label": "Science tutoring" },
-    { "key": "tutoring-language", "label": "Language tutoring" },
-    { "key": "english", "label": "English communication" },
-    { "key": "patience-with-elderly", "label": "Patience with elderly" },
-    { "key": "walking-ok", "label": "Comfortable walking 1–2 km" },
-    { "key": "bike-rider", "label": "Has a bike / e-bike" },
-    { "key": "driver-licensed", "label": "Licensed driver with own vehicle" },
-    { "key": "lift-light-weight", "label": "Can lift light weight (<5 kg)" }
+    { "key": "read-text", "label": "Read text" },
+    { "key": "translate-text", "label": "Translate text" },
+    { "key": "explain-forms", "label": "Explain forms" },
+    { "key": "fill-forms", "label": "Fill forms" },
+    { "key": "phone-help", "label": "Phone help" },
+    { "key": "computer-help", "label": "Computer help" },
+    { "key": "online-search", "label": "Online search" },
+    { "key": "book-appointment", "label": "Book appointment" },
+    { "key": "scan-documents", "label": "Scan documents" },
+    { "key": "upload-documents", "label": "Upload documents" },
+    { "key": "buy-groceries", "label": "Buy groceries" },
+    { "key": "fetch-medicine", "label": "Fetch medicine" },
+    { "key": "collect-package", "label": "Collect package" },
+    { "key": "drop-items", "label": "Drop items" },
+    { "key": "pickup-food", "label": "Pickup food" },
+    { "key": "carry-bags", "label": "Carry bags" },
+    { "key": "local-errand", "label": "Local errand" },
+    { "key": "event-setup", "label": "Event setup" },
+    { "key": "registration-help", "label": "Registration help" },
+    { "key": "guide-visitors", "label": "Guide visitors" },
+    { "key": "queue-support", "label": "Queue support" },
+    { "key": "distribute-materials", "label": "Distribute materials" },
+    { "key": "donation-sorting", "label": "Donation sorting" },
+    { "key": "food-packing", "label": "Food packing" },
+    { "key": "community-cleanup", "label": "Community cleanup" }
   ]
 }

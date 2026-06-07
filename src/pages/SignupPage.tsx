@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { AuthMethodTabs, type AuthMethod } from '../components/AuthMethodTabs';
 import { PhoneAuthForm } from '../components/PhoneAuthForm';
 import { EmailAuthForm } from '../components/EmailAuthForm';
+import { OnboardingProgress } from '../components/OnboardingProgress';
 import { useRedirectWhenSignedIn } from '../lib/use-redirect-when-signed-in';
 
 export default function SignupPage() {
@@ -14,6 +15,7 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="mx-auto max-w-md px-6 py-16 sm:py-24">
+        <OnboardingProgress current={1} />
         <h1 className="text-3xl font-semibold tracking-tight">Create account</h1>
         <p className="mt-3 text-neutral-600">
           Choose how you&apos;d like to sign up.

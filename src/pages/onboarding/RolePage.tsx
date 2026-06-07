@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { useAuthState, type Role } from '../../lib/auth-context';
 import { db } from '../../lib/firebase';
+import { OnboardingProgress } from '../../components/OnboardingProgress';
 
 type Choice = 'volunteer' | 'customer' | 'both';
 
@@ -72,6 +73,7 @@ export default function RolePage() {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
+        <OnboardingProgress current={2} />
         <h1 className="text-3xl font-semibold tracking-tight">
           How do you want to use this?
         </h1>

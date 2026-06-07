@@ -1,7 +1,11 @@
 # Progress
 
 ## Current milestone
-**M4 — Matching engine** (smoke test pending). M0–M3 ✅ committed (`b8d62e9` → `637c602` → `9fb4414` → `8e1c794`; local-only until push). M4.1–M4.3 ✅ code; M4.4 smoke test in flight. Emulator must be restarted to register the new Cloud Function.
+**Onboarding polish slice** (between M4 and M5). M0–M4 ✅ committed (`b8d62e9` → `637c602` → `9fb4414` → `8e1c794` → `a15c585`; local-only until push). Mid-M4 polish:
+- New 25-item flat skills catalog (scripts/seed/catalog.json bumped to seedVersion 2).
+- 3-step numbered stepper added to /signup, /onboarding/role, /onboarding/profile.
+- ProfilePage: volunteer users now pick skills (multi-select chips, max 10, required); customer-only users still get the "About you" bio textarea.
+- Existing test volunteers (Allen) still have stale skill keys ("smartphone-literacy") from the old catalog — will need re-onboarding or manual skill update in the Firestore emulator to keep matching showing them.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)
