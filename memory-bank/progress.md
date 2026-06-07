@@ -1,7 +1,7 @@
 # Progress
 
 ## Current milestone
-**M3 — Task posting & risk** (smoke test pending). M0–M2 ✅ committed (`b8d62e9` → `637c602` → `9fb4414`; local-only until push). M3.1–M3.4 ✅ code; M3.5 smoke test in flight.
+**M4 — Matching engine** (smoke test pending). M0–M3 ✅ committed (`b8d62e9` → `637c602` → `9fb4414` → `8e1c794`; local-only until push). M4.1–M4.3 ✅ code; M4.4 smoke test in flight. Emulator must be restarted to register the new Cloud Function.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)

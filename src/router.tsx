@@ -10,6 +10,7 @@ import RolePage from './pages/onboarding/RolePage';
 import ProfilePage from './pages/onboarding/ProfilePage';
 import AppHomePage from './pages/AppHomePage';
 import CreateTaskPage from './pages/CreateTaskPage';
+import TaskDetailPage from './pages/TaskDetailPage';
 import { ProtectedRoute } from './lib/protected-route';
 
 export const router = createBrowserRouter([
@@ -53,6 +54,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute requires="ready">
         <CreateTaskPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/tasks/:taskId',
+    element: (
+      <ProtectedRoute requires="ready">
+        <TaskDetailPage />
       </ProtectedRoute>
     ),
   },

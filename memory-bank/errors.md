@@ -21,6 +21,17 @@
 - **Fix:** set `module: "node16"`, `moduleResolution: "node16"`, `rootDir: "src"`, `outDir: "lib"`.
 - **Avoid next time:** when scaffolding new TS projects under TS 6+, set `module`, `moduleResolution`, `rootDir`, `outDir` explicitly — don't rely on defaults.
 
+## 2026-06-07 — 9 moderate npm audit issues inside firebase-admin's transitive deps
+- **What:** After installing h3-js in functions/, `npm audit` reports 9 moderate vulns in transitive deps of `firebase-admin` and `firebase-functions` — `uuid`, `gaxios`, `google-gax`, `teeny-request`, `retry-request`, `@google-cloud/firestore`, `@google-cloud/storage`.
+- **Severity:** moderate; none in our code; all reachable only via firebase-admin call paths we don't touch directly. None are exploitable from the browser (Functions only).
+- **Why not fix:** `npm audit fix --force` would downgrade `firebase-admin@13.10.0` to an older line incompatible with our pinned `firebase-functions@7.2.5`. Breaking change for no security gain — Google publishes the next firebase-admin minor with the fixes.
+- **What we did:** logged here; nothing else. Re-check when bumping firebase-admin.
+
+## 2026-06-07 — Scaling shortcut: rankNearbyVolunteers fetches all available volunteers in-memory
+- **What:** The matching Cloud Function reads all users with `availableNow=true` (capped at 500) and post-filters by H3 distance / skill / risk in memory.
+- **Why this shortcut:** Firestore's `where('field','in',[...])` caps at 30 values. A 2 km search radius at H3 resolution 9 covers ~125 cells — too many for a single `in` query. The clean fix is multi-resolution H3 indexing (store res-7 and res-9 cells, query by res-7 first) or a GeoFirestore-style geohash range query. That's a multi-day spike, not Phase 1 work.
+- **Production risk:** with thousands of available volunteers in one city, the in-memory fetch + filter becomes the bottleneck. Add per-city sharding before scaling beyond a few hundred concurrent volunteers.
+
 ## 2026-06-07 — Auth-then-navigate race: first sign-in bounced back to /login, second worked
 - **What broke:** In a private window, signing in via Email/Password (and Phone OTP) the *first* attempt redirected back to `/login`. The *second* submit on the same form worked.
 - **Root cause:** The form's submit handler called `navigate('/app')` synchronously after `signInWithEmailAndPassword` resolved. The Firebase user is signed in by then, but `AuthProvider`'s `onAuthStateChanged` listener fires on the next microtask, so `AuthContext` still reports `signed-out` when `ProtectedRoute` on `/app` mounts → it bounces to `/login`.

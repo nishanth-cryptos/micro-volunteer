@@ -5,9 +5,14 @@
 import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { latLngToCell } from 'h3-js';
 import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
+import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
+import { MyTasksList } from '../components/MyTasksList';
+
+const H3_RESOLUTION = 9;
 
 export default function AppHomePage() {
   const state = useAuthState();
@@ -29,16 +34,50 @@ export default function AppHomePage() {
 
   async function toggleAvailability() {
     setError(null);
+    const ref = doc(db(), 'users', user.uid);
+    if (available) {
+      // Going OFF — just flip the flag. Leave lastKnownLocation in place
+      // (the matching engine filters by availableNow, so stale values
+      // aren't visible to anyone).
+      setBusy(true);
+      try {
+        await updateDoc(ref, {
+          availableNow: false,
+          availabilityUpdatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Could not update. Try again.',
+        );
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    // Going ON — capture location first, then write.
     setBusy(true);
     try {
-      await updateDoc(doc(db(), 'users', user.uid), {
-        availableNow: !available,
+      const loc = await getCurrentLocation();
+      const h3Cell = latLngToCell(loc.lat, loc.lng, H3_RESOLUTION);
+      await updateDoc(ref, {
+        availableNow: true,
         availabilityUpdatedAt: serverTimestamp(),
+        lastKnownLocation: {
+          lat: loc.lat,
+          lng: loc.lng,
+          h3Cell,
+          updatedAt: serverTimestamp(),
+        },
       });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not update. Try again.',
-      );
+      if (err instanceof GeolocationError) {
+        setError(err.userMessage);
+      } else {
+        setError(
+          err instanceof Error ? err.message : 'Could not update. Try again.',
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -55,20 +94,23 @@ export default function AppHomePage() {
         </p>
 
         {isCustomer && (
-          <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
-            <h2 className="text-lg font-semibold text-neutral-900">
-              Need a hand with something?
-            </h2>
-            <p className="mt-1 text-sm text-neutral-600">
-              Post a small task and we'll find a nearby volunteer.
-            </p>
-            <Link
-              to="/create-task"
-              className="mt-4 inline-block rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
-            >
-              Post a task
-            </Link>
-          </section>
+          <>
+            <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
+              <h2 className="text-lg font-semibold text-neutral-900">
+                Need a hand with something?
+              </h2>
+              <p className="mt-1 text-sm text-neutral-600">
+                Post a small task and we'll find a nearby volunteer.
+              </p>
+              <Link
+                to="/create-task"
+                className="mt-4 inline-block rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+              >
+                Post a task
+              </Link>
+            </section>
+            <MyTasksList uid={user.uid} />
+          </>
         )}
 
         {isVolunteer && (

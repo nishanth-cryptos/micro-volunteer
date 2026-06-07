@@ -39,6 +39,12 @@ export interface UserDoc {
   idImagePath?: string;          // Storage path; never client-readable
   availableNow?: boolean;
   availabilityUpdatedAt?: Timestamp;
+  lastKnownLocation?: {
+    lat: number;
+    lng: number;
+    h3Cell: string;              // h3-js resolution 9
+    updatedAt: Timestamp;
+  };
   consent?: { tcVersion: string; acceptedAt: Timestamp };
   createdAt?: Timestamp;
 }

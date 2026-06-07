@@ -109,7 +109,7 @@ export default function CreateTaskPage() {
       if (preference.trim()) description.preference = preference.trim();
       if (safetyNote.trim()) description.safetyNote = safetyNote.trim();
 
-      await addDoc(collection(db(), 'tasks'), {
+      const created = await addDoc(collection(db(), 'tasks'), {
         customerId: user.uid,
         title: title.trim(),
         category: selectedCategory.key,
@@ -123,7 +123,7 @@ export default function CreateTaskPage() {
         createdAt: serverTimestamp(),
         expiresAt: Timestamp.fromMillis(Date.now() + TASK_EXPIRY_MS),
       });
-      void navigate('/app', { replace: true });
+      void navigate(`/tasks/${created.id}`, { replace: true });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not post the task. Try again.',
