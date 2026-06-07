@@ -1,7 +1,7 @@
 # Progress
 
 ## Current milestone
-**M0 — Foundation** ✅ **DONE 2026-06-07**. Next: M1 (Auth + roles).
+**M1 — Auth & roles** (finishing). M0 ✅ DONE 2026-06-07; M1.1–M1.5 ✅; M1.6 smoke test in flight.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)

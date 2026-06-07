@@ -21,6 +21,12 @@
 - **Fix:** set `module: "node16"`, `moduleResolution: "node16"`, `rootDir: "src"`, `outDir: "lib"`.
 - **Avoid next time:** when scaffolding new TS projects under TS 6+, set `module`, `moduleResolution`, `rootDir`, `outDir` explicitly — don't rely on defaults.
 
+## 2026-06-07 — Auth-then-navigate race: first sign-in bounced back to /login, second worked
+- **What broke:** In a private window, signing in via Email/Password (and Phone OTP) the *first* attempt redirected back to `/login`. The *second* submit on the same form worked.
+- **Root cause:** The form's submit handler called `navigate('/app')` synchronously after `signInWithEmailAndPassword` resolved. The Firebase user is signed in by then, but `AuthProvider`'s `onAuthStateChanged` listener fires on the next microtask, so `AuthContext` still reports `signed-out` when `ProtectedRoute` on `/app` mounts → it bounces to `/login`.
+- **Fix:** removed `navigate(...)` from `EmailAuthForm` and `PhoneAuthForm`. Added a page-level hook `useRedirectWhenSignedIn()` in `src/lib/use-redirect-when-signed-in.ts` used by `/login` and `/signup`. The hook watches `useAuthState()` and only navigates once the provider has caught up (no-doc / incomplete / ready), routing the user to the correct next step.
+- **Avoid next time:** never derive navigation from a Firebase promise resolution while a separate context subscription is the source of truth for auth state. React to the context.
+
 ## 2026-06-07 — Functions emulator: dev Node 26 vs prod Node 22 mismatch (soft warning)
 - **What happened:** `functions: Your requested "node" version "22" doesn't match your global version "26". Using node@26 from host.`
 - **Root cause:** `functions/package.json` declares `engines.node: "22"` (Cloud Functions prod runtime). Local machine has Node 26 globally.

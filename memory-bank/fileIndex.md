@@ -20,11 +20,24 @@
 - `.firebaserc` — `default` project alias = `REPLACE_WITH_FIREBASE_PROJECT_ID` (set during Console step).
 
 ## Frontend src/
-- `src/main.tsx` — React root mount. Imports `./index.css` (Tailwind entry). Throws if `#root` missing.
-- `src/App.tsx` — M0 landing-page smoke test. Replaced by router shell in M1.
+- `src/main.tsx` — React root mount. Wraps app in `<AuthProvider>` + `<RouterProvider>`. Throws if `#root` missing.
 - `src/index.css` — single `@import "tailwindcss";` directive (Tailwind v4 model).
-- `src/vite-env.d.ts` — typed `ImportMetaEnv` for the `VITE_FIREBASE_*` vars.
-- `src/lib/firebase.ts` — `getFirebaseApp()` lazy initializer. Reads env vars, throws clear error if missing. Does NOT export Auth/Firestore/Storage helpers (those land in M1+).
+- `src/vite-env.d.ts` — typed `ImportMetaEnv` for the `VITE_FIREBASE_*` vars + `VITE_USE_EMULATORS`.
+- `src/router.tsx` — `createBrowserRouter` route table. Public: `/`, `/login`, `/signup`. Protected: `/onboarding/consent`, `/onboarding/role` (allowIncomplete), `/app`.
+- `src/lib/firebase.ts` — `getFirebaseApp()` + lazy `auth()`, `db()`, `storage()`, `functions()` accessors. Connects to emulators when `VITE_USE_EMULATORS=1`. Functions region: `asia-south1`.
+- `src/lib/auth-context.tsx` — `<AuthProvider>` + `useAuthState()`. Discriminated union: `loading | signed-out | no-doc | incomplete | ready`. Subscribes to `users/{uid}` via `onSnapshot`.
+- `src/lib/protected-route.tsx` — `<ProtectedRoute requires="consent" | "role" | "ready">`. Per-step guard; redirects users at any other step.
+- `src/lib/use-redirect-when-signed-in.ts` — `useRedirectWhenSignedIn()` hook. Used by `/login` and `/signup` to forward authenticated users to the correct next step, after `AuthProvider` state has settled (avoids the auth-then-navigate race — see errors.md 2026-06-07).
+- `src/lib/auth-errors.ts` — `readableAuthError(err)` maps Firebase error codes to short user-facing strings.
+- `src/components/AuthMethodTabs.tsx` — accessible Phone / Email tab switcher (role=tablist).
+- `src/components/PhoneAuthForm.tsx` — phone → OTP form. Uses `RecaptchaVerifier` invisible mode; auto-bypassed by Auth emulator in dev.
+- `src/components/EmailAuthForm.tsx` — email + password (+ confirm on signup) form.
+- `src/pages/HomePage.tsx` — public landing.
+- `src/pages/LoginPage.tsx` — sign-in page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
+- `src/pages/SignupPage.tsx` — sign-up page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
+- `src/pages/onboarding/ConsentPage.tsx` — T&C capture; on accept writes `users/{uid}` with `consent` + base fields (`setDoc`).
+- `src/pages/onboarding/RolePage.tsx` — role picker; on continue updates `users/{uid}.roles` (`updateDoc`).
+- `src/pages/AppHomePage.tsx` — authenticated home with sign-out button. Real dashboards in M3/M5.
 
 ## Scripts / seed
 - `scripts/seed/catalog.json` — starter seed for `catalog/categories` and `catalog/skills`. Reviewed pre-launch; loaded into Firestore by an admin-only callable in M1. Replaced by the M8 admin UI for live edits.

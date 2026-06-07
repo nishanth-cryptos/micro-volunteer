@@ -1,13 +1,102 @@
 rules_version = '2';
 
-// DENY-BY-DEFAULT. Every collection and document must be granted access
-// EXPLICITLY in a later milestone, role-scoped (volunteer/customer/admin)
-// and owner-scoped. No "allow read, write: if true" — ever, even temporarily.
-// Sensitive mutations (points, trust score, OTP generation/verification,
-// matching rank) must be handled server-side in Cloud Functions, not here.
+// Deny-by-default for everything except the explicit grants below.
+// Every grant is role-scoped and owner-scoped. No `allow read, write: if true`.
+// Sensitive fields (trust, points, idVerified, banned, etc.) are write-locked
+// for clients and only mutated by Cloud Functions via Admin SDK.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ----- Helpers -----
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Fields a client may set on their initial users/{uid} document.
+    function userCreateAllowedKeys() {
+      return [
+        'displayName',
+        'photoURL',
+        'bio',
+        'phoneNumber',
+        'email',
+        'roles',
+        'skills',
+        'consent',
+        'createdAt'
+      ];
+    }
+
+    // Fields a client may mutate on their own users/{uid} document after create.
+    // Consent + createdAt are write-once: enforced by exclusion from this list.
+    function userUpdateAllowedKeys() {
+      return [
+        'displayName',
+        'photoURL',
+        'bio',
+        'phoneNumber',
+        'email',
+        'roles',
+        'skills'
+      ];
+    }
+
+    // Server-only fields. Must never appear in a client write (create or update).
+    function userServerOnlyKeys() {
+      return [
+        'idVerified',
+        'idImagePath',
+        'trustScore',
+        'verifiedTaskCount',
+        'verifiedHours',
+        'points',
+        'skillPoints',
+        'openReportsCount',
+        'warningsCount',
+        'suspendedUntil',
+        'banned',
+        'lastSeenAt'
+      ];
+    }
+
+    // Consent shape: { tcVersion: string, acceptedAt: timestamp }.
+    function hasValidConsent() {
+      return request.resource.data.consent.tcVersion is string
+        && request.resource.data.consent.acceptedAt is timestamp;
+    }
+
+    // Roles, if present, must be an array of allowed strings.
+    function rolesIfPresentValid() {
+      return !('roles' in request.resource.data.keys())
+        || (request.resource.data.roles is list
+            && request.resource.data.roles.size() > 0
+            && request.resource.data.roles.size() <= 2
+            && request.resource.data.roles.hasOnly(['volunteer', 'customer']));
+    }
+
+    // ----- users/{userId} -----
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(userCreateAllowedKeys())
+        && hasValidConsent()
+        && rolesIfPresentValid()
+        && !request.resource.data.keys().hasAny(userServerOnlyKeys());
+
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(userUpdateAllowedKeys())
+        && rolesIfPresentValid();
+
+      allow delete: if false;
+    }
+
+    // Everything else stays deny-by-default until later milestones grant access.
     match /{document=**} {
       allow read, write: if false;
     }
