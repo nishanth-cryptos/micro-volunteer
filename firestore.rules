@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// DENY-BY-DEFAULT. Every collection and document must be granted access
+// EXPLICITLY in a later milestone, role-scoped (volunteer/customer/admin)
+// and owner-scoped. No "allow read, write: if true" — ever, even temporarily.
+// Sensitive mutations (points, trust score, OTP generation/verification,
+// matching rank) must be handled server-side in Cloud Functions, not here.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

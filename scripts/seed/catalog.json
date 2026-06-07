@@ -1,0 +1,27 @@
+{
+  "_comment": "Starter seed for catalog/categories and catalog/skills. Reviewed and edited pre-launch. M8 admin UI replaces hand-editing this file. Region-specific languages should be added by Nishanth before deploy.",
+  "_seedVersion": 1,
+  "categories": [
+    { "key": "errands", "label": "Errands", "description": "Groceries, post office, package pickup, simple shopping help.", "defaultRisk": "low" },
+    { "key": "tutoring", "label": "Tutoring", "description": "Help with school/college subjects or language learning.", "defaultRisk": "low" },
+    { "key": "tech-help", "label": "Tech help", "description": "Phone setup, app help, basic computer questions.", "defaultRisk": "low" },
+    { "key": "digital-help", "label": "Digital help", "description": "Filling forms online, paying bills, navigating government portals.", "defaultRisk": "low" },
+    { "key": "mobility-assist", "label": "Mobility assistance", "description": "Accompany on a walk, light shopping support in public spaces.", "defaultRisk": "medium" },
+    { "key": "conversation-companionship", "label": "Conversation / companionship", "description": "Friendly check-in calls or short public-space meetups for community members.", "defaultRisk": "low" },
+    { "key": "community-delivery", "label": "Community delivery help", "description": "Carrying community food share or neighbour-to-neighbour parcels.", "defaultRisk": "low" }
+  ],
+  "skills": [
+    { "key": "smartphone-literacy", "label": "Smartphone literacy" },
+    { "key": "computer-literacy", "label": "Computer literacy" },
+    { "key": "form-filling", "label": "Form filling" },
+    { "key": "tutoring-math", "label": "Math tutoring" },
+    { "key": "tutoring-science", "label": "Science tutoring" },
+    { "key": "tutoring-language", "label": "Language tutoring" },
+    { "key": "english", "label": "English communication" },
+    { "key": "patience-with-elderly", "label": "Patience with elderly" },
+    { "key": "walking-ok", "label": "Comfortable walking 1–2 km" },
+    { "key": "bike-rider", "label": "Has a bike / e-bike" },
+    { "key": "driver-licensed", "label": "Licensed driver with own vehicle" },
+    { "key": "lift-light-weight", "label": "Can lift light weight (<5 kg)" }
+  ]
+}

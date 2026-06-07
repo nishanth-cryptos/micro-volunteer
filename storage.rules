@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// DENY-BY-DEFAULT for Storage. Profile photos, ID images, and any other
+// uploads must be authorized EXPLICITLY in a later milestone, owner-scoped,
+// with size/MIME validation. ID images are sensitive PII — public URLs are
+// forbidden; access goes through signed URLs or short-lived tokens.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
