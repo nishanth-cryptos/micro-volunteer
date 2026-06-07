@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
 
@@ -19,6 +19,7 @@ export default function AppHomePage() {
   const { user, userDoc } = state;
   const name = userDoc.displayName ?? 'there';
   const isVolunteer = userDoc.roles?.includes('volunteer') ?? false;
+  const isCustomer = userDoc.roles?.includes('customer') ?? false;
   const available = userDoc.availableNow ?? false;
 
   async function handleSignOut() {
@@ -50,8 +51,25 @@ export default function AppHomePage() {
           Welcome, {name}.
         </h1>
         <p className="mt-3 text-neutral-600">
-          Your dashboard lands in M3 (post tasks) and M5 (volunteer offers).
+          Your dashboard lands in M5 (volunteer offers).
         </p>
+
+        {isCustomer && (
+          <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
+            <h2 className="text-lg font-semibold text-neutral-900">
+              Need a hand with something?
+            </h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              Post a small task and we'll find a nearby volunteer.
+            </p>
+            <Link
+              to="/create-task"
+              className="mt-4 inline-block rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+            >
+              Post a task
+            </Link>
+          </section>
+        )}
 
         {isVolunteer && (
           <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">

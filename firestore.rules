@@ -81,6 +81,78 @@ service cloud.firestore {
             && request.resource.data.roles.hasOnly(['volunteer', 'customer']));
     }
 
+    // ----- tasks/{taskId} -----
+
+    // Field whitelist for the initial client create. Lifecycle fields
+    // (acceptedVolunteerId, startedAt, completedAt, OTP fields, ratings)
+    // are added later by Cloud Functions / future client flows.
+    function taskCreateAllowedKeys() {
+      return [
+        'customerId',
+        'title',
+        'category',
+        'requiredSkills',
+        'description',
+        'location',
+        'riskLevel',
+        'estimatedMinutes',
+        'status',
+        'searchRadiusM',
+        'createdAt',
+        'expiresAt'
+      ];
+    }
+
+    function taskDescriptionValid() {
+      let d = request.resource.data.description;
+      return d.meetingPoint is string && d.meetingPoint.size() > 0
+        && d.meetingPoint.size() <= 280
+        && d.whatToBring is string
+        && d.whatToBring.size() <= 280
+        && (!('preference' in d.keys()) || (d.preference is string && d.preference.size() <= 280))
+        && (!('safetyNote' in d.keys()) || (d.safetyNote is string && d.safetyNote.size() <= 280));
+    }
+
+    function taskLocationValid() {
+      let l = request.resource.data.location;
+      return l.lat is number && l.lat >= -90 && l.lat <= 90
+        && l.lng is number && l.lng >= -180 && l.lng <= 180
+        && l.h3Cell is string && l.h3Cell.size() > 0;
+    }
+
+    function taskFieldsValid() {
+      let d = request.resource.data;
+      return d.title is string && d.title.size() > 0 && d.title.size() <= 80
+        && d.category is string && d.category.size() > 0
+        && d.requiredSkills is list && d.requiredSkills.size() > 0
+        && d.requiredSkills.size() <= 5
+        && d.riskLevel in ['low', 'medium']           // 'high' / 'prohibited' rejected here
+        && d.estimatedMinutes is number
+        && d.estimatedMinutes >= 5 && d.estimatedMinutes <= 480
+        && d.status == 'searching'                    // initial status only
+        && d.searchRadiusM is number
+        && d.searchRadiusM >= 500 && d.searchRadiusM <= 10000
+        && d.createdAt is timestamp
+        && d.expiresAt is timestamp
+        && taskDescriptionValid()
+        && taskLocationValid();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn()
+        && request.auth.uid == resource.data.customerId;
+
+      allow create: if isSignedIn()
+        && request.resource.data.customerId == request.auth.uid
+        && request.resource.data.keys().hasOnly(taskCreateAllowedKeys())
+        && taskFieldsValid();
+
+      // Lifecycle writes (accept, status changes, OTP material) land in
+      // M5+ via Cloud Functions. Clients have no direct update path yet.
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // ----- users/{userId} -----
     match /users/{userId} {
       allow read: if isOwner(userId);

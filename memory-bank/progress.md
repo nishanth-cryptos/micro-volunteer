@@ -1,7 +1,7 @@
 # Progress
 
 ## Current milestone
-**M2 — Profile & availability** (smoke test pending). M0 + M1 ✅ committed (`a8d1ae7`, `87cc85e` → rebased to `b8d62e9`, `637c602` on top of GitHub Initial; local-only until push). M2.1–M2.4 ✅ code; M2.5 smoke test in flight.
+**M3 — Task posting & risk** (smoke test pending). M0–M2 ✅ committed (`b8d62e9` → `637c602` → `9fb4414`; local-only until push). M3.1–M3.4 ✅ code; M3.5 smoke test in flight.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)
