@@ -140,8 +140,13 @@ service cloud.firestore {
     }
 
     match /tasks/{taskId} {
-      allow read: if isSignedIn()
-        && request.auth.uid == resource.data.customerId;
+      // Read access:
+      //   - the task's customer always
+      //   - the accepted volunteer (after they accept)
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.customerId
+        || request.auth.uid == resource.data.acceptedVolunteerId
+      );
 
       allow create: if isSignedIn()
         && request.resource.data.customerId == request.auth.uid

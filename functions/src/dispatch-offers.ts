@@ -70,6 +70,11 @@ export const dispatchOffers = onDocumentCreated(
         taskTitle: task.title,
         taskCategory: task.category,
         taskRiskLevel: task.riskLevel,
+        // Denormalised volunteer profile so the customer's task detail
+        // can render names + avatars without reading users/{uid}
+        // (which is owner-scoped by rules).
+        displayName: v.displayName,
+        photoURL: v.photoURL,
         state: 'offered',
         score: v.score,
         scoreBreakdown: v.scoreBreakdown,

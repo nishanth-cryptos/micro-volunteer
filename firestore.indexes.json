@@ -16,6 +16,14 @@
         { "fieldPath": "state", "order": "ASCENDING" },
         { "fieldPath": "offeredAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "acceptedVolunteerId", "order": "ASCENDING" },
+        { "fieldPath": "acceptedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

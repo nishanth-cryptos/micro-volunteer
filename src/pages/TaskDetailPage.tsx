@@ -55,6 +55,8 @@ type OfferState = 'offered' | 'accepted' | 'rejected' | 'superseded' | 'expired'
 interface OfferDoc {
   id: string;
   volunteerId: string;
+  displayName?: string;        // denormalised by dispatchOffers
+  photoURL?: string | null;    // denormalised by dispatchOffers
   state: OfferState;
   score: number;
   scoreBreakdown: {
@@ -67,8 +69,6 @@ interface OfferDoc {
   };
   distanceM: number;
   offeredAt: Timestamp | null;
-  // displayName/photoURL aren't denormalised on the offer doc today;
-  // we'd add them in a follow-up if the UI needs them on accepted view.
 }
 
 export default function TaskDetailPage() {
@@ -140,7 +140,14 @@ export default function TaskDetailPage() {
           </p>
         )}
         {task && <TaskSummary task={task} />}
-        {task && <OffersSection task={task} offers={offers} />}
+        {task && state.status === 'ready' && (
+          <OffersSection
+            task={task}
+            offers={offers}
+            viewerUid={state.user.uid}
+            viewerName={state.userDoc.displayName ?? null}
+          />
+        )}
       </div>
     </main>
   );
@@ -207,24 +214,43 @@ function TaskSummary({ task }: { task: TaskDoc }) {
 function OffersSection({
   task,
   offers,
+  viewerUid,
+  viewerName,
 }: {
   task: TaskDoc;
   offers: OfferDoc[];
+  viewerUid: string;
+  viewerName: string | null;
 }) {
+  const viewerIsCustomer = viewerUid === task.customerId;
+  const viewerIsAcceptedVolunteer = viewerUid === task.acceptedVolunteerId;
+
   if (task.status === 'accepted') {
     const accepted = offers.find((o) => o.state === 'accepted');
+    const acceptedName =
+      accepted?.displayName
+      || (viewerIsAcceptedVolunteer ? viewerName : null)
+      || 'Volunteer';
+    const headline = viewerIsAcceptedVolunteer
+      ? 'You accepted this task'
+      : 'Task accepted';
     return (
       <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-        <p className="text-sm font-medium text-emerald-700">Task accepted</p>
+        <p className="text-sm font-medium text-emerald-700">{headline}</p>
         {accepted ? (
-          <div className="mt-4">
-            <p className="text-base font-medium text-neutral-900">
-              Volunteer ID: <span className="font-mono text-sm">{accepted.volunteerId}</span>
-            </p>
-            <p className="mt-1 text-sm text-neutral-600">
-              {formatDistance(accepted.distanceM)} away · score{' '}
-              {accepted.score.toFixed(2)}
-            </p>
+          <div className="mt-4 flex items-center gap-4">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-200 text-base font-medium text-emerald-800">
+              {acceptedName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-base font-medium text-neutral-900">
+                {acceptedName}
+              </p>
+              <p className="mt-1 text-sm text-neutral-600">
+                {formatDistance(accepted.distanceM)} away · score{' '}
+                {accepted.score.toFixed(2)}
+              </p>
+            </div>
           </div>
         ) : (
           <p className="mt-2 text-sm text-neutral-600">
@@ -267,6 +293,13 @@ function OffersSection({
   }
 
   // status === 'searching'
+  // Volunteers shouldn't see the customer's pending-offers queue — only
+  // the customer (task owner) sees that. For volunteers, this section is
+  // empty during searching state (they reach this page via OfferInbox or
+  // AcceptedTasksList only after they've accepted).
+  if (!viewerIsCustomer) {
+    return null;
+  }
   const pending = offers.filter((o) => o.state === 'offered');
   return (
     <section className="mt-12">
@@ -280,18 +313,20 @@ function OffersSection({
       </p>
       {pending.length > 0 && (
         <ul className="mt-6 space-y-3">
-          {pending.map((o) => (
+          {pending.map((o) => {
+            const name = o.displayName || 'Volunteer';
+            return (
             <li
               key={o.id}
               className="rounded-2xl border border-neutral-200 bg-white p-5"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-200 text-base font-medium text-neutral-700">
-                  ?
+                  {name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-sm text-neutral-700">
-                    {o.volunteerId.slice(0, 8)}…
+                  <p className="font-medium text-neutral-900">
+                    {name}
                   </p>
                   <p className="mt-0.5 text-sm text-neutral-600">
                     {formatDistance(o.distanceM)} away · score{' '}
@@ -309,7 +344,8 @@ function OffersSection({
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </section>

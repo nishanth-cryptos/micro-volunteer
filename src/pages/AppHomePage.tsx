@@ -12,6 +12,7 @@ import { useAuthState } from '../lib/auth-context';
 import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
 import { MyTasksList } from '../components/MyTasksList';
 import { OfferInbox } from '../components/OfferInbox';
+import { AcceptedTasksList } from '../components/AcceptedTasksList';
 
 const H3_RESOLUTION = 9;
 
@@ -115,6 +116,7 @@ export default function AppHomePage() {
         )}
 
         {isVolunteer && <OfferInbox uid={user.uid} />}
+        {isVolunteer && <AcceptedTasksList uid={user.uid} />}
 
         {isVolunteer && (
           <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
