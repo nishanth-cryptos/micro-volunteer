@@ -1,12 +1,50 @@
 rules_version = '2';
 
-// DENY-BY-DEFAULT for Storage. Profile photos, ID images, and any other
-// uploads must be authorized EXPLICITLY in a later milestone, owner-scoped,
-// with size/MIME validation. ID images are sensitive PII — public URLs are
-// forbidden; access goes through signed URLs or short-lived tokens.
+// Profile photo + optional ID image. Everything else deny-by-default.
+// All sensitive flows (trust, OTPs, points) live in Firestore + Cloud
+// Functions; Storage rules only need to scope owner reads/writes of media.
 
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // ----- Helpers -----
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isAllowedImage() {
+      // 2 MB max; JPEG / PNG / WebP only.
+      return request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    // ----- Profile photo -----
+    // Stored at /users/{userId}/photo.
+    // Required field; readable by any signed-in user so the app can render
+    // identity on match cards, accepted-task views, chat headers, etc.
+    // Writes only by the owner; size + MIME enforced here in addition to
+    // client-side checks.
+    match /users/{userId}/photo {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isAllowedImage();
+      allow delete: if isOwner(userId);
+    }
+
+    // ----- ID image (sensitive PII) -----
+    // Stored at /users/{userId}/id-image.
+    // Optional. NEVER readable by clients. Cloud Functions read via the
+    // Admin SDK (bypasses these rules) when an admin needs to verify ID,
+    // or when a Function checks idVerified status before allowing a
+    // Medium-risk task offer. Writes only by the owner.
+    match /users/{userId}/id-image {
+      allow read: if false;
+      allow write: if isOwner(userId) && isAllowedImage();
+      allow delete: if isOwner(userId);
+    }
+
+    // ----- Everything else -----
     match /{allPaths=**} {
       allow read, write: if false;
     }

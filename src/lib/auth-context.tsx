@@ -30,12 +30,15 @@ export type Role = 'volunteer' | 'customer' | 'admin';
 
 export interface UserDoc {
   displayName?: string;
-  photoURL?: string;
+  photoURL?: string;             // Storage path, NOT a public URL
   bio?: string;
   phoneNumber?: string;
   email?: string;
   roles?: Role[];
   skills?: string[];
+  idImagePath?: string;          // Storage path; never client-readable
+  availableNow?: boolean;
+  availabilityUpdatedAt?: Timestamp;
   consent?: { tcVersion: string; acceptedAt: Timestamp };
   createdAt?: Timestamp;
 }
@@ -57,7 +60,11 @@ function classify(user: FirebaseUser, userDoc: UserDoc | null): AuthState {
   if (!userDoc) return { status: 'no-doc', user };
   const hasConsent = Boolean(userDoc.consent?.acceptedAt);
   const hasRole = (userDoc.roles?.length ?? 0) > 0;
-  if (hasConsent && hasRole) return { status: 'ready', user, userDoc };
+  const hasProfile =
+    Boolean(userDoc.displayName) && Boolean(userDoc.photoURL);
+  if (hasConsent && hasRole && hasProfile) {
+    return { status: 'ready', user, userDoc };
+  }
   return { status: 'incomplete', user, userDoc };
 }
 

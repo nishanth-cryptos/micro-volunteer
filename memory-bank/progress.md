@@ -1,7 +1,7 @@
 # Progress
 
 ## Current milestone
-**M1 — Auth & roles** (finishing). M0 ✅ DONE 2026-06-07; M1.1–M1.5 ✅; M1.6 smoke test in flight.
+**M2 — Profile & availability** (smoke test pending). M0 + M1 ✅ committed (`a8d1ae7`, `87cc85e` → rebased to `b8d62e9`, `637c602` on top of GitHub Initial; local-only until push). M2.1–M2.4 ✅ code; M2.5 smoke test in flight.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)

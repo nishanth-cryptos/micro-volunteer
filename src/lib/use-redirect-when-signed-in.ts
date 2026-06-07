@@ -18,9 +18,13 @@ export function useRedirectWhenSignedIn() {
     if (state.status === 'no-doc') {
       path = '/onboarding/consent';
     } else if (state.status === 'incomplete') {
-      path = state.userDoc.consent?.acceptedAt
-        ? '/onboarding/role'
-        : '/onboarding/consent';
+      if (!state.userDoc.consent?.acceptedAt) {
+        path = '/onboarding/consent';
+      } else if (!state.userDoc.roles?.length) {
+        path = '/onboarding/role';
+      } else {
+        path = '/onboarding/profile';
+      }
     }
     void navigate(path, { replace: true });
   }, [state, navigate]);

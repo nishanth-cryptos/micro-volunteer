@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import ConsentPage from './pages/onboarding/ConsentPage';
 import RolePage from './pages/onboarding/RolePage';
+import ProfilePage from './pages/onboarding/ProfilePage';
 import AppHomePage from './pages/AppHomePage';
 import { ProtectedRoute } from './lib/protected-route';
 
@@ -27,6 +28,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute requires="role">
         <RolePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/onboarding/profile',
+    element: (
+      <ProtectedRoute requires="profile">
+        <ProfilePage />
       </ProtectedRoute>
     ),
   },

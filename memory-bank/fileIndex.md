@@ -37,7 +37,8 @@
 - `src/pages/SignupPage.tsx` — sign-up page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
 - `src/pages/onboarding/ConsentPage.tsx` — T&C capture; on accept writes `users/{uid}` with `consent` + base fields (`setDoc`).
 - `src/pages/onboarding/RolePage.tsx` — role picker; on continue updates `users/{uid}.roles` (`updateDoc`).
-- `src/pages/AppHomePage.tsx` — authenticated home with sign-out button. Real dashboards in M3/M5.
+- `src/pages/onboarding/ProfilePage.tsx` — name + photo (required) + bio + optional ID image. Uploads to Storage at `users/{uid}/photo` and `users/{uid}/id-image`, then updates user doc with displayName, photoURL (Storage path), bio, idImagePath.
+- `src/pages/AppHomePage.tsx` — authenticated home. Availability ON/OFF switch for volunteers (writes `availableNow` + `availabilityUpdatedAt`). Sign-out button. Real dashboards in M3/M5.
 
 ## Scripts / seed
 - `scripts/seed/catalog.json` — starter seed for `catalog/categories` and `catalog/skills`. Reviewed pre-launch; loaded into Firestore by an admin-only callable in M1. Replaced by the M8 admin UI for live edits.

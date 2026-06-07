@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthState, type AuthState } from './auth-context';
 
-export type RequiredStep = 'consent' | 'role' | 'ready';
+export type RequiredStep = 'consent' | 'role' | 'profile' | 'ready';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -26,8 +26,11 @@ function currentStep(state: AuthState): CurrentStep {
       return 'signed-out';
     case 'no-doc':
       return 'consent';
-    case 'incomplete':
-      return state.userDoc.consent?.acceptedAt ? 'role' : 'consent';
+    case 'incomplete': {
+      if (!state.userDoc.consent?.acceptedAt) return 'consent';
+      if (!state.userDoc.roles?.length) return 'role';
+      return 'profile';
+    }
     case 'ready':
       return 'ready';
   }
@@ -36,6 +39,7 @@ function currentStep(state: AuthState): CurrentStep {
 function pathForStep(step: RequiredStep): string {
   if (step === 'consent') return '/onboarding/consent';
   if (step === 'role') return '/onboarding/role';
+  if (step === 'profile') return '/onboarding/profile';
   return '/app';
 }
 
