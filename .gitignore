@@ -15,6 +15,10 @@ ui-debug.log
 functions/lib/
 functions/node_modules/
 
+# Emulator state snapshot (persists Auth users + Firestore docs between
+# restarts via `npm run emulators`). Local-only; never commit.
+emulator-data/
+
 # Editors / OS
 .DS_Store
 .vscode/

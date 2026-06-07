@@ -148,10 +148,30 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(taskCreateAllowedKeys())
         && taskFieldsValid();
 
-      // Lifecycle writes (accept, status changes, OTP material) land in
-      // M5+ via Cloud Functions. Clients have no direct update path yet.
+      // Lifecycle writes (accept, status changes, OTP material) live in
+      // Cloud Functions (Admin SDK bypasses these rules). Clients have
+      // no direct update path.
       allow update: if false;
       allow delete: if false;
+
+      // Customer reading the offers subcollection of THEIR task.
+      // Subcollection match (also covered by the wildcard rule below).
+      match /offers/{volunteerId} {
+        allow read: if isSignedIn()
+          && request.auth.uid
+             == get(/databases/$(database)/documents/tasks/$(taskId)).data.customerId;
+        allow write: if false;
+      }
+    }
+
+    // Volunteer reading their own offers via collection-group query.
+    // The recursive {path=**} segment is REQUIRED for collection-group
+    // queries to match the rule — nested matches only cover subcollection
+    // access, not `collectionGroup('offers')`.
+    match /{path=**}/offers/{volunteerId} {
+      allow read: if isSignedIn()
+        && resource.data.volunteerId == request.auth.uid;
+      allow write: if false;
     }
 
     // ----- users/{userId} -----

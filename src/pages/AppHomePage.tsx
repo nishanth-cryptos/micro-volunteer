@@ -11,6 +11,7 @@ import { auth, db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
 import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
 import { MyTasksList } from '../components/MyTasksList';
+import { OfferInbox } from '../components/OfferInbox';
 
 const H3_RESOLUTION = 9;
 
@@ -112,6 +113,8 @@ export default function AppHomePage() {
             <MyTasksList uid={user.uid} />
           </>
         )}
+
+        {isVolunteer && <OfferInbox uid={user.uid} />}
 
         {isVolunteer && (
           <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">

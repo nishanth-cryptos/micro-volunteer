@@ -1,18 +1,32 @@
-// Customer view of a posted task + ranked list of nearby volunteers.
-// Fetches the task document (rules: customer-only read), then calls the
-// rankNearbyVolunteers callable. Live status updates land in M5.
+// Customer view of one task plus its offers + lifecycle state.
+// Subscribes live to:
+//   - tasks/{id}          (status, acceptedVolunteerId)
+//   - tasks/{id}/offers   (dispatchOffers writes these on task create)
+// When task.status === 'searching' the page shows the offered volunteers
+// queue. When 'accepted' it shows only the accepted volunteer prominently.
+// Chat (M7), Start/End OTP (M6) hook in here in later milestones.
 
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
+  collection,
   doc,
-  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
   type Timestamp,
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
 import { getCategory, getSkillLabel } from '../lib/catalog';
+
+type TaskStatus =
+  | 'searching'
+  | 'accepted'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'expired';
 
 interface TaskDoc {
   customerId: string;
@@ -28,16 +42,20 @@ interface TaskDoc {
   location: { lat: number; lng: number; h3Cell: string };
   riskLevel: 'low' | 'medium';
   estimatedMinutes: number;
-  status: string;
+  status: TaskStatus;
   searchRadiusM: number;
   createdAt: Timestamp;
   expiresAt: Timestamp;
+  acceptedVolunteerId?: string;
+  acceptedAt?: Timestamp;
 }
 
-interface RankedVolunteer {
-  uid: string;
-  displayName: string;
-  photoURL: string | null;
+type OfferState = 'offered' | 'accepted' | 'rejected' | 'superseded' | 'expired';
+
+interface OfferDoc {
+  id: string;
+  volunteerId: string;
+  state: OfferState;
   score: number;
   scoreBreakdown: {
     distance: number;
@@ -48,55 +66,61 @@ interface RankedVolunteer {
     reportPenalty: number;
   };
   distanceM: number;
-}
-
-interface RankResponse {
-  taskId: string;
-  totalCandidates: number;
-  volunteers: RankedVolunteer[];
+  offeredAt: Timestamp | null;
+  // displayName/photoURL aren't denormalised on the offer doc today;
+  // we'd add them in a follow-up if the UI needs them on accepted view.
 }
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const state = useAuthState();
   const [task, setTask] = useState<TaskDoc | null>(null);
-  const [ranking, setRanking] = useState<RankResponse | null>(null);
+  const [offers, setOffers] = useState<OfferDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!taskId || state.status !== 'ready') return;
-    let cancelled = false;
-    async function load() {
-      try {
-        const taskSnap = await getDoc(doc(db(), 'tasks', taskId!));
-        if (cancelled) return;
-        if (!taskSnap.exists()) {
+    const taskRef = doc(db(), 'tasks', taskId);
+    const taskUnsub = onSnapshot(
+      taskRef,
+      (snap) => {
+        if (!snap.exists()) {
           setError('Task not found.');
           setLoading(false);
           return;
         }
-        setTask(taskSnap.data() as TaskDoc);
-        const rankFn = httpsCallable<{ taskId: string }, RankResponse>(
-          functions(),
-          'rankNearbyVolunteers',
+        setTask(snap.data() as TaskDoc);
+        setLoading(false);
+      },
+      (err) => {
+        setError(err.message);
+        setLoading(false);
+      },
+    );
+
+    const offersQ = query(
+      collection(db(), 'tasks', taskId, 'offers'),
+      orderBy('score', 'desc'),
+    );
+    const offersUnsub = onSnapshot(
+      offersQ,
+      (snap) => {
+        setOffers(
+          snap.docs.map((d) => {
+            const data = d.data() as Omit<OfferDoc, 'id'>;
+            return { id: d.id, ...data };
+          }),
         );
-        const result = await rankFn({ taskId: taskId! });
-        if (cancelled) return;
-        setRanking(result.data);
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : 'Could not load this task.',
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void load();
+      },
+      () => {
+        // Older tasks may have no offers subcollection — that's fine.
+      },
+    );
+
     return () => {
-      cancelled = true;
+      taskUnsub();
+      offersUnsub();
     };
   }, [taskId, state.status]);
 
@@ -116,7 +140,7 @@ export default function TaskDetailPage() {
           </p>
         )}
         {task && <TaskSummary task={task} />}
-        {ranking && <RankingList ranking={ranking} />}
+        {task && <OffersSection task={task} offers={offers} />}
       </div>
     </main>
   );
@@ -180,48 +204,107 @@ function TaskSummary({ task }: { task: TaskDoc }) {
   );
 }
 
-function RankingList({ ranking }: { ranking: RankResponse }) {
+function OffersSection({
+  task,
+  offers,
+}: {
+  task: TaskDoc;
+  offers: OfferDoc[];
+}) {
+  if (task.status === 'accepted') {
+    const accepted = offers.find((o) => o.state === 'accepted');
+    return (
+      <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+        <p className="text-sm font-medium text-emerald-700">Task accepted</p>
+        {accepted ? (
+          <div className="mt-4">
+            <p className="text-base font-medium text-neutral-900">
+              Volunteer ID: <span className="font-mono text-sm">{accepted.volunteerId}</span>
+            </p>
+            <p className="mt-1 text-sm text-neutral-600">
+              {formatDistance(accepted.distanceM)} away · score{' '}
+              {accepted.score.toFixed(2)}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-neutral-600">
+            Volunteer details will sync shortly.
+          </p>
+        )}
+        <p className="mt-4 text-xs text-neutral-500">
+          Chat with the volunteer opens here in M7. Start / End OTP flow lands
+          in M6.
+        </p>
+      </section>
+    );
+  }
+
+  if (task.status === 'completed') {
+    return (
+      <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
+        <p className="text-sm font-medium text-neutral-900">Completed</p>
+        <p className="mt-2 text-sm text-neutral-600">
+          Rating + receipt land in M6.
+        </p>
+      </section>
+    );
+  }
+
+  if (
+    task.status === 'cancelled' ||
+    task.status === 'expired'
+  ) {
+    return (
+      <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
+        <p className="text-sm font-medium text-neutral-900">
+          {task.status === 'cancelled' ? 'Cancelled' : 'Expired'}
+        </p>
+        <p className="mt-2 text-sm text-neutral-600">
+          Post a new task if you still need help.
+        </p>
+      </section>
+    );
+  }
+
+  // status === 'searching'
+  const pending = offers.filter((o) => o.state === 'offered');
   return (
     <section className="mt-12">
       <h2 className="text-lg font-semibold text-neutral-900">
-        Nearby volunteers
+        Pending offers
       </h2>
       <p className="mt-1 text-sm text-neutral-600">
-        {ranking.totalCandidates === 0
-          ? 'No matching volunteers right now. M5 adds push offers when one becomes available.'
-          : `Showing ${String(ranking.volunteers.length)} of ${String(ranking.totalCandidates)} eligible volunteers.`}
+        {pending.length === 0
+          ? 'Nobody nearby has been offered yet. Volunteers will be matched as they come online.'
+          : `${String(pending.length)} ${pending.length === 1 ? 'volunteer has' : 'volunteers have'} been offered. The first to accept gets the task.`}
       </p>
-      {ranking.volunteers.length > 0 && (
+      {pending.length > 0 && (
         <ul className="mt-6 space-y-3">
-          {ranking.volunteers.map((v) => (
+          {pending.map((o) => (
             <li
-              key={v.uid}
+              key={o.id}
               className="rounded-2xl border border-neutral-200 bg-white p-5"
             >
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-200 text-base font-medium text-neutral-700">
-                  {(v.displayName || '?').charAt(0).toUpperCase()}
+                  ?
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-neutral-900">
-                    {v.displayName || 'Unnamed volunteer'}
+                  <p className="font-mono text-sm text-neutral-700">
+                    {o.volunteerId.slice(0, 8)}…
                   </p>
                   <p className="mt-0.5 text-sm text-neutral-600">
-                    {formatDistance(v.distanceM)} away · score {v.score.toFixed(2)}
+                    {formatDistance(o.distanceM)} away · score{' '}
+                    {o.score.toFixed(2)}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <ScoreChip label="Dist" value={v.scoreBreakdown.distance} />
-                    <ScoreChip label="Skill" value={v.scoreBreakdown.skill} />
-                    <ScoreChip label="Trust" value={v.scoreBreakdown.trust} />
+                    <ScoreChip label="Dist" value={o.scoreBreakdown.distance} />
+                    <ScoreChip label="Skill" value={o.scoreBreakdown.skill} />
+                    <ScoreChip label="Trust" value={o.scoreBreakdown.trust} />
                     <ScoreChip
                       label="Past"
-                      value={v.scoreBreakdown.pastCompletion}
+                      value={o.scoreBreakdown.pastCompletion}
                     />
-                    {v.scoreBreakdown.reportPenalty > 0 && (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-800">
-                        − Reports {v.scoreBreakdown.reportPenalty.toFixed(2)}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>

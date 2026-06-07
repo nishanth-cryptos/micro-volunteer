@@ -1,11 +1,16 @@
 # Progress
 
 ## Current milestone
-**Onboarding polish slice** (between M4 and M5). M0–M4 ✅ committed (`b8d62e9` → `637c602` → `9fb4414` → `8e1c794` → `a15c585`; local-only until push). Mid-M4 polish:
-- New 25-item flat skills catalog (scripts/seed/catalog.json bumped to seedVersion 2).
-- 3-step numbered stepper added to /signup, /onboarding/role, /onboarding/profile.
-- ProfilePage: volunteer users now pick skills (multi-select chips, max 10, required); customer-only users still get the "About you" bio textarea.
-- Existing test volunteers (Allen) still have stale skill keys ("smartphone-literacy") from the old catalog — will need re-onboarding or manual skill update in the Firestore emulator to keep matching showing them.
+**M5 — Notifications & lifecycle (smoke test pending).** M0–M4 + onboarding polish ✅ on `origin/main` through commit `631603f`. M5.1–M5.5 ✅ code; M5.6 smoke test in flight.
+
+M5 in-app (real FCM web push deferred to a follow-up slice):
+- `dispatchOffers` Firestore onCreate trigger fans out top-10 offers per task.
+- `acceptOffer` callable runs a race-safe transaction; sibling offers become 'superseded' outside the txn.
+- `rejectOffer` callable flips one offer state.
+- Volunteer `/app` shows `OfferInbox` (collection group query). Accept/Reject buttons call the callables.
+- Customer `/tasks/{id}` is now live-subscribed (onSnapshot) to the task and its offers subcollection. Different UI for searching / accepted / cancelled / expired states.
+- Firestore: tasks/{id}/offers rules opened (read by volunteerId or task customer; writes server-only). Composite index added: `(offers) volunteerId ASC, state ASC, offeredAt DESC` (collection-group scope).
+- Radius expansion scheduler: not implemented (emulator can't auto-fire schedulers); deferred to a follow-up slice.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)

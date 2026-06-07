@@ -74,7 +74,8 @@ npm --prefix functions run serve   # emulators
 
 ### Firebase emulators (all services)
 ```bash
-firebase emulators:start
+npm run emulators          # persistent — imports + exports ./emulator-data
+firebase emulators:start   # one-shot — wipes Auth/Firestore on Ctrl+C
 # Auth :9099 · Firestore :8080 · Functions :5001 · Storage :9199 · Hosting :5002 · UI :4000
 ```
 

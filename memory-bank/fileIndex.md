@@ -35,6 +35,7 @@
 - `src/components/TaskLocationPicker.tsx` — Leaflet + OSM map with a draggable marker. Geolocation on mount (5 s timeout) → fallback to Mumbai. Computes H3 cell at resolution 9 (h3-js) and surfaces lat/lng/h3Cell to the parent.
 - `src/components/OnboardingProgress.tsx` — three-step numbered stepper used on `/signup`, `/onboarding/role`, and `/onboarding/profile`. Consent gate is unnumbered.
 - `src/components/MyTasksList.tsx` — live customer-side list of own tasks via `onSnapshot(customerId == uid, orderBy createdAt desc)`. Rows show status badge, risk colour, and link to task detail.
+- `src/components/OfferInbox.tsx` — volunteer-side inbox shown on `/app`. Collection-group query on `offers` where `volunteerId == uid AND state == 'offered'`. Each row renders denormalised task info and `Accept` / `Reject` buttons calling the corresponding Cloud Functions.
 - `src/lib/catalog.ts` — typed re-export of `scripts/seed/catalog.json`. Exposes `CATEGORIES`, `SKILLS`, `getCategory()`, `getSkillLabel()`, and `deriveRisk(categoryKey)`.
 - `src/pages/CreateTaskPage.tsx` — customer creates a task. Structured chips for category + skills, numeric duration, four short textareas, map pin. Risk auto-derived from category. `addDoc` to `tasks/{auto-id}` with status='searching' and 24h expiry; navigates to `/tasks/{id}` on success.
 - `src/pages/TaskDetailPage.tsx` — customer view of a task + ranked volunteers list via `httpsCallable('rankNearbyVolunteers')`. Shows task summary, skill chips, and per-candidate score breakdown chips (Dist / Skill / Trust / Past, plus a Reports penalty chip when present).
@@ -54,7 +55,11 @@
 - `functions/package.json` — `firebase-functions@7.2.5`, `firebase-admin@13.10.0`, Node 22 runtime.
 - `functions/tsconfig.json` — TS strict; `module: node16`, `moduleResolution: node16`, `rootDir: src`, `outDir: lib`.
 - `functions/src/index.ts` — re-exports every concrete Cloud Function from its own file so the emulator + deploy pipeline can find them.
-- `functions/src/rank-nearby-volunteers.ts` — HTTPS callable (region asia-south1) that scores nearby available volunteers for a given task using the locked formula. Customer-only; reads task, filters eligible volunteers, scores, returns top 20.
+- `functions/src/scoring.ts` — shared matching/scoring code: `TaskDoc`, `UserDoc`, `isEligible`, `score`, `haversineM`, `rankForTask`. Both `rankNearbyVolunteers` (callable preview) and `dispatchOffers` (trigger) call into this.
+- `functions/src/rank-nearby-volunteers.ts` — HTTPS callable (region asia-south1) wrapping `rankForTask`. Customer-only preview.
+- `functions/src/dispatch-offers.ts` — Firestore onCreate trigger on `tasks/{taskId}`. Scores eligible volunteers and writes per-volunteer offer documents at `tasks/{taskId}/offers/{volunteerId}` with denormalised `taskTitle` / `taskCategory` / `taskRiskLevel` / `customerId` so the volunteer inbox renders without a parent-task fetch. Idempotent (skips if subcollection already has docs). Top batch capped at 10.
+- `functions/src/accept-offer.ts` — HTTPS callable. Race-safe Firestore transaction flips `tasks/{id}.status` from 'searching' to 'accepted' and the corresponding offer to 'accepted'. Outside the transaction, marks sibling 'offered' offers as 'superseded'.
+- `functions/src/reject-offer.ts` — HTTPS callable. Marks one offer 'rejected'.
 
 ## Documentation
 - `CHECKPOINT.md` — thin pointer to `memory-bank/`.
