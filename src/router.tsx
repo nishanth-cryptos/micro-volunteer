@@ -12,6 +12,7 @@ import AppHomePage from './pages/AppHomePage';
 import CreateTaskPage from './pages/CreateTaskPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 import { ProtectedRoute } from './lib/protected-route';
+import AdminDashboard from './pages/AdminDashboard';
 
 export const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
@@ -62,6 +63,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute requires="ready">
         <TaskDetailPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute requires="ready" requiresAdmin={true}>
+        <AdminDashboard />
       </ProtectedRoute>
     ),
   },

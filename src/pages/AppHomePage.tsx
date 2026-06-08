@@ -2,25 +2,42 @@
 // M2 adds: prominent availability ON/OFF toggle for volunteers.
 // Real dashboard (post tasks, offer inbox) lands in M3 + M5.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { latLngToCell } from 'h3-js';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
 import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
 import { MyTasksList } from '../components/MyTasksList';
 import { OfferInbox } from '../components/OfferInbox';
 import { AcceptedTasksList } from '../components/AcceptedTasksList';
+import { getSkillLabel } from '../lib/catalog';
+import { KarmaBadge } from '../components/KarmaBadge';
+import { KarmaToast } from '../components/KarmaToast';
 
 const H3_RESOLUTION = 9;
 
 export default function AppHomePage() {
   const state = useAuthState();
   const navigate = useNavigate();
+  const location = useLocation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const navState = location.state as { toastMessage?: string } | null;
+    if (navState?.toastMessage) {
+      const msg = navState.toastMessage;
+      setTimeout(() => {
+        setToastMessage(msg);
+        // Clean up navigation state to prevent double fires on refresh
+        window.history.replaceState({}, document.title);
+      }, 0);
+    }
+  }, [location]);
 
   if (state.status !== 'ready') return null;
   const { user, userDoc } = state;
@@ -88,12 +105,125 @@ export default function AppHomePage() {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Welcome, {name}.
-        </h1>
-        <p className="mt-3 text-neutral-600">
-          Your dashboard lands in M5 (volunteer offers).
-        </p>
+        {userDoc.accountStatus === 'warned' && (
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm flex gap-3 animate-pulse-subtle">
+            <svg
+              className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <div>
+              <p className="font-semibold text-sm">Account Warning Issued</p>
+              <p className="mt-1 text-xs text-amber-800">
+                An administrator has issued a warning to your account. Continued violations will result in temporary suspension or deactivation.
+              </p>
+              {userDoc.moderationReason && (
+                <p className="mt-2 text-xs font-medium bg-white/50 inline-block px-2.5 py-1 rounded-md text-amber-950">
+                  Reason: {userDoc.moderationReason}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Welcome, {name}.
+            </h1>
+            <p className="mt-3 text-neutral-600">
+              Your dashboard lands in M5 (volunteer offers).
+            </p>
+          </div>
+          {isVolunteer && (
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Karma Points</span>
+              <KarmaBadge points={userDoc.points ?? 0} />
+            </div>
+          )}
+        </div>
+
+        {userDoc.isAdmin === true && (
+          <div className="mt-4">
+            <Link
+              to="/admin"
+              className="inline-block rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+            >
+              Go to Admin Dashboard
+            </Link>
+          </div>
+        )}
+
+        {isVolunteer && (
+          <section className="mt-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-neutral-900">Volunteer Stats</h2>
+            
+            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Trust Score</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xl font-bold text-neutral-900">
+                    Score: {userDoc.trustScore ?? 30}/100
+                  </span>
+                  {(() => {
+                    const score = userDoc.trustScore ?? 30;
+                    if (score >= 85) {
+                      return (
+                        <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                          Trusted
+                        </span>
+                      );
+                    } else if (score >= 60) {
+                      return (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                          Reliable
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-800">
+                          Newcomer
+                        </span>
+                      );
+                    }
+                  })()}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Completions</p>
+                <p className="mt-2 text-xl font-bold text-neutral-900">
+                  {userDoc.verifiedTaskCount ?? 0} tasks ({userDoc.verifiedHours?.toFixed(1) ?? '0.0'} hours)
+                </p>
+              </div>
+            </div>
+
+            {Object.keys(userDoc.skillPoints ?? {}).length > 0 && (
+              <div className="mt-6 border-t border-neutral-100 pt-6">
+                <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-3">Skill Points</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(userDoc.skillPoints ?? {}).map(([key, val]) => (
+                    <span
+                      key={key}
+                      className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700"
+                    >
+                      {getSkillLabel(key)}: {val}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         {isCustomer && (
           <>
@@ -177,6 +307,13 @@ export default function AppHomePage() {
         >
           Sign out
         </button>
+
+        {toastMessage && (
+          <KarmaToast
+            message={toastMessage}
+            onClose={() => setToastMessage(null)}
+          />
+        )}
       </div>
     </main>
   );

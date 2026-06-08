@@ -259,6 +259,32 @@ expiresAt?: Timestamp
 
 **Logging rules:** never log phone, email, OTPs, auth tokens, or precise coordinates.
 
+## Trust Score Thresholds & Badges
+- **Trusted**: `trustScore >= 85` (Emerald status chip/badge)
+- **Reliable**: `60 <= trustScore < 85` (Amber status chip/badge)
+- **Newcomer**: `trustScore < 60` (Neutral status chip/badge; defaults to 30 for new users)
+
+## Trust Score Recompute Formula
+The trust score is calculated server-side inside Cloud Functions as follows:
+```
+trustScore = Math.max(30, Math.min(100, Math.round(clampedScore * 100)))
+```
+where `clampedScore` is between `[0.3, 1.0]`, derived from `rawScore`:
+```
+rawScore = (verifiedTaskCount * 0.35) + 
+           (scaledAvgRating * 0.30) + 
+           (verifiedHours * 0.15) + 
+           (idVerified ? 0.10 : 0) - 
+           (pendingReports * 0.15 + warningsCount * 0.25)
+```
+- `scaledAvgRating`: The average of ratings from completed tasks (`1` to `5`), scaled to `[0.0, 1.0]` (i.e. divided by `5.0`). Defaults to `1.0` if no tasks have been rated.
+
+## Points & Skill Points Awarding
+On task completion, volunteers and customers receive:
+- **Volunteer Points**: `10` base points + duration bonus (`+1` point per 15 minutes of estimated task duration, capped at `8` bonus points. Maximum `18` points total).
+- **Volunteer Skill Points**: `+1` skill point for each required skill from the task, stored in `userDoc.skillPoints[skillKey]`.
+- **Customer Points**: `2` points awarded on successful completion/verification of their task.
+
 ## Matching score formula
 ```
 score(volunteer, task) =

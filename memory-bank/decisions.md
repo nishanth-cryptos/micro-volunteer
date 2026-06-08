@@ -63,3 +63,10 @@
 ## 2026-06-07 — Functions tsconfig: module=node16, moduleResolution=node16
 - **Why:** TS 6 deprecates the implicit `node` / `node10` setting. Functions package.json has no `"type": "module"`, so `node16` resolution emits CommonJS for Cloud Functions Node 22 runtime.
 - **Rejected:** `nodenext` (more churn over time); `commonjs` resolution (deprecated path).
+
+## 2026-06-08 — Trust score DB scaling, suspension check, and exactOptionalPropertyTypes
+- **Decisions:**
+  1. **Trust Score database representation**: Stored as an integer from `30` to `100` (`Math.round(clampedScore * 100)`), corresponding to underlying [0.3, 1.0] float logic. New users default to a floor of `30`.
+  2. **Suspension/Moderation Active Checks**: Account active status is enforced globally via `checkActiveStatus` helper across all user-facing callable functions, preventing suspended/banned actions.
+  3. **TypeScript `exactOptionalPropertyTypes` compatibility**: Forms and callable parameters build dynamically, omitting optional fields rather than passing them as `undefined`, complying with the strict project TS rules.
+

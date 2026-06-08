@@ -69,3 +69,22 @@
 - **Root cause:** `tsconfig.json` only includes `src`. Type-aware lint can't service files outside the project.
 - **Fix:** split eslint.config.js into two blocks — type-aware lint only for `src/**`, plain lint (no type info) for root `.ts/.js` files.
 - **Avoid next time:** scope `projectService` strictly to the files that are actually in the TS project's include glob.
+
+## 2026-06-08 — Cloud Function awardPointsOnCompletion transaction order violation
+- **What broke:** The Firestore trigger transaction in `awardPointsOnCompletion` failed with `Error: Firestore transactions require all reads to be executed before all writes`.
+- **Root cause:** Inside the transaction block, the code updated the volunteer document (a write) and then attempted to fetch the customer document (a read).
+- **Fix:** Moved the customer document read statement to the top of the transaction block, before the first write.
+- **Avoid next time:** Always verify that every database read statement inside a Firestore transaction is executed before any write/update statements.
+
+## 2026-06-08 — Firestore rules crash on missing user accountStatus / isAdmin
+- **What broke:** Users were blocked from proceeding past the role/consent onboarding steps due to permission denials.
+- **Root cause:** The `isSuspendedOrBanned` and `isAdmin` helpers evaluated paths like `get(path).data.accountStatus` and `get(path).data.isAdmin`. For newly created users, these optional fields were not defined, triggering a runtime "undefined property" evaluation error in rules, which fails open checks.
+- **Fix:** Rewrote helper rules to safely verify that the field key exists in `data.keys()` before attempting to access/check its value. Also did this for `acceptedVolunteerId` in `/tasks/{taskId}/events` read rules.
+- **Avoid next time:** Never access optional fields directly in Firestore security rules without verifying their presence in the document map using `'key' in get(path).data.keys()`.
+
+## 2026-06-08 — Admin user lookup and task audit failing with permission denied
+- **What broke:** Searching for a user or task in the Admin Dashboard failed, and the stats card didn't load.
+- **Root cause:** Firestore security rules restricted read operations for `users/{userId}` to the owner only (`isOwner(userId)`), and `tasks/{taskId}` to the customer/volunteer only. The administrator (`isAdmin()`) had no read permissions, preventing them from fetching profiles or list-querying collections.
+- **Fix:** Added `|| isAdmin()` to the read permission rules under `users/{userId}`, `tasks/{taskId}`, and `tasks/{taskId}/events/{eventId}` in `firestore.rules`.
+- **Avoid next time:** When creating security rules for collections that need admin moderation or lookup screens, always ensure `isAdmin()` permissions are included in the read/list rule definitions.
+

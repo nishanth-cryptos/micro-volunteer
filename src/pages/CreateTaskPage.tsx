@@ -109,8 +109,9 @@ export default function CreateTaskPage() {
       if (preference.trim()) description.preference = preference.trim();
       if (safetyNote.trim()) description.safetyNote = safetyNote.trim();
 
-      const created = await addDoc(collection(db(), 'tasks'), {
+      const taskData: Record<string, unknown> = {
         customerId: user.uid,
+        customerName: userDoc.displayName || 'Customer',
         title: title.trim(),
         category: selectedCategory.key,
         requiredSkills: selectedSkills,
@@ -122,7 +123,12 @@ export default function CreateTaskPage() {
         searchRadiusM: INITIAL_SEARCH_RADIUS_M,
         createdAt: serverTimestamp(),
         expiresAt: Timestamp.fromMillis(Date.now() + TASK_EXPIRY_MS),
-      });
+      };
+      if (userDoc.photoURL) {
+        taskData.customerPhotoURL = userDoc.photoURL;
+      }
+
+      const created = await addDoc(collection(db(), 'tasks'), taskData);
       void navigate(`/tasks/${created.id}`, { replace: true });
     } catch (err) {
       setError(

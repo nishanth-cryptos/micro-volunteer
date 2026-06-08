@@ -18,7 +18,8 @@ export type AuditEventType =
   | 'cancelled'
   | 'expired'
   | 'reported'
-  | 'radius_expanded';
+  | 'radius_expanded'
+  | 'reassigned';
 
 export async function writeAuditEvent(
   taskId: string,

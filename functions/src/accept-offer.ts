@@ -16,6 +16,7 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { checkActiveStatus } from './moderation-helper';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -44,6 +45,8 @@ export const acceptOffer = onCall(
     const volunteerId = request.auth.uid;
 
     const db = getFirestore();
+    await checkActiveStatus(db, volunteerId);
+
     const taskRef = db.collection('tasks').doc(taskId);
     const offerRef = taskRef.collection('offers').doc(volunteerId);
 

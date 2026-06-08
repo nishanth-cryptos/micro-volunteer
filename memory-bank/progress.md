@@ -1,14 +1,22 @@
 # Progress
 
 ## Current milestone
-**M6 — OTP proof of work (smoke test pending).** M0–M5 + onboarding polish + M5 polish ✅ on `main` through `1456778`. M6.1–M6.3 ✅ code; M6.4 smoke test in flight.
+**Milestone 8 — Points, Trust, Safety & Admin Dashboard (Completed).** All requirements for M8 have been successfully coded, built, and verified. Note: Milestone 7 (Chat) is deferred.
 
-M6 in-app (no real SMS — Task Start/End OTPs are app-generated):
-- `generateStartOtp` / `generateEndOtp` callables (customer-only). 6-digit code from `crypto.randomInt`, per-task salt, SHA-256 hash stored on the task doc with 10-min TTL. Plaintext returned ONCE in the callable response; never persisted; never logged.
-- `verifyStartOtp` / `verifyEndOtp` callables (accepted-volunteer-only). Constant-time hash compare; flips task.status from `accepted` → `in_progress` → `completed`. Clears OTP material on success. Awards `points`, `verifiedTaskCount`, `verifiedHours`, and per-skill `skillPoints` on completion.
-- `submitCustomerRating` callable (1–5 stars + optional comment ≤ 280 chars). Idempotent.
-- Audit trail: `tasks/{id}/events` subcollection populated by every transition (`start_otp_generated`, `started`, `end_otp_generated`, `completed`, `rated`). Append-only; rules allow read by customer + accepted volunteer; writes denied.
-- New UI components: `CustomerOtpPanel`, `VolunteerOtpPanel`, `CustomerRatingPanel`. Wired into `TaskDetailPage` by status + viewer role.
+M8 features implemented:
+- **Backend (Cloud Functions):**
+  - `awardPointsOnCompletion`: Triggers on task completion to award points (10 base + duration bonus) to volunteer and customer (2 points). Appends an audit trail event and updates verifiedTaskCount / verifiedHours.
+  - `recomputeTrustScore`: Triggered on user review/rating submission or reports. Recalculates user trust score based on completed rated tasks, ID verification status, and report penalties. Clamped to `[30, 100]`.
+  - `verifyEndOtp`: Refactored to delegate reputation updates to `awardPointsOnCompletion`.
+  - `submitCustomerRating`: Triggers trust score recompute on review completion.
+  - `reportUser` / `blockUser` / `applyModerationAction`: Server-authoritative moderators and callables.
+- **Frontend (React UI):**
+  - `/admin` Admin Dashboard: Stats panels, Pending Reports Queue (Warn / Suspend / Ban / Dismiss), User Lookup & Mod Logs, Task Audit Trail.
+  - Modals & Forms: Report/Block overlays on Task Details.
+  - Verification & Interceptor: Full-screen block for suspended/banned users with moderation details.
+  - Volunteer Stats Panel: Renders Trust Score (with Newcomer/Reliable/Trusted badges), points, completions, and skill points mapping on `/app`.
+  - Exclude suspended/banned volunteers from matching eligibility lists and search counts.
+  - Mid-task suspension handling: Automatically reset tasks to searching state, clear assigned volunteer parameters, trigger matching re-runs, display reassignment notices to customers, and redirect volunteers back to the homepage with a warning toast.
 
 ## Done
 - Repo initialized (git, main branch, .gitignore)

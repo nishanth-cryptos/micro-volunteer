@@ -47,6 +47,15 @@ export interface UserDoc {
   };
   consent?: { tcVersion: string; acceptedAt: Timestamp };
   createdAt?: Timestamp;
+  accountStatus?: 'active' | 'warned' | 'suspended' | 'banned';
+  suspendedUntil?: Timestamp;
+  moderationReason?: string;
+  isAdmin?: boolean;
+  points?: number;
+  skillPoints?: Record<string, number>;
+  verifiedTaskCount?: number;
+  verifiedHours?: number;
+  trustScore?: number;
 }
 
 export type AuthState =
