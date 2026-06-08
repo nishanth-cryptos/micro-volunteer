@@ -8,6 +8,7 @@ import SignupPage from './pages/SignupPage';
 import ConsentPage from './pages/onboarding/ConsentPage';
 import RolePage from './pages/onboarding/RolePage';
 import ProfilePage from './pages/onboarding/ProfilePage';
+import SkillsPage from './pages/onboarding/SkillsPage';
 import AppHomePage from './pages/AppHomePage';
 import CreateTaskPage from './pages/CreateTaskPage';
 import TaskDetailPage from './pages/TaskDetailPage';
@@ -39,6 +40,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute requires="profile">
         <ProfilePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/onboarding/skills',
+    element: (
+      <ProtectedRoute requires="skills">
+        <SkillsPage />
       </ProtectedRoute>
     ),
   },

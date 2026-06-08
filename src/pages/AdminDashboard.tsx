@@ -1,18 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
+  startAfter,
   where,
   Timestamp,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Link } from 'react-router-dom';
 import { db, functions } from '../lib/firebase';
+
+const REASON_MIN_LENGTH = 10;
+const AUTO_DISMISS_MS = 3000;
+const ACTIVITY_LOG_PAGE_SIZE = 50;
 
 interface ReportDoc {
   id: string;
@@ -22,6 +29,9 @@ interface ReportDoc {
   reason: string;
   details: string;
   status: 'pending' | 'actioned' | 'dismissed';
+  // Number of unique reporters who have filed against this (reportedUid,
+  // taskId) pair. Maintained server-side in functions/src/report-user.ts.
+  uniqueReporterCount?: number;
   createdAt: Timestamp;
 }
 
@@ -57,8 +67,10 @@ interface ModerationLogEntry {
   timestamp: Timestamp;
 }
 
+type AdminTab = 'reports' | 'users' | 'tasks' | 'activity';
+
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'reports' | 'users' | 'tasks'>('reports');
+  const [activeTab, setActiveTab] = useState<AdminTab>('reports');
   
   // Stats
   const [stats, setStats] = useState({
@@ -187,6 +199,18 @@ export default function AdminDashboard() {
           >
             Task Audit Trail
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('activity')}
+            className={
+              'border-b-2 px-6 py-3 text-sm font-medium transition focus:outline-none ' +
+              (activeTab === 'activity'
+                ? 'border-neutral-900 text-neutral-900'
+                : 'border-transparent text-neutral-500 hover:text-neutral-900')
+            }
+          >
+            Activity Log
+          </button>
         </div>
 
         {/* Tab Panels */}
@@ -194,6 +218,7 @@ export default function AdminDashboard() {
           {activeTab === 'reports' && <PendingReportsPanel />}
           {activeTab === 'users' && <UserLookupPanel />}
           {activeTab === 'tasks' && <TaskAuditPanel />}
+          {activeTab === 'activity' && <ActivityLogPanel />}
         </div>
       </div>
     </main>
@@ -210,11 +235,35 @@ function PendingReportsPanel() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Cache of resolved display names keyed by uid. `null` marks a uid we
+  // already tried to resolve but couldn't (missing/deleted user doc) so
+  // we don't refetch on every snapshot tick.
+  const [userNames, setUserNames] = useState<Record<string, string | null>>({});
+  // Cache of (customerId, acceptedVolunteerId) per taskId so we can derive
+  // the reporter's role (Customer / Volunteer) without surfacing UIDs.
+  const [taskMap, setTaskMap] = useState<
+    Record<string, { customerId: string; acceptedVolunteerId?: string }>
+  >({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   // Moderation state
   const [selectedReport, setSelectedReport] = useState<ReportDoc | null>(null);
   const [modAction, setModAction] = useState<'warn' | 'suspend' | 'ban' | 'dismiss'>('warn');
   const [reason, setReason] = useState('');
   const [durationDays, setDurationDays] = useState(3);
+
+  // Auto-dismiss the success banner. Errors also clear after the same
+  // window so transient failures don't sit on screen forever.
+  useEffect(() => {
+    if (!actionSuccess) return;
+    const id = setTimeout(() => setActionSuccess(null), AUTO_DISMISS_MS);
+    return () => clearTimeout(id);
+  }, [actionSuccess]);
+  useEffect(() => {
+    if (!error) return;
+    const id = setTimeout(() => setError(null), AUTO_DISMISS_MS);
+    return () => clearTimeout(id);
+  }, [error]);
 
   useEffect(() => {
     const q = query(
@@ -240,9 +289,101 @@ function PendingReportsPanel() {
     return unsub;
   }, []);
 
+  // Resolve display names for any new (reporter, reported, customer,
+  // volunteer) uids appearing in the report list or its associated tasks.
+  // firestore.rules grants admins read access to users/{uid}, so a direct
+  // getDoc is fine here.
+  useEffect(() => {
+    let cancelled = false;
+    const uids = new Set<string>();
+    for (const r of reports) {
+      uids.add(r.reporterUid);
+      uids.add(r.reportedUid);
+      const t = taskMap[r.taskId];
+      if (t) {
+        uids.add(t.customerId);
+        if (t.acceptedVolunteerId) uids.add(t.acceptedVolunteerId);
+      }
+    }
+    const unresolved = [...uids].filter((u) => !(u in userNames));
+    if (unresolved.length === 0) return;
+    void Promise.all(
+      unresolved.map(async (uid) => {
+        try {
+          const snap = await getDoc(doc(db(), 'users', uid));
+          const data = snap.exists() ? (snap.data() as { displayName?: string }) : null;
+          return [uid, data?.displayName ?? null] as const;
+        } catch {
+          return [uid, null] as const;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setUserNames((prev) => {
+        const next = { ...prev };
+        for (const [uid, name] of results) {
+          next[uid] = name;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reports, userNames, taskMap]);
+
+  // Resolve task customer/volunteer ids so we can label the reporter's role
+  // (Customer / Volunteer) without surfacing UIDs.
+  useEffect(() => {
+    let cancelled = false;
+    const taskIds = new Set(reports.map((r) => r.taskId));
+    const unresolved = [...taskIds].filter((t) => !(t in taskMap));
+    if (unresolved.length === 0) return;
+    void Promise.all(
+      unresolved.map(async (taskId) => {
+        try {
+          const snap = await getDoc(doc(db(), 'tasks', taskId));
+          if (!snap.exists()) return null;
+          const data = snap.data() as {
+            customerId: string;
+            acceptedVolunteerId?: string;
+          };
+          return [taskId, data] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setTaskMap((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          if (!r) continue;
+          const [taskId, data] = r;
+          next[taskId] = data.acceptedVolunteerId
+            ? { customerId: data.customerId, acceptedVolunteerId: data.acceptedVolunteerId }
+            : { customerId: data.customerId };
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reports, taskMap]);
+
+  function reporterRole(report: ReportDoc): string {
+    const t = taskMap[report.taskId];
+    if (!t) return 'Reporter';
+    if (t.customerId === report.reporterUid) return 'Customer';
+    if (t.acceptedVolunteerId === report.reporterUid) return 'Volunteer';
+    return 'Reporter';
+  }
+
   async function handleModerationSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedReport) return;
+    if (reason.trim().length < REASON_MIN_LENGTH) return;
 
     setError(null);
     setBusyReportId(selectedReport.id);
@@ -281,7 +422,7 @@ function PendingReportsPanel() {
       setActionSuccess(`Successfully applied ${modAction} to user.`);
       setSelectedReport(null);
       setReason('');
-      setTimeout(() => setActionSuccess(null), 3000);
+      // auto-dismiss handled by useEffect above
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply moderation action.');
     } finally {
@@ -303,90 +444,171 @@ function PendingReportsPanel() {
       {reports.length === 0 ? (
         <p className="text-neutral-600 text-sm">No pending reports in queue.</p>
       ) : (
-        <div className="space-y-4">
-          {reports.map((report) => (
-            <div
-              key={report.id}
-              className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800">
-                    Reason: {report.reason.replace('_', ' ')}
-                  </span>
-                  <p className="mt-3 text-sm text-neutral-700">
-                    <span className="font-semibold text-neutral-900">Details: </span>
-                    {report.details || 'No details provided.'}
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-neutral-500">
-                    <span>
-                      <span className="font-medium text-neutral-800">Reporter: </span>
-                      {report.reporterUid}
-                    </span>
-                    <span>
-                      <span className="font-medium text-neutral-800">Reported User: </span>
-                      {report.reportedUid}
-                    </span>
-                    <span>
-                      <span className="font-medium text-neutral-800">Task Link: </span>
-                      <Link
-                        to={`/tasks/${report.taskId}`}
-                        className="text-neutral-900 underline hover:text-neutral-700 font-semibold"
-                      >
-                        {report.taskId}
-                      </Link>
-                    </span>
-                    <span>
-                      {report.createdAt.toDate().toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
+        <div className="space-y-3">
+          {reports.map((report) => {
+            const expanded = expandedId === report.id;
+            const role = reporterRole(report);
+            const reportedName = userNames[report.reportedUid] ?? '…';
+            return (
+              <div
+                key={report.id}
+                className="rounded-2xl border border-neutral-200 bg-white shadow-sm"
+              >
+                {/* Collapsed header — always rendered, acts as the toggle */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedReport(report);
-                    setModAction('warn');
-                  }}
-                  className="rounded-full bg-neutral-900 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-neutral-800 focus:outline-none"
+                  aria-expanded={expanded}
+                  onClick={() => setExpandedId(expanded ? null : report.id)}
+                  className="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
                 >
-                  Action Report
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-block rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-medium text-neutral-700">
+                        {role}
+                      </span>
+                      <span className="text-sm font-medium text-neutral-900 truncate">
+                        reported {reportedName}
+                      </span>
+                      <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-semibold text-red-800">
+                        {report.reason.replace('_', ' ')}
+                      </span>
+                      {(report.uniqueReporterCount ?? 1) > 1 && (
+                        <span
+                          className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800"
+                          title="Unique reporters against this user on this task"
+                        >
+                          {report.uniqueReporterCount} reporters
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {report.createdAt.toDate().toLocaleString()}
+                    </p>
+                  </div>
+                  <span
+                    aria-hidden="true"
+                    className={
+                      'flex-shrink-0 text-neutral-400 transition ' +
+                      (expanded ? 'rotate-180' : '')
+                    }
+                  >
+                    ▾
+                  </span>
                 </button>
+
+                {/* Expanded body */}
+                {expanded && (() => {
+                  const t = taskMap[report.taskId];
+                  const customerName = t
+                    ? userNames[t.customerId] ?? '…'
+                    : undefined;
+                  const volunteerUid = t?.acceptedVolunteerId;
+                  const volunteerName = volunteerUid
+                    ? userNames[volunteerUid] ?? '…'
+                    : undefined;
+                  return (
+                  <div className="border-t border-neutral-100 px-5 py-4">
+                    <p className="text-sm text-neutral-700">
+                      <span className="font-semibold text-neutral-900">Details: </span>
+                      {report.details || 'No details provided.'}
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 gap-y-1.5 text-xs text-neutral-600 sm:grid-cols-2 sm:gap-x-6">
+                      {t && (
+                        <span>
+                          <span className="font-medium text-neutral-800">Customer: </span>
+                          <span className="text-neutral-900 font-medium">{customerName}</span>
+                          <span className="ml-1.5 font-mono text-[10px] text-neutral-400">
+                            ({t.customerId})
+                          </span>
+                        </span>
+                      )}
+                      {volunteerUid && (
+                        <span>
+                          <span className="font-medium text-neutral-800">Volunteer: </span>
+                          <span className="text-neutral-900 font-medium">{volunteerName}</span>
+                          <span className="ml-1.5 font-mono text-[10px] text-neutral-400">
+                            ({volunteerUid})
+                          </span>
+                        </span>
+                      )}
+                      <span>
+                        <span className="font-medium text-neutral-800">Task ID: </span>
+                        <Link
+                          to={`/tasks/${report.taskId}`}
+                          className="font-mono text-[11px] text-neutral-900 underline hover:text-neutral-700"
+                        >
+                          {report.taskId}
+                        </Link>
+                      </span>
+                      <span>
+                        <span className="font-medium text-neutral-800">Unique reporters: </span>
+                        {report.uniqueReporterCount ?? 1}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {(['warn', 'suspend', 'ban', 'dismiss'] as const).map((act) => (
+                        <button
+                          key={act}
+                          type="button"
+                          onClick={() => {
+                            setSelectedReport(report);
+                            setModAction(act);
+                            setReason('');
+                          }}
+                          className={
+                            'rounded-full px-4 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+                            (act === 'ban'
+                              ? 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500'
+                              : act === 'suspend'
+                                ? 'bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-500'
+                                : act === 'warn'
+                                  ? 'bg-neutral-900 text-white hover:bg-neutral-800 focus-visible:ring-neutral-900'
+                                  : 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 focus-visible:ring-neutral-900')
+                          }
+                        >
+                          {act === 'warn'
+                            ? 'Warn'
+                            : act === 'suspend'
+                              ? 'Suspend'
+                              : act === 'ban'
+                                ? 'Ban'
+                                : 'Dismiss'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  );
+                })()}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* ACTION REPORT MODAL */}
+      {/* ACTION REPORT MODAL — preset action comes from the inline button
+          the admin clicked in the expanded card. */}
       {selectedReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all">
-            <h2 className="text-xl font-semibold text-neutral-900">Action Safety Report</h2>
+            <h2 className="text-xl font-semibold text-neutral-900">
+              {modAction === 'warn'
+                ? 'Issue warning'
+                : modAction === 'suspend'
+                  ? 'Suspend account'
+                  : modAction === 'ban'
+                    ? 'Ban account'
+                    : 'Dismiss report'}
+            </h2>
             <p className="mt-1 text-xs text-neutral-600">
-              Apply moderation to user: <span className="font-semibold">{selectedReport.reportedUid}</span>
+              Target: <span className="font-semibold text-neutral-900">
+                {userNames[selectedReport.reportedUid] ?? 'user'}
+              </span>
             </p>
 
             <form onSubmit={(e) => void handleModerationSubmit(e)} className="mt-6">
-              <div>
-                <label htmlFor="mod-action" className="block text-sm font-medium text-neutral-700">
-                  Moderation Action
-                </label>
-                <select
-                  id="mod-action"
-                  value={modAction}
-                  onChange={(e) => setModAction(e.target.value as typeof modAction)}
-                  className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                >
-                  <option value="warn">Issue Warning (persistent banner)</option>
-                  <option value="suspend">Temporary Suspension (locked access)</option>
-                  <option value="ban">Permanent Ban (deactivated)</option>
-                  <option value="dismiss">Dismiss Report (no action)</option>
-                </select>
-              </div>
-
               {modAction === 'suspend' && (
-                <div className="mt-4">
+                <div>
                   <label htmlFor="suspend-duration" className="block text-sm font-medium text-neutral-700">
                     Suspension Duration
                   </label>
@@ -404,7 +626,7 @@ function PendingReportsPanel() {
                 </div>
               )}
 
-              <div className="mt-4">
+              <div className={modAction === 'suspend' ? 'mt-4' : ''}>
                 <label htmlFor="mod-reason" className="block text-sm font-medium text-neutral-700">
                   Reason (visible to user on warn/suspend/ban, and stored in log)
                 </label>
@@ -417,6 +639,11 @@ function PendingReportsPanel() {
                   placeholder="Explain the reason for this action..."
                   className="mt-1 block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 shadow-sm placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                 />
+                {reason.length > 0 && reason.trim().length < REASON_MIN_LENGTH && (
+                  <p className="mt-1 text-xs text-red-700">
+                    Please provide a meaningful reason
+                  </p>
+                )}
               </div>
 
               {error && (
@@ -436,7 +663,9 @@ function PendingReportsPanel() {
                 </button>
                 <button
                   type="submit"
-                  disabled={busyReportId !== null}
+                  disabled={
+                    busyReportId !== null || reason.trim().length < REASON_MIN_LENGTH
+                  }
                   className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none disabled:opacity-50"
                 >
                   {busyReportId !== null ? 'Applying...' : 'Apply Action'}
@@ -467,6 +696,54 @@ function UserLookupPanel() {
   const [busy, setBusy] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
+
+  // Cache of admin display names so the Moderation Log never surfaces raw
+  // UIDs. firestore.rules already lets admins read other users/{uid}.
+  const [adminNames, setAdminNames] = useState<Record<string, string | null>>({});
+
+  // Auto-dismiss any success / error banner after 3s — matches the same
+  // behaviour in PendingReportsPanel for consistency.
+  useEffect(() => {
+    if (!actionSuccess) return;
+    const id = setTimeout(() => setActionSuccess(null), AUTO_DISMISS_MS);
+    return () => clearTimeout(id);
+  }, [actionSuccess]);
+  useEffect(() => {
+    if (!error) return;
+    const id = setTimeout(() => setError(null), AUTO_DISMISS_MS);
+    return () => clearTimeout(id);
+  }, [error]);
+
+  // Resolve admin display names referenced in the moderation log.
+  useEffect(() => {
+    let cancelled = false;
+    const uids = new Set(modLogs.map((l) => l.adminId).filter(Boolean));
+    const unresolved = [...uids].filter((u) => !(u in adminNames));
+    if (unresolved.length === 0) return;
+    void Promise.all(
+      unresolved.map(async (uid) => {
+        try {
+          const snap = await getDoc(doc(db(), 'users', uid));
+          const data = snap.exists() ? (snap.data() as { displayName?: string }) : null;
+          return [uid, data?.displayName ?? null] as const;
+        } catch {
+          return [uid, null] as const;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setAdminNames((prev) => {
+        const next = { ...prev };
+        for (const [uid, name] of results) {
+          next[uid] = name;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [modLogs, adminNames]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -536,6 +813,7 @@ function UserLookupPanel() {
   async function handleModerationSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    if (reason.trim().length < REASON_MIN_LENGTH) return;
 
     setError(null);
     setBusy(true);
@@ -588,7 +866,7 @@ function UserLookupPanel() {
         })),
       );
 
-      setTimeout(() => setActionSuccess(null), 3000);
+      // auto-dismiss handled by useEffect above
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply moderation action.');
     } finally {
@@ -769,7 +1047,9 @@ function UserLookupPanel() {
                         </span>
                       </div>
                       <p className="mt-1 text-neutral-600">Reason: {log.reason}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">Admin: {log.adminId}</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        Admin: {adminNames[log.adminId] || 'Admin'}
+                      </p>
                     </li>
                   ))}
                 </ul>
@@ -831,11 +1111,16 @@ function UserLookupPanel() {
                     placeholder="Enter reason..."
                     className="mt-1 block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                   />
+                  {reason.length > 0 && reason.trim().length < REASON_MIN_LENGTH && (
+                    <p className="mt-1 text-xs text-red-700">
+                      Please provide a meaningful reason
+                    </p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || reason.trim().length < REASON_MIN_LENGTH}
                   className="w-full rounded-full bg-neutral-900 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
                 >
                   {busy ? 'Applying...' : 'Apply Action'}
@@ -857,6 +1142,13 @@ function TaskAuditPanel() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Customer / volunteer ids for the loaded task — used to label the
+  // actor of each audit event as a role (never a raw UID).
+  const [taskActors, setTaskActors] = useState<{
+    customerId?: string;
+    acceptedVolunteerId?: string;
+  } | null>(null);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
 
   async function handleAuditSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -864,6 +1156,8 @@ function TaskAuditPanel() {
 
     setError(null);
     setEvents([]);
+    setExpandedEventId(null);
+    setTaskActors(null);
     setLoading(true);
 
     try {
@@ -876,6 +1170,16 @@ function TaskAuditPanel() {
         setLoading(false);
         return;
       }
+      const taskData = taskSnap.data() as {
+        customerId?: string;
+        acceptedVolunteerId?: string;
+      };
+      setTaskActors({
+        ...(taskData.customerId ? { customerId: taskData.customerId } : {}),
+        ...(taskData.acceptedVolunteerId
+          ? { acceptedVolunteerId: taskData.acceptedVolunteerId }
+          : {}),
+      });
 
       // Query subcollection events
       const eventsQ = query(
@@ -896,6 +1200,18 @@ function TaskAuditPanel() {
     }
   }
 
+  function actorLabel(actorUid: string): string {
+    if (actorUid === 'system') return 'System';
+    if (taskActors?.customerId && actorUid === taskActors.customerId) return 'Customer';
+    if (
+      taskActors?.acceptedVolunteerId &&
+      actorUid === taskActors.acceptedVolunteerId
+    ) {
+      return 'Volunteer';
+    }
+    return 'Admin';
+  }
+
   return (
     <div>
       <form onSubmit={(e) => void handleAuditSearch(e)} className="flex max-w-md gap-3">
@@ -903,7 +1219,7 @@ function TaskAuditPanel() {
           type="text"
           value={taskIdInput}
           onChange={(e) => setTaskIdInput(e.target.value)}
-          placeholder="Enter Task ID (UUID)..."
+          placeholder="Enter Task ID"
           required
           className="block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
         />
@@ -923,48 +1239,329 @@ function TaskAuditPanel() {
           <h3 className="text-lg font-semibold text-neutral-900">Task Lifecycle History</h3>
           <p className="mt-1 text-xs text-neutral-500 font-mono">ID: {taskIdInput.trim()}</p>
 
-          <div className="mt-6 flow-root">
-            <ul className="-mb-8">
-              {events.map((event, eventIdx) => (
-                <li key={event.id}>
-                  <div className="relative pb-8">
-                    {eventIdx !== events.length - 1 ? (
-                      <span
-                        className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-neutral-200"
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                    <div className="relative flex space-x-3">
-                      <div>
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 ring-8 ring-white text-xs font-semibold text-neutral-700">
-                          {eventIdx + 1}
+          <ul className="mt-6 space-y-2">
+            {events.map((event, eventIdx) => {
+              const expanded = expandedEventId === event.id;
+              return (
+                <li
+                  key={event.id}
+                  className="rounded-xl border border-neutral-200"
+                >
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() => setExpandedEventId(expanded ? null : event.id)}
+                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+                  >
+                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
+                      {eventIdx + 1}
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium text-neutral-900 uppercase tracking-wide">
+                        {event.type.replace('_', ' ')}
+                      </span>
+                      <span className="block text-xs text-neutral-500">
+                        {event.at.toDate().toLocaleString()}
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={
+                        'flex-shrink-0 text-neutral-400 transition ' +
+                        (expanded ? 'rotate-180' : '')
+                      }
+                    >
+                      ▾
+                    </span>
+                  </button>
+                  {expanded && (
+                    <div className="border-t border-neutral-100 px-4 py-3">
+                      <p className="text-xs text-neutral-500">
+                        Triggered by:{' '}
+                        <span className="font-medium text-neutral-900">
+                          {actorLabel(event.actorUid)}
                         </span>
-                      </div>
-                      <div className="flex-1 min-w-0 pt-1.5 flex justify-between space-x-4">
-                        <div>
-                          <p className="text-sm font-medium text-neutral-900">
-                            Status transition: <span className="uppercase text-neutral-950 font-semibold">{event.type.replace('_', ' ')}</span>
-                          </p>
-                          <p className="text-xs text-neutral-500 mt-0.5">
-                            Triggered by actor UID: <span className="font-mono">{event.actorUid}</span>
-                          </p>
-                          {event.payload && Object.keys(event.payload).length > 0 && (
-                            <pre className="mt-2 text-xs bg-neutral-50 p-2 rounded-md font-mono text-neutral-700 max-w-full overflow-x-auto">
-                              {JSON.stringify(event.payload, null, 2)}
-                            </pre>
-                          )}
-                        </div>
-                        <div className="text-right text-xs whitespace-nowrap text-neutral-500">
-                          {event.at.toDate().toLocaleString()}
-                        </div>
-                      </div>
+                      </p>
+                      {event.payload && Object.keys(event.payload).length > 0 && (
+                        <pre className="mt-2 text-xs bg-neutral-50 p-2 rounded-md font-mono text-neutral-700 max-w-full overflow-x-auto">
+                          {JSON.stringify(event.payload, null, 2)}
+                        </pre>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </li>
-              ))}
-            </ul>
-          </div>
+              );
+            })}
+          </ul>
         </section>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
+   ACTIVITY LOG PANEL
+   ============================================================================ */
+interface ActivityLogDoc {
+  id: string;
+  eventType: string;
+  description: string;
+  userId: string;
+  taskId?: string;
+  createdAt: Timestamp;
+}
+
+const ACTIVITY_EVENT_LABELS: Record<string, string> = {
+  user_registered: 'User registered',
+  task_created: 'Task created',
+  task_accepted: 'Task accepted',
+  task_started: 'Task started',
+  task_completed: 'Task completed',
+  report_submitted: 'Report submitted',
+  moderation_action: 'Moderation action',
+  user_blocked: 'User blocked',
+};
+
+function ActivityLogPanel() {
+  const [filter, setFilter] = useState<string>('all');
+  const [entries, setEntries] = useState<ActivityLogDoc[]>([]);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const filterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All event types' },
+      ...Object.entries(ACTIVITY_EVENT_LABELS).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    ],
+    [],
+  );
+
+  // Initial load on mount. Filter changes go through changeFilter() which
+  // both resets state and kicks the same loader — keeps the effect free
+  // of synchronous setState calls (react-hooks/set-state-in-effect).
+  useEffect(() => {
+    let cancelled = false;
+    async function initial() {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db(), 'activityLog'),
+            orderBy('createdAt', 'desc'),
+            limit(ACTIVITY_LOG_PAGE_SIZE),
+          ),
+        );
+        if (cancelled) return;
+        setEntries(
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<ActivityLogDoc, 'id'>),
+          })),
+        );
+        setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+        setHasMore(snap.size === ACTIVITY_LOG_PAGE_SIZE);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Could not load activity log.');
+      }
+    }
+    void initial();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function loadFirstPage(forFilter: string) {
+    setError(null);
+    setLoading(true);
+    try {
+      const base = collection(db(), 'activityLog');
+      const q =
+        forFilter === 'all'
+          ? query(
+              base,
+              orderBy('createdAt', 'desc'),
+              limit(ACTIVITY_LOG_PAGE_SIZE),
+            )
+          : query(
+              base,
+              where('eventType', '==', forFilter),
+              orderBy('createdAt', 'desc'),
+              limit(ACTIVITY_LOG_PAGE_SIZE),
+            );
+      const snap = await getDocs(q);
+      setEntries(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<ActivityLogDoc, 'id'>),
+        })),
+      );
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.size === ACTIVITY_LOG_PAGE_SIZE);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load activity log.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function changeFilter(next: string) {
+    setFilter(next);
+    setEntries([]);
+    setLastDoc(null);
+    setHasMore(true);
+    setExpandedId(null);
+    void loadFirstPage(next);
+  }
+
+  async function loadMore() {
+    if (!lastDoc || !hasMore || loading) return;
+    setLoading(true);
+    try {
+      const base = collection(db(), 'activityLog');
+      const q =
+        filter === 'all'
+          ? query(
+              base,
+              orderBy('createdAt', 'desc'),
+              startAfter(lastDoc),
+              limit(ACTIVITY_LOG_PAGE_SIZE),
+            )
+          : query(
+              base,
+              where('eventType', '==', filter),
+              orderBy('createdAt', 'desc'),
+              startAfter(lastDoc),
+              limit(ACTIVITY_LOG_PAGE_SIZE),
+            );
+      const snap = await getDocs(q);
+      setEntries((prev) => [
+        ...prev,
+        ...snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<ActivityLogDoc, 'id'>),
+        })),
+      ]);
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? lastDoc);
+      setHasMore(snap.size === ACTIVITY_LOG_PAGE_SIZE);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load more entries.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <label htmlFor="activity-filter" className="text-xs font-semibold text-neutral-500">
+          Filter:
+        </label>
+        <select
+          id="activity-filter"
+          value={filter}
+          onChange={(e) => changeFilter(e.target.value)}
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+        >
+          {filterOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-4 text-sm text-red-700 font-medium">
+          {error}
+        </p>
+      )}
+
+      <ul className="mt-6 space-y-2">
+        {entries.length === 0 && !loading && (
+          <li className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500">
+            No activity yet.
+          </li>
+        )}
+        {entries.map((entry) => {
+          const expanded = expandedId === entry.id;
+          const label = ACTIVITY_EVENT_LABELS[entry.eventType] ?? entry.eventType;
+          return (
+            <li
+              key={entry.id}
+              className="rounded-xl border border-neutral-200 bg-white"
+            >
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setExpandedId(expanded ? null : entry.id)}
+                className="flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+              >
+                <span className="mt-0.5 inline-block rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-medium text-neutral-700">
+                  {label}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm text-neutral-900 truncate">
+                    {entry.description}
+                  </span>
+                  <span className="block text-xs text-neutral-500 mt-0.5">
+                    {entry.createdAt.toDate().toLocaleString()}
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={
+                    'flex-shrink-0 text-neutral-400 transition mt-1 ' +
+                    (expanded ? 'rotate-180' : '')
+                  }
+                >
+                  ▾
+                </span>
+              </button>
+              {expanded && (
+                <div className="border-t border-neutral-100 px-4 py-3 text-xs text-neutral-600 space-y-1">
+                  <p>
+                    <span className="font-medium text-neutral-800">Event type: </span>
+                    {label}
+                  </p>
+                  {entry.taskId && (
+                    <p>
+                      <span className="font-medium text-neutral-800">Task: </span>
+                      <Link
+                        to={`/tasks/${entry.taskId}`}
+                        className="text-neutral-900 underline hover:text-neutral-700 font-medium"
+                      >
+                        Open task
+                      </Link>
+                    </p>
+                  )}
+                  <p>
+                    <span className="font-medium text-neutral-800">Recorded: </span>
+                    {entry.createdAt.toDate().toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {hasMore && (
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            disabled={loading}
+            className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {loading ? 'Loading…' : 'Load more'}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -77,7 +77,12 @@ function classify(user: FirebaseUser, userDoc: UserDoc | null): AuthState {
   const hasRole = (userDoc.roles?.length ?? 0) > 0;
   const hasProfile =
     Boolean(userDoc.displayName) && Boolean(userDoc.photoURL);
-  if (hasConsent && hasRole && hasProfile) {
+  // Volunteers (or dual-role users) must also have at least one skill set
+  // before they count as fully onboarded. Customer-only users skip skills.
+  const isVolunteer = userDoc.roles?.includes('volunteer') ?? false;
+  const hasSkills = (userDoc.skills?.length ?? 0) > 0;
+  const skillsOk = !isVolunteer || hasSkills;
+  if (hasConsent && hasRole && hasProfile && skillsOk) {
     return { status: 'ready', user, userDoc };
   }
   return { status: 'incomplete', user, userDoc };

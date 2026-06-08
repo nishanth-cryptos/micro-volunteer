@@ -11,6 +11,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { constantTimeEquals, hashOtp } from './otp';
+import { appendActivityLog, safeDisplayName } from './activity-log';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -96,6 +97,21 @@ export const verifyEndOtp = onCall(
         endOtpSalt: FieldValue.delete(),
         endOtpExpiresAt: FieldValue.delete(),
       });
+    });
+
+    let taskTitle = 'a task';
+    try {
+      const t = await taskRef.get();
+      taskTitle = (t.data() as { title?: string } | undefined)?.title?.trim() || 'a task';
+    } catch {
+      /* keep fallback */
+    }
+    const volunteerName = await safeDisplayName(db, callerUid, 'volunteer');
+    await appendActivityLog(db, {
+      eventType: 'task_completed',
+      description: `Task '${taskTitle}' completed by ${volunteerName}`,
+      userId: callerUid,
+      taskId,
     });
 
     return { taskId, status: 'completed' };

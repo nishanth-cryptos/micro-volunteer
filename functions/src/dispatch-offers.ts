@@ -10,6 +10,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { rankForTask, type TaskDoc } from './scoring';
+import { appendActivityLog, safeDisplayName } from './activity-log';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -47,6 +48,23 @@ export const dispatchOffers = onDocumentWritten(
 
     const db = getFirestore();
     const offersRef = db.collection('tasks').doc(taskId).collection('offers');
+
+    // Activity log: only on initial task creation, not on the
+    // back-to-searching reassignment path (that already gets its own
+    // 'reassigned' audit event on the task itself).
+    if (wasCreatedSearching) {
+      const customerName = await safeDisplayName(
+        db,
+        afterData.customerId,
+        'A customer',
+      );
+      await appendActivityLog(db, {
+        eventType: 'task_created',
+        description: `${customerName} posted task '${afterData.title}'`,
+        userId: afterData.customerId,
+        taskId,
+      });
+    }
 
     // If transitioned back to searching, clear existing offers first
     if (transitionedToSearching) {

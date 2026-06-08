@@ -19,13 +19,16 @@ const db = getFirestore();
 // Admin fixtures
 // ---------------------------------------------------------------------------
 
+// Admins cluster around the user-supplied test centre (13.0202, 77.6815)
+// — Bangalore. Same centre as the seed-users fixtures so admins can also
+// post / be matched against the test volunteer pool.
 const ADMINS = [
   {
     email: 'admin@example.org',
     password: 'admin123',
     displayName: 'Admin User',
     bio: 'System administrator.',
-    lat: 18.6105, lng: 73.7875, // Kalewadi centre
+    lat: 13.0205, lng: 77.6816, // ~30 m NE of test centre
     trustScore: 100, idVerified: true,
     verifiedTaskCount: 20, verifiedHours: 40, points: 200,
   },
@@ -34,7 +37,7 @@ const ADMINS = [
     password: 'admin123',
     displayName: 'Mod Two',
     bio: 'Secondary moderator.',
-    lat: 18.6115, lng: 73.7870, // ~150 m N of centre
+    lat: 13.0215, lng: 77.6811, // ~150 m N of test centre
     trustScore: 90, idVerified: true,
     verifiedTaskCount: 12, verifiedHours: 18, points: 120,
   },

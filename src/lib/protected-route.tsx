@@ -13,7 +13,7 @@ import type { Timestamp } from 'firebase/firestore';
 import { useAuthState, type AuthState } from './auth-context';
 import { auth } from './firebase';
 
-export type RequiredStep = 'consent' | 'role' | 'profile' | 'ready';
+export type RequiredStep = 'consent' | 'role' | 'profile' | 'skills' | 'ready';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -32,9 +32,14 @@ function currentStep(state: AuthState): CurrentStep {
     case 'no-doc':
       return 'consent';
     case 'incomplete': {
-      if (!state.userDoc.consent?.acceptedAt) return 'consent';
-      if (!state.userDoc.roles?.length) return 'role';
-      return 'profile';
+      const ud = state.userDoc;
+      if (!ud.consent?.acceptedAt) return 'consent';
+      if (!ud.roles?.length) return 'role';
+      const hasProfile = Boolean(ud.displayName) && Boolean(ud.photoURL);
+      if (!hasProfile) return 'profile';
+      // Volunteers/dual-role users land here when profile is done but
+      // skills haven't been picked yet.
+      return 'skills';
     }
     case 'ready':
       return 'ready';
@@ -45,6 +50,7 @@ function pathForStep(step: RequiredStep): string {
   if (step === 'consent') return '/onboarding/consent';
   if (step === 'role') return '/onboarding/role';
   if (step === 'profile') return '/onboarding/profile';
+  if (step === 'skills') return '/onboarding/skills';
   return '/app';
 }
 

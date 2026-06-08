@@ -7,9 +7,17 @@ interface Props {
   taskId: string;
   reportedUserId: string;
   reportedUserName: string;
+  // Role of the user currently viewing this panel. Volunteers do not see
+  // the Block button — block remains a customer-only action.
+  viewerRole: 'customer' | 'volunteer';
 }
 
-export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: Props) {
+export function ReportBlockPanel({
+  taskId,
+  reportedUserId,
+  reportedUserName,
+  viewerRole,
+}: Props) {
   const navigate = useNavigate();
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -21,6 +29,8 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
   const [reportBusy, setReportBusy] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
+  // Set when the Cloud Function rejects with already-exists — neutral copy.
+  const [reportDuplicate, setReportDuplicate] = useState(false);
 
   // Block state
   const [blockBusy, setBlockBusy] = useState(false);
@@ -30,6 +40,7 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
   async function handleReportSubmit(e: React.FormEvent) {
     e.preventDefault();
     setReportError(null);
+    setReportDuplicate(false);
     setReportBusy(true);
 
     try {
@@ -37,7 +48,7 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
         { reportedUserId: string; taskId: string; reason: string; details: string },
         { reportId: string }
       >(functions(), 'reportUser');
-      
+
       await fn({
         reportedUserId,
         taskId,
@@ -52,9 +63,21 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
         setReportSuccess(false);
       }, 3000);
     } catch (err) {
-      setReportError(
-        err instanceof Error ? err.message : 'Could not submit report. Try again.',
-      );
+      // Firebase callable surfaces our HttpsError code as `err.code` on a
+      // FirebaseError. Anything tagged 'functions/already-exists' means the
+      // duplicate-prevention check fired — show neutral copy instead of a
+      // red error.
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? (err as { code?: string }).code
+          : undefined;
+      if (code === 'functions/already-exists') {
+        setReportDuplicate(true);
+      } else {
+        setReportError(
+          err instanceof Error ? err.message : 'Could not submit report. Try again.',
+        );
+      }
     } finally {
       setReportBusy(false);
     }
@@ -93,9 +116,11 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
       <h3 className="text-base font-semibold text-neutral-900">Safety & Trust</h3>
       <p className="mt-1 text-sm text-neutral-600">
         If you experience any safety issues, rudeness, or a no-show, please report it.
-        You can also block this user to prevent matching again.
+        {viewerRole === 'customer'
+          ? ' You can also block this user to prevent matching again.'
+          : ''}
       </p>
-      
+
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
@@ -104,13 +129,15 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
         >
           Report {reportedUserName}
         </button>
-        <button
-          type="button"
-          onClick={() => setShowBlockModal(true)}
-          className="rounded-full bg-white border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-        >
-          Block {reportedUserName}
-        </button>
+        {viewerRole === 'customer' && (
+          <button
+            type="button"
+            onClick={() => setShowBlockModal(true)}
+            className="rounded-full bg-white border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          >
+            Block {reportedUserName}
+          </button>
+        )}
       </div>
 
       {/* REPORT MODAL */}
@@ -127,6 +154,23 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
             {reportSuccess ? (
               <div className="mt-6 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-sm font-medium">
                 Report submitted successfully. Thank you for helping keep our community safe.
+              </div>
+            ) : reportDuplicate ? (
+              <div className="mt-6 rounded-xl bg-neutral-100 border border-neutral-200 p-4 text-neutral-700 text-sm">
+                You've already submitted a report for this user on this task.
+                Administrators are reviewing it.
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReportModal(false);
+                      setReportDuplicate(false);
+                    }}
+                    className="rounded-full border border-neutral-300 px-4 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={(e) => void handleReportSubmit(e)} className="mt-6">

@@ -70,3 +70,14 @@
   2. **Suspension/Moderation Active Checks**: Account active status is enforced globally via `checkActiveStatus` helper across all user-facing callable functions, preventing suspended/banned actions.
   3. **TypeScript `exactOptionalPropertyTypes` compatibility**: Forms and callable parameters build dynamically, omitting optional fields rather than passing them as `undefined`, complying with the strict project TS rules.
 
+
+## 2026-06-08 — Block doc denormalisation for "Blocked users" UI
+- **Decision:** `blocks/{id}` documents now carry `blockedBy` (initiator uid) plus `displayName`/`photoURL` snapshots for each side (`userANameSnapshot` / `userAPhotoSnapshot` / `userBNameSnapshot` / `userBPhotoSnapshot`). Written server-side in the `blockUser` callable at block-creation time.
+- **Why:** Customers asked to see *which* volunteers they had blocked. The deny-by-default `users/{uid}` rule blocks the customer from reading the blocked party's profile directly, so we had to either loosen the user-doc rule (rejected — leaks PII far beyond this use case) or denormalise the displayable fields onto the block doc itself. Snapshot fields stay in sync with existing patterns (`customerName` on tasks, `taskTitle` on offer docs).
+- **Effect:** Legacy block docs (none in prod yet) without `blockedBy` are silently skipped by the UI — we can't attribute initiator after the fact. If real blocks predate this change, a one-off backfill would be needed.
+
+## 2026-06-08 — Ban revoke + 30-day permanent-purge policy
+- **Decision:** On admin revoke of a banned user, delete only that user's in-flight customer-posted tasks (`searching`/`accepted`/`in_progress`). After 30 days of continuous ban, a daily scheduled function permanently deletes the Firebase Auth account, Storage profile/ID files, and Firestore `users/{uid}` doc + subcollections — but **not** their tasks, reports, blocks, or audit events.
+- **Why:** Nishanth chose this scope explicitly when asked (2026-06-08). Preserves the "immutable audit trail" invariant in systemPatterns.md while still removing the user-identifiable PII (auth, photo, ID image, profile doc) after the cool-down window. Dangling UID refs on past tasks/reports/blocks are tolerated by UI fallbacks.
+- **Rejected:** (a) Hard-deleting tasks + events along with the user — breaks audit and harms innocent counterparties on shared tasks. (b) Pure soft-delete flag — doesn't satisfy "delete from db and everywhere".
+- **Effect:** Adds `bannedAt: Timestamp` on `users/{uid}` (set on ban, cleared on dismiss). Adds new scheduled function `scheduledPurgeBannedUsers` (daily, region asia-south1). `recursiveDelete` from firebase-admin walks the user's subcollections (moderationLog, deviceTokens, notifications) and any in-flight task's offers + events.

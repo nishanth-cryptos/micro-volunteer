@@ -44,6 +44,7 @@ Each lives in Cloud Functions; Firestore rules enforce that clients cannot write
 | `chats/{chatId}/messages/{msgId}` | Chat messages |
 | `reports/{reportId}` | User/message reports |
 | `adminActions/{actionId}` | Audit trail for admin warn/suspend/ban |
+| `activityLog/{entryId}` | Site-wide reverse-chronological event feed (admin read; Cloud Function writes only) |
 | `catalog/categories` / `catalog/skills` | Curated category & skill catalogs (admin-managed, public-readable) |
 
 ### Document shapes (field types abbreviated)
@@ -169,6 +170,18 @@ actionedAt?: Timestamp
 adminNote?: string
 ```
 
+**`activityLog/{entryId}`** — append-only site-wide event feed; written exclusively by Cloud Functions, read only by admins:
+```
+eventType: 'user_registered' | 'task_created' | 'task_accepted'
+         | 'task_started' | 'task_completed' | 'report_submitted'
+         | 'moderation_action' | 'user_blocked'
+description: string                    // human-readable; denormalised at write
+                                       // time — NEVER contains raw UIDs
+userId: string                         // primary actor for the event
+taskId?: string                        // present when the event is task-scoped
+createdAt: Timestamp
+```
+
 **`adminActions/{actionId}`** — server-only:
 ```
 adminUid: string
@@ -188,6 +201,7 @@ expiresAt?: Timestamp
 | `offers` (collection group) | `(volunteerId ASC, state ASC, offeredAt DESC)` — "my offers" |
 | `chats` | `(participants array-contains, lastMessageAt DESC)` — inbox |
 | `reports` | `(status ASC, createdAt DESC)` — admin queue |
+| `activityLog` | `(eventType ASC, createdAt DESC)` — filtered admin activity feed |
 
 ### Subcollection vs root choices
 - **offers under tasks** — fan-out is per-task; offers don't outlive their task. Collection-group query gives volunteers their offers across all tasks.

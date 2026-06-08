@@ -11,6 +11,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { writeAuditEvent } from './audit';
 import { constantTimeEquals, hashOtp } from './otp';
+import { appendActivityLog, safeDisplayName } from './activity-log';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -100,6 +101,22 @@ export const verifyStartOtp = onCall(
     });
 
     await writeAuditEvent(taskId, 'started', callerUid);
+
+    let taskTitle = 'a task';
+    try {
+      const t = await taskRef.get();
+      taskTitle = (t.data() as { title?: string } | undefined)?.title?.trim() || 'a task';
+    } catch {
+      /* keep fallback */
+    }
+    const volunteerName = await safeDisplayName(db, callerUid, 'volunteer');
+    await appendActivityLog(db, {
+      eventType: 'task_started',
+      description: `Task '${taskTitle}' started by ${volunteerName}`,
+      userId: callerUid,
+      taskId,
+    });
+
     return { taskId, status: 'in_progress' };
   },
 );

@@ -1,7 +1,7 @@
-// Profile onboarding — captures name (required), photo (required), and:
-//   - volunteer / both → a skill picker from the catalog (required)
-//   - customer-only   → a free-text bio (optional)
-// Plus optional ID image for anyone. Stored at fixed Storage paths:
+// Profile onboarding (step 3) — captures name (required), photo (required),
+// and an optional bio for everyone. Plus an optional ID image.
+// Skills moved to step 4 (/onboarding/skills) — volunteers only.
+// Stored at fixed Storage paths:
 //   users/{uid}/photo
 //   users/{uid}/id-image
 
@@ -17,14 +17,12 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { useAuthState } from '../../lib/auth-context';
 import { db, storage } from '../../lib/firebase';
-import { SKILLS } from '../../lib/catalog';
 import { OnboardingProgress } from '../../components/OnboardingProgress';
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_NAME = 80;
 const MAX_BIO = 280;
-const MAX_SKILLS = 10;
 
 function validateImage(file: File): string | null {
   if (!ALLOWED_MIME.includes(file.type)) {
@@ -40,7 +38,6 @@ export default function ProfilePage() {
   const state = useAuthState();
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [idFile, setIdFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +61,8 @@ export default function ProfilePage() {
 
   if (state.status !== 'incomplete') return null;
   const user = state.user;
-  const userDoc = state.userDoc;
-  const isVolunteer = userDoc.roles?.includes('volunteer') ?? false;
+  const isVolunteer =
+    state.userDoc.roles?.includes('volunteer') ?? false;
 
   function onPhotoChange(e: ChangeEvent<HTMLInputElement>) {
     setError(null);
@@ -99,16 +96,6 @@ export default function ProfilePage() {
     setIdFile(file);
   }
 
-  function toggleSkill(key: string) {
-    setSelectedSkills((prev) =>
-      prev.includes(key)
-        ? prev.filter((k) => k !== key)
-        : prev.length >= MAX_SKILLS
-          ? prev
-          : [...prev, key],
-    );
-  }
-
   async function handleSubmit() {
     setError(null);
     const trimmedName = displayName.trim();
@@ -117,10 +104,7 @@ export default function ProfilePage() {
       return setError(`Name must be ${String(MAX_NAME)} characters or fewer.`);
     }
     if (!photoFile) return setError('Please add a profile photo.');
-    if (isVolunteer && selectedSkills.length === 0) {
-      return setError('Please choose at least one skill you can help with.');
-    }
-    if (!isVolunteer && bio.length > MAX_BIO) {
+    if (bio.length > MAX_BIO) {
       return setError(`Bio must be ${String(MAX_BIO)} characters or fewer.`);
     }
 
@@ -135,9 +119,7 @@ export default function ProfilePage() {
         displayName: trimmedName,
         photoURL: photoPath,
       };
-      if (isVolunteer) {
-        update.skills = selectedSkills;
-      } else if (bio.trim()) {
+      if (bio.trim()) {
         update.bio = bio.trim();
       }
 
@@ -150,8 +132,10 @@ export default function ProfilePage() {
       }
 
       await updateDoc(doc(db(), 'users', user.uid), update);
-      // ProtectedRoute on /onboarding/profile will see status flip to
-      // 'ready' once the onSnapshot updates and redirect to /app.
+      // ProtectedRoute on /onboarding/profile will redirect once the
+      // onSnapshot delivers the new doc:
+      //   - volunteer / dual: → /onboarding/skills (step 4)
+      //   - customer-only:    → /app
     } catch (err) {
       setError(
         err instanceof Error
@@ -166,7 +150,7 @@ export default function ProfilePage() {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
-        <OnboardingProgress current={3} />
+        <OnboardingProgress current={3} includeSkills={isVolunteer} />
         <h1 className="text-3xl font-semibold tracking-tight">
           Tell us about you
         </h1>
@@ -233,53 +217,27 @@ export default function ProfilePage() {
             />
           </div>
 
-          {isVolunteer ? (
-            <section>
-              <h2 className="text-sm font-medium text-neutral-900">
-                What can you help with?
-              </h2>
-              <p className="mt-1 text-sm text-neutral-600">
-                Choose up to {MAX_SKILLS}. Pick only what you’re actually
-                comfortable doing.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {SKILLS.map((s) => (
-                  <SkillChip
-                    key={s.key}
-                    selected={selectedSkills.includes(s.key)}
-                    onClick={() => toggleSkill(s.key)}
-                  >
-                    {s.label}
-                  </SkillChip>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-neutral-500">
-                {selectedSkills.length} / {MAX_SKILLS} selected
-              </p>
-            </section>
-          ) : (
-            <div>
-              <label
-                htmlFor={bioId}
-                className="block text-sm font-medium text-neutral-900"
-              >
-                About you{' '}
-                <span className="font-normal text-neutral-500">(optional)</span>
-              </label>
-              <textarea
-                id={bioId}
-                maxLength={MAX_BIO}
-                rows={3}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                placeholder="A short line about you. What kind of help you tend to ask for, hours you're usually around."
-              />
-              <p className="mt-1 text-xs text-neutral-500">
-                {bio.length} / {MAX_BIO}
-              </p>
-            </div>
-          )}
+          <div>
+            <label
+              htmlFor={bioId}
+              className="block text-sm font-medium text-neutral-900"
+            >
+              About you{' '}
+              <span className="font-normal text-neutral-500">(optional)</span>
+            </label>
+            <textarea
+              id={bioId}
+              maxLength={MAX_BIO}
+              rows={3}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+              placeholder="A short line about you. What kind of help you tend to ask for, hours you're usually around."
+            />
+            <p className="mt-1 text-xs text-neutral-500">
+              {bio.length} / {MAX_BIO}
+            </p>
+          </div>
 
           <div className="rounded-2xl border border-neutral-200 bg-white p-5">
             <p className="text-sm font-medium text-neutral-900">
@@ -320,35 +278,10 @@ export default function ProfilePage() {
           disabled={busy}
           className="mt-10 rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-50"
         >
-          {busy ? 'Uploading…' : 'Continue'}
+          {busy ? 'Uploading…' : isVolunteer ? 'Continue → Skills' : 'Continue'}
         </button>
       </div>
     </main>
   );
 }
 
-function SkillChip({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={
-        'rounded-full border px-4 py-2 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 ' +
-        (selected
-          ? 'border-neutral-900 bg-neutral-900 text-white'
-          : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-500')
-      }
-    >
-      {children}
-    </button>
-  );
-}

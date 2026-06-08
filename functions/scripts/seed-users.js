@@ -40,6 +40,10 @@ function pickSkills(count) {
 // Fixture sets
 // ---------------------------------------------------------------------------
 
+// All fixtures cluster around the user-supplied test centre
+// (13.0202, 77.6815) — Bangalore. Spread mirrors the original Kalewadi
+// layout (~50–600 m apart) so every fixture sits well inside the default
+// 2 km task search radius and distance scoring still has variance.
 const VOLUNTEERS_ONLY = [
   {
     email: 'vol@example.com',
@@ -48,7 +52,7 @@ const VOLUNTEERS_ONLY = [
     bio: 'Here to help.',
     trustScore: 88, idVerified: true,
     verifiedTaskCount: 14, verifiedHours: 22, points: 156,
-    lat: 18.6108, lng: 73.7869, // ~300 m NW of Kalewadi centre
+    lat: 13.0208, lng: 77.6810, // ~80 m NW of test centre
   },
   {
     email: 'vol1@example.com',
@@ -57,7 +61,7 @@ const VOLUNTEERS_ONLY = [
     bio: 'Weekend helper.',
     trustScore: 74, idVerified: false,
     verifiedTaskCount: 6, verifiedHours: 9, points: 72,
-    lat: 18.6095, lng: 73.7891, // ~200 m E of centre
+    lat: 13.0195, lng: 77.6832, // ~200 m SE of test centre
   },
   {
     email: 'vol2@example.com',
@@ -66,7 +70,7 @@ const VOLUNTEERS_ONLY = [
     bio: 'New volunteer, eager to help.',
     trustScore: 42, idVerified: false,
     verifiedTaskCount: 1, verifiedHours: 1, points: 10,
-    lat: 18.6085, lng: 73.7862, // ~550 m SW of centre
+    lat: 13.0185, lng: 77.6803, // ~250 m SW of test centre
   },
 ];
 
@@ -76,21 +80,21 @@ const CUSTOMERS_ONLY = [
     password: 'pass123',
     displayName: 'Sunita',
     bio: 'Needs occasional help.',
-    lat: 18.6102, lng: 73.7874, // Kalewadi centre
+    lat: 13.0202, lng: 77.6815, // test centre
   },
   {
     email: 'cus1@example.com',
     password: 'pass123',
     displayName: 'Deepak',
     bio: 'Busy schedule, appreciate community help.',
-    lat: 18.6112, lng: 73.7855, // ~450 m NW of centre
+    lat: 13.0212, lng: 77.6796, // ~250 m NW of test centre
   },
   {
     email: 'cus2@example.com',
     password: 'pass123',
     displayName: 'Rekha',
     bio: 'Looking for trusted help in my area.',
-    lat: 18.6120, lng: 73.7900, // ~450 m NE of centre
+    lat: 13.0220, lng: 77.6841, // ~350 m NE of test centre
   },
 ];
 
@@ -102,7 +106,7 @@ const BOTH = [
     bio: 'Happy to assist nearby. Also posts tasks.',
     trustScore: 62, idVerified: true,
     verifiedTaskCount: 3, verifiedHours: 4, points: 38,
-    lat: 18.6118, lng: 73.7882, // ~450 m NE of centre
+    lat: 13.0218, lng: 77.6823, // ~200 m NE of test centre
   },
   {
     email: 'both1@example.com',
@@ -111,7 +115,7 @@ const BOTH = [
     bio: 'Both helps and asks for help in the community.',
     trustScore: 80, idVerified: true,
     verifiedTaskCount: 10, verifiedHours: 14, points: 100,
-    lat: 18.6100, lng: 73.7900, // ~250 m E of centre
+    lat: 13.0200, lng: 77.6841, // ~280 m E of test centre
   },
   {
     email: 'both2@example.com',
@@ -120,7 +124,7 @@ const BOTH = [
     bio: 'New to the platform — happy to help when free.',
     trustScore: 55, idVerified: false,
     verifiedTaskCount: 2, verifiedHours: 3, points: 25,
-    lat: 18.6080, lng: 73.7890, // ~550 m S of centre
+    lat: 13.0180, lng: 77.6831, // ~280 m SE of test centre
   },
 ];
 

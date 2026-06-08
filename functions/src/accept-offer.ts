@@ -17,6 +17,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
+import { appendActivityLog, safeDisplayName } from './activity-log';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -113,6 +114,25 @@ export const acceptOffer = onCall(
         err: err instanceof Error ? err.message : String(err),
       });
     }
+
+    // Activity log — after the transactional accept lands. Pull the
+    // task title for a human-readable description; fall back if the
+    // fetch fails so logging never blocks the accept response.
+    let taskTitle = 'a task';
+    try {
+      const taskSnap = await taskRef.get();
+      const t = taskSnap.exists ? (taskSnap.data() as { title?: string }) : null;
+      taskTitle = t?.title?.trim() || 'a task';
+    } catch {
+      /* keep fallback */
+    }
+    const volunteerName = await safeDisplayName(db, volunteerId, 'a volunteer');
+    await appendActivityLog(db, {
+      eventType: 'task_accepted',
+      description: `${volunteerName} accepted task '${taskTitle}'`,
+      userId: volunteerId,
+      taskId,
+    });
 
     return { taskId, acceptedAt: acceptedAtMs };
   },

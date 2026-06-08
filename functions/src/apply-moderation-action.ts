@@ -2,6 +2,7 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { recomputeTrustScore } from './recompute-trust-score';
+import { appendActivityLog, safeDisplayName } from './activity-log';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -88,11 +89,16 @@ export const applyModerationAction = onCall(
       userUpdate.accountStatus = 'banned';
       userUpdate.banned = true;
       userUpdate.moderationReason = reason;
+      // bannedAt anchors the 30-day permanent-purge window used by
+      // scheduledPurgeBannedUsers. Set only when the user is freshly
+      // banned (re-banning resets the clock, which is the desired UX).
+      userUpdate.bannedAt = FieldValue.serverTimestamp();
     } else if (action === 'dismiss') {
       userUpdate.accountStatus = 'active';
       userUpdate.banned = FieldValue.delete();
       userUpdate.suspendedUntil = FieldValue.delete();
       userUpdate.moderationReason = FieldValue.delete();
+      userUpdate.bannedAt = FieldValue.delete();
     }
 
     // A pending report is consumed iff we were given a reportId (any action,
@@ -181,11 +187,49 @@ export const applyModerationAction = onCall(
 
     await batch.commit();
 
+    // Revoke cleanup: when a previously-banned user is reactivated, wipe
+    // any in-flight tasks they posted as customer so nothing is left
+    // dangling under their identity. Completed / cancelled / expired
+    // tasks are preserved (audit). Volunteer-side active tasks were
+    // already detached and re-queued at ban time (block above), so no
+    // additional handling is needed for those here.
+    const wasBanned = userSnap.data()?.accountStatus === 'banned';
+    if (action === 'dismiss' && wasBanned) {
+      const orphanSnap = await db.collection('tasks')
+        .where('customerId', '==', userId)
+        .where('status', 'in', ['searching', 'accepted', 'in_progress'])
+        .get();
+      // recursiveDelete walks subcollections (offers, events). It is not
+      // a single atomic write — partial failure would leave debris, but
+      // for a small per-user fan-out (typically <10 docs) the simplicity
+      // win outweighs the cost of building a manual cascading batch.
+      await Promise.all(
+        orphanSnap.docs.map((d) => db.recursiveDelete(d.ref)),
+      );
+    }
+
     // Recompute trust score for volunteer targets
     const roles = userSnap.data()?.roles as string[] | undefined;
     if (roles?.includes('volunteer')) {
       await recomputeTrustScore(db, userId);
     }
+
+    // Activity log — action-specific phrasing; never include UIDs.
+    const targetName = await safeDisplayName(db, userId, 'a user');
+    const adminName = await safeDisplayName(db, adminUid, 'Admin');
+    const verb =
+      action === 'warn'
+        ? 'warned'
+        : action === 'suspend'
+          ? 'suspended'
+          : action === 'ban'
+            ? 'banned'
+            : 'reactivated';
+    await appendActivityLog(db, {
+      eventType: 'moderation_action',
+      description: `${adminName} ${verb} ${targetName}`,
+      userId: adminUid,
+    });
 
     return { success: true };
   },

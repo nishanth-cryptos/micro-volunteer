@@ -1,24 +1,33 @@
-// Numbered onboarding stepper shown on /signup, /onboarding/role, and
-// /onboarding/profile. Three steps total. The consent gate is an
-// interstitial and intentionally not numbered.
+// Numbered onboarding stepper shown on /signup, /onboarding/role,
+// /onboarding/profile, and (volunteers only) /onboarding/skills.
+// The consent gate is an interstitial and intentionally not numbered.
 
-export type OnboardingStep = 1 | 2 | 3;
+export type OnboardingStep = 1 | 2 | 3 | 4;
 
 interface Props {
   current: OnboardingStep;
+  // When true, render the 4-step (volunteer) variant ending in "Skills".
+  // Default is 3 steps (customer-only or pre-role pages where the role
+  // is not yet known).
+  includeSkills?: boolean;
 }
 
-const STEPS: { num: OnboardingStep; label: string }[] = [
+const BASE_STEPS: { num: OnboardingStep; label: string }[] = [
   { num: 1, label: 'Account' },
   { num: 2, label: 'Role' },
   { num: 3, label: 'Profile' },
 ];
+const SKILLS_STEP: { num: OnboardingStep; label: string } = {
+  num: 4,
+  label: 'Skills',
+};
 
-export function OnboardingProgress({ current }: Props) {
+export function OnboardingProgress({ current, includeSkills }: Props) {
+  const steps = includeSkills ? [...BASE_STEPS, SKILLS_STEP] : BASE_STEPS;
   return (
     <nav aria-label="Onboarding progress" className="mb-12">
       <ol className="flex items-start justify-center gap-2 sm:gap-3">
-        {STEPS.map((step, idx) => {
+        {steps.map((step, idx) => {
           const completed = current > step.num;
           const isCurrent = current === step.num;
           return (
@@ -49,7 +58,7 @@ export function OnboardingProgress({ current }: Props) {
                   {step.label}
                 </span>
               </div>
-              {idx < STEPS.length - 1 && (
+              {idx < steps.length - 1 && (
                 <span
                   aria-hidden="true"
                   className={

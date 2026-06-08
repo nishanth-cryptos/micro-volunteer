@@ -106,6 +106,10 @@ export default function TaskDetailPage() {
 
   const [completedEvent, setCompletedEvent] = useState<EventDoc | null>(null);
   const [hasReassignedEvent, setHasReassignedEvent] = useState(false);
+  // Frozen "now" — used for the 24h post-completion report window check.
+  // Refreshing per-render trips react-hooks/purity; the window only matters
+  // hours after completion so the mount-time value is plenty accurate.
+  const [now] = useState(() => Date.now());
   const prevStatusRef = useRef<TaskStatus | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastPoints, setToastPoints] = useState<number>(0);
@@ -261,10 +265,33 @@ export default function TaskDetailPage() {
               const isCustomer = viewerUid === task.customerId;
               const isVolunteer = viewerUid === task.acceptedVolunteerId;
               const hasAcceptedVol = !!task.acceptedVolunteerId;
+
+              // Reporting window (mirrors functions/src/report-user.ts):
+              //   - accepted / in_progress: always inside the window
+              //   - completed: only if completedAt is within 24h
+              //   - volunteer side additionally requires status !== 'accepted'
+              //     (i.e., Start OTP must have been verified)
+              const REPORT_WINDOW_AFTER_COMPLETION_MS = 24 * 60 * 60 * 1000;
+              const insideLifecycle =
+                task.status === 'accepted' || task.status === 'in_progress';
+              const insidePostCompletionWindow =
+                task.status === 'completed' &&
+                !!task.completedAt &&
+                now - task.completedAt.toMillis() <
+                  REPORT_WINDOW_AFTER_COMPLETION_MS;
+              const inWindow = insideLifecycle || insidePostCompletionWindow;
+
+              // Volunteer can only report once status has moved past
+              // 'accepted'. Customer can report anytime in-window.
+              const allowedForViewer = isCustomer
+                ? true
+                : isVolunteer && task.status !== 'accepted';
+
               const showReportBlock =
                 hasAcceptedVol &&
                 (isCustomer || isVolunteer) &&
-                ['accepted', 'in_progress', 'completed'].includes(task.status);
+                inWindow &&
+                allowedForViewer;
 
               if (!showReportBlock) return null;
 
@@ -281,6 +308,7 @@ export default function TaskDetailPage() {
                   taskId={taskId}
                   reportedUserId={reportedUserId}
                   reportedUserName={reportedUserName}
+                  viewerRole={isCustomer ? 'customer' : 'volunteer'}
                 />
               );
             })()}

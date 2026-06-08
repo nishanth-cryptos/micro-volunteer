@@ -24,6 +24,14 @@
         { "fieldPath": "acceptedVolunteerId", "order": "ASCENDING" },
         { "fieldPath": "acceptedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "activityLog",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "eventType", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

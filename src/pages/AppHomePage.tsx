@@ -4,7 +4,15 @@
 
 import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { latLngToCell } from 'h3-js';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
@@ -13,6 +21,7 @@ import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
 import { MyTasksList } from '../components/MyTasksList';
 import { OfferInbox } from '../components/OfferInbox';
 import { AcceptedTasksList } from '../components/AcceptedTasksList';
+import { BlockedUsersList } from '../components/BlockedUsersList';
 import { getSkillLabel } from '../lib/catalog';
 import { KarmaBadge } from '../components/KarmaBadge';
 import { KarmaToast } from '../components/KarmaToast';
@@ -45,6 +54,13 @@ export default function AppHomePage() {
   const isVolunteer = userDoc.roles?.includes('volunteer') ?? false;
   const isCustomer = userDoc.roles?.includes('customer') ?? false;
   const available = userDoc.availableNow ?? false;
+
+  // Admin home short-circuit. Admins never see volunteer/customer
+  // dashboards from /app — they get a minimal landing with a direct
+  // Dashboard link and a pending-reports alert.
+  if (userDoc.isAdmin === true) {
+    return <AdminHomeScreen name={name} />;
+  }
 
   async function handleSignOut() {
     await signOut(auth());
@@ -152,17 +168,6 @@ export default function AppHomePage() {
           )}
         </div>
 
-        {userDoc.isAdmin === true && (
-          <div className="mt-4">
-            <Link
-              to="/admin"
-              className="inline-block rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
-            >
-              Go to Admin Dashboard
-            </Link>
-          </div>
-        )}
-
         {isVolunteer && (
           <section className="mt-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-neutral-900">Volunteer Stats</h2>
@@ -242,6 +247,7 @@ export default function AppHomePage() {
               </Link>
             </section>
             <MyTasksList uid={user.uid} />
+            <BlockedUsersList uid={user.uid} />
           </>
         )}
 
@@ -314,6 +320,73 @@ export default function AppHomePage() {
             onClose={() => setToastMessage(null)}
           />
         )}
+      </div>
+    </main>
+  );
+}
+
+// Admin landing — minimal by spec: heading, dashboard CTA, and a neutral
+// alert if any pending reports are awaiting review. No karma / stats /
+// availability / blocks. The pending-reports subscription mirrors the
+// admin dashboard's own query so the counts agree.
+function AdminHomeScreen({ name }: { name: string }) {
+  const [pendingCount, setPendingCount] = useState<number>(0);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const q = query(
+      collection(db(), 'reports'),
+      where('status', '==', 'pending'),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => setPendingCount(snap.size),
+      () => {
+        /* keep zero on error */
+      },
+    );
+    return unsub;
+  }, []);
+
+  async function handleSignOut() {
+    await signOut(auth());
+    void navigate('/', { replace: true });
+  }
+
+  return (
+    <main className="min-h-screen bg-neutral-50 text-neutral-900">
+      <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Welcome, {name}.
+        </h1>
+
+        <div className="mt-8">
+          <Link
+            to="/admin"
+            className="inline-block rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+          >
+            Go to Admin Dashboard
+          </Link>
+        </div>
+
+        {pendingCount > 0 && (
+          <button
+            type="button"
+            onClick={() => void navigate('/admin')}
+            className="mt-6 block w-full rounded-2xl border border-neutral-200 bg-white px-5 py-4 text-left text-sm text-neutral-700 transition hover:border-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+          >
+            You have <span className="font-semibold text-neutral-900">{pendingCount}</span>{' '}
+            pending {pendingCount === 1 ? 'report' : 'reports'} waiting for review.
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => void handleSignOut()}
+          className="mt-12 rounded-full border border-neutral-300 px-5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+        >
+          Sign out
+        </button>
       </div>
     </main>
   );

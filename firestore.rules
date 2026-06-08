@@ -281,6 +281,15 @@ service cloud.firestore {
       allow write: if false; // Handled by Cloud Function
     }
 
+    // ----- activityLog/{entryId} -----
+    // Append-only, admin-read site-wide audit feed. All writes go through
+    // Cloud Functions (Admin SDK bypasses these rules); clients have no
+    // direct write path. Non-admin users cannot read.
+    match /activityLog/{entryId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Everything else stays deny-by-default until later milestones grant access.
     match /{document=**} {
       allow read, write: if false;

@@ -16,5 +16,9 @@ export { awardPointsOnCompletion } from './award-points-on-completion';
 export { reportUser } from './report-user';
 export { blockUser } from './block-user';
 export { applyModerationAction } from './apply-moderation-action';
+export { scheduledPurgeBannedUsers } from './scheduled-purge-banned-users';
+export { onVolunteerAvailable } from './on-volunteer-available';
+export { periodicRedispatchOffers } from './periodic-redispatch-offers';
+export { logUserRegistered } from './log-user-registered';
 
 
