@@ -56,8 +56,8 @@
 - `scripts/seed/catalog.json` — starter seed for `catalog/categories` and `catalog/skills`. Reviewed pre-launch; loaded into Firestore by an admin-only callable in M1. Replaced by the M8 admin UI for live edits.
 - `scripts/seed-admin.js` — root redirect wrapper that executes the Admin SDK seed script to create the local administrator.
 - `scripts/seed-users.js` — root redirect wrapper that executes the Admin SDK seed script to create test volunteer + customer accounts.
-- `functions/scripts/seed-admin.js` — database seed script using the Admin SDK to create the default administrator user and profile.
-- `functions/scripts/seed-users.js` — database seed script using the Admin SDK to create 4 test volunteers (varying trust/skills) and 2 test customers, all with Mumbai-area H3 locations.
+- `functions/scripts/seed-admin.js` — Admin SDK seed: 2 admins (admin@example.org, admin2@example.org / `admin123`) with `isAdmin: true` + full volunteer-shape fields. Idempotent — re-syncs password + displayName on existing accounts.
+- `functions/scripts/seed-users.js` — Admin SDK seed: 3 volunteer-only + 3 customer-only + 3 dual-role test users (all Kalewadi-centred, `pass123`). Same idempotent password resync as seed-admin.
 
 ## Cloud Functions
 - `functions/package.json` — `firebase-functions@7.2.5`, `firebase-admin@13.10.0`, Node 22 runtime.

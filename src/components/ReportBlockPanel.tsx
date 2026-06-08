@@ -14,8 +14,9 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
 
-  // Report Form state
-  const [reason, setReason] = useState('rude');
+  // Report Form state — values must stay in sync with systemPatterns.md
+  // PII inventory / report taxonomy: safety | no_show | inappropriate | fraud | other.
+  const [reason, setReason] = useState('safety');
   const [details, setDetails] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -139,9 +140,10 @@ export function ReportBlockPanel({ taskId, reportedUserId, reportedUserName }: P
                     onChange={(e) => setReason(e.target.value)}
                     className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                   >
-                    <option value="rude">Rude or inappropriate behavior</option>
-                    <option value="unsafe">Unsafe conduct</option>
+                    <option value="safety">Safety concern</option>
                     <option value="no_show">No show / did not arrive</option>
+                    <option value="inappropriate">Inappropriate behavior</option>
+                    <option value="fraud">Fraud or scam</option>
                     <option value="other">Other reason</option>
                   </select>
                 </div>

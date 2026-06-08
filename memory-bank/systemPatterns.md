@@ -265,19 +265,22 @@ expiresAt?: Timestamp
 - **Newcomer**: `trustScore < 60` (Neutral status chip/badge; defaults to 30 for new users)
 
 ## Trust Score Recompute Formula
-The trust score is calculated server-side inside Cloud Functions as follows:
+The trust score is calculated server-side inside Cloud Functions. Each
+positive component is normalised to `[0, 1]` *before* its weight is applied,
+so raw activity counts can't dominate the formula:
 ```
-trustScore = Math.max(30, Math.min(100, Math.round(clampedScore * 100)))
+rawScore = 0.35 * min(1, verifiedTaskCount / 20)    // TASK_SATURATION = 20
+         + 0.30 * scaledAvgRating
+         + 0.15 * min(1, verifiedHours / 40)         // HOURS_SATURATION = 40
+         + 0.10 * (idVerified ? 1 : 0)
+         - reportPenalty                             // accumulated by adminAction (+0.15 warn, +0.25 suspend)
+
+clampedScore = max(0.3, min(1.0, rawScore))
+trustScore   = round(clampedScore * 100)             // stored 30..100 on user doc
 ```
-where `clampedScore` is between `[0.3, 1.0]`, derived from `rawScore`:
-```
-rawScore = (verifiedTaskCount * 0.35) + 
-           (scaledAvgRating * 0.30) + 
-           (verifiedHours * 0.15) + 
-           (idVerified ? 0.10 : 0) - 
-           (pendingReports * 0.15 + warningsCount * 0.25)
-```
-- `scaledAvgRating`: The average of ratings from completed tasks (`1` to `5`), scaled to `[0.0, 1.0]` (i.e. divided by `5.0`). Defaults to `1.0` if no tasks have been rated.
+- `scaledAvgRating`: average of ratings from this volunteer's completed tasks (1–5) divided by 5.0. If no tasks have been rated yet, defaults to `1.0` so newcomers aren't penalised on the rating component.
+- Sum of positive weights = 0.90, so a maxed-out volunteer pegs at `trustScore = 90` (the `Trusted` threshold is 85). Saturation caps live in `recompute-trust-score.ts` as `TASK_SATURATION` / `HOURS_SATURATION`.
+- `reportPenalty` is accumulated on the user doc by `applyModerationAction` (warn = +0.15, suspend = +0.25). Ban does not add penalty because the account is already blocked from matching.
 
 ## Points & Skill Points Awarding
 On task completion, volunteers and customers receive:

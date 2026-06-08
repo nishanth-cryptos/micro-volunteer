@@ -19,23 +19,29 @@ M8 features implemented:
   - Mid-task suspension handling: Automatically reset tasks to searching state, clear assigned volunteer parameters, trigger matching re-runs, display reassignment notices to customers, and redirect volunteers back to the homepage with a warning toast.
 
 ## Done
-- Repo initialized (git, main branch, .gitignore)
-- Vite 8 + React 19 + TS 6 strict scaffold
-- Tailwind v4 wired via `@tailwindcss/vite` plugin
-- ESLint 9 flat config + Prettier configured (`lint`, `format`, `typecheck`, `build`, `dev` scripts)
-- Firebase client SDK installed; lazy initializer at `src/lib/firebase.ts`
-- `.env.example` with NAMES ONLY (no values)
-- `firebase.json` (hosting, firestore, storage, functions, emulators ports)
-- `firestore.rules` — deny-by-default
-- `storage.rules` — deny-by-default
-- `firestore.indexes.json` — empty
-- `.firebaserc` with placeholder project id
-- `functions/` scaffold (TS strict, Node 22 runtime, builds clean)
-- Memory bank (`memory-bank/` 7 files) + root `CLAUDE.md` + thin `CHECKPOINT.md`
-- Verified: `tsc --noEmit` clean, `eslint .` clean, `vite build` clean (5.47 kB CSS = Tailwind working), `functions` build clean.
+- **M0 Foundation** — Vite 8 + React 19 + TS 6 strict, Tailwind v4, ESLint 9 flat + Prettier, Firebase client SDK + lazy initializer, deny-by-default firestore + storage rules, `functions/` scaffold (TS strict, Node 22). Memory bank + CLAUDE.md.
+- **M1 Auth & roles** — Firebase Phone OTP + Email/Password, T&C consent capture, role selection, protected routes with onboarding step machine (`src/lib/protected-route.tsx`), `useRedirectWhenSignedIn` hook to dodge the auth-then-navigate race.
+- **M2 Profile & availability** — display name + required photo + bio + optional ID image, prominent availability ON/OFF toggle for volunteers, geolocation + H3 res-9 cell write on toggle-ON.
+- **M3 Task posting & risk** — map pin (Leaflet/OSM) + structured form (category, skills, duration, 4 short textareas), risk auto-derived from category, client `addDoc` with server-validated shape via firestore rules.
+- **M4 Matching engine** — `rankNearbyVolunteers` callable + shared `scoring.ts` (distance/skill/trust/availability/past − reportPenalty), customer-side TaskDetail with ranked candidate list and score breakdown chips.
+- **M5 Notifications & lifecycle** — `dispatchOffers` trigger writes per-volunteer offer docs on task create AND on transitions back to `searching` (reassignment), volunteer `OfferInbox` + `AcceptedTasksList`, `acceptOffer` / `rejectOffer` callables (race-safe transaction).
+- **M6 OTP proof of work** — `generateStartOtp` / `verifyStartOtp` / `generateEndOtp` / `verifyEndOtp` callables (hash+salt+TTL, plaintext returned only to customer once), `submitCustomerRating`, append-only `tasks/{id}/events` audit trail via `writeAuditEvent`, `expireStaleTasks` scheduler.
+- **M8 Points, trust, safety & admin** (M7 chat deferred):
+  - `awardPointsOnCompletion` trigger awards volunteer points (10 base + 1/15min, cap 18) + customer points (2, only if customer also has volunteer role) + skill points + audit event on status flip to `completed`.
+  - `recomputeTrustScore` with normalised formula (see systemPatterns.md). Fires from `awardPointsOnCompletion`, `submitCustomerRating`, and post-moderation.
+  - `reportUser` / `blockUser` / `applyModerationAction` callables with `checkActiveStatus` helper enforced across all user-facing callables.
+  - Admin Dashboard at `/admin` (`requiresAdmin` route guard): stats panels, pending-reports queue, user lookup with moderation log, task audit timeline.
+  - `ReportBlockPanel` overlays on TaskDetail (canonical taxonomy: safety / no_show / inappropriate / fraud / other).
+  - Global ban/suspend interceptor in `ProtectedRoute` — full-screen Banned/Suspended screens for affected users.
+  - Mid-task suspension/ban: assigned task flips back to `searching`, OTP material cleared, audit event `reassigned` written, `dispatchOffers` re-fires; customers see a reassignment notice, volunteers are redirected to `/app` with a toast.
+  - Block-aware matching: `scoring.rankForTask` filters out mutually-blocked users from both directions.
+  - Seed scripts (Kalewadi-centred fixtures; both scripts re-sync passwords on existing accounts so credentials stay valid across runs):
+    - `npm run seed:admin` → 2 admins (admin@example.org, admin2@example.org — both pass `admin123`, `isAdmin: true`, full volunteer-shape fields so they can also test the volunteer/customer flows).
+    - `npm run seed:users` → 3 volunteer-only (vol@, vol1@, vol2@) + 3 customer-only (cus@, cus1@, cus2@) + 3 dual-role (both@, both1@, both2@) — all pass `pass123`.
+- Verified at every step: frontend `typecheck` + `lint` + `vite build` clean; functions `build` clean.
 
 ## In progress
-- Nothing in active development. Awaiting Firebase Console step-through, then M1 kickoff.
+- Nothing in active development. M7 (in-app chat) is the next milestone.
 
 ## Firebase project (created 2026-06-07)
 - **Name:** micro - volunteer
@@ -64,9 +70,9 @@ M8 features implemented:
 - [ ] Verify Phone Auth real SMS works (small test batch with real number)
 
 ## Known mocks / TODOs
-- `App.tsx` is an M0 smoke-test landing page — will be replaced by the router shell in M1.
-- `src/lib/firebase.ts` initializes app only; no Auth/Firestore/Storage helpers yet.
-- `scripts/seed/catalog.json` is starter content — Nishanth to review categories/skills (especially region-specific languages) before M1 deploy.
+- `scripts/seed/catalog.json` is starter content — Nishanth to review categories/skills (especially region-specific languages) before launch.
+- FCM real device push deferred (Spark plan + emulator-only dev). No real notifications until Blaze upgrade.
+- Storage uses the emulator only; production Storage gated on Blaze upgrade.
 
 ## Decisions locked 2026-06-07 (see decisions.md)
 - Data model approved (collections, doc shapes, indexes, denormalization, security-rules sketch).
@@ -78,5 +84,6 @@ M8 features implemented:
 - Customer rating: **1–5 stars + optional comment** post-completion.
 
 ## Next steps
-1. Step through Firebase Console together (create project + enable services).
-2. M1: Phone OTP + email auth, T&C consent, role selection, protected routes, catalog seed callable.
+1. Live smoke test of M8 in the emulator suite (report → moderation → reassignment → completion).
+2. M7: in-app chat (opens on acceptance, report message, block user).
+3. Pre-launch: Blaze upgrade + real-device FCM smoke test + Storage Console enable.

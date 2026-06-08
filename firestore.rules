@@ -61,11 +61,14 @@ service cloud.firestore {
       ];
     }
 
-    // Server-only fields. Must never appear in a client write (create or update).
+    // Server-only fields. Must never appear in a client write at create-time.
+    // (Update-time enforcement comes from userUpdateAllowedKeys() being the
+    // exhaustive allowlist of client-mutable fields.) Note: idImagePath is
+    // client-writable on update (profile upload) but the trust gate is the
+    // server-only `idVerified` boolean below.
     function userServerOnlyKeys() {
       return [
         'idVerified',
-        'idImagePath',
         'trustScore',
         'verifiedTaskCount',
         'verifiedHours',

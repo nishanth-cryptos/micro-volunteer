@@ -65,14 +65,12 @@ export const applyModerationAction = onCall(
 
     // Determine state changes
     const userUpdate: Record<string, unknown> = {};
-    let penaltyIncrement = 0;
 
     if (action === 'warn') {
       userUpdate.accountStatus = 'warned';
       userUpdate.moderationReason = reason;
       userUpdate.warningsCount = FieldValue.increment(1);
-      penaltyIncrement = 0.15; // +0.15 report penalty for warnings
-      userUpdate.reportPenalty = FieldValue.increment(penaltyIncrement);
+      userUpdate.reportPenalty = FieldValue.increment(0.15);
     } else if (action === 'suspend') {
       if (typeof durationDays !== 'number' || durationDays <= 0) {
         throw new HttpsError(
@@ -80,14 +78,12 @@ export const applyModerationAction = onCall(
           'durationDays must be a positive number for suspension.',
         );
       }
-      const suspendedUntil = Timestamp.fromMillis(
+      userUpdate.accountStatus = 'suspended';
+      userUpdate.suspendedUntil = Timestamp.fromMillis(
         Date.now() + durationDays * 24 * 60 * 60 * 1000,
       );
-      userUpdate.accountStatus = 'suspended';
-      userUpdate.suspendedUntil = suspendedUntil;
       userUpdate.moderationReason = reason;
-      penaltyIncrement = 0.25; // +0.25 report penalty for suspensions
-      userUpdate.reportPenalty = FieldValue.increment(penaltyIncrement);
+      userUpdate.reportPenalty = FieldValue.increment(0.25);
     } else if (action === 'ban') {
       userUpdate.accountStatus = 'banned';
       userUpdate.banned = true;
@@ -97,13 +93,17 @@ export const applyModerationAction = onCall(
       userUpdate.banned = FieldValue.delete();
       userUpdate.suspendedUntil = FieldValue.delete();
       userUpdate.moderationReason = FieldValue.delete();
-      // Decrement pendingReports since it's resolved
-      userUpdate.pendingReports = FieldValue.increment(-1);
-      // Ensure we don't go below 0
+    }
+
+    // A pending report is consumed iff we were given a reportId (any action,
+    // including dismiss). Plain "reactivate" via UserLookup has no reportId
+    // and must not touch the counter. Computed once here so we don't write
+    // pendingReports twice in the batch below.
+    const consumesPendingReport =
+      typeof reportId === 'string' && reportId.length > 0;
+    if (consumesPendingReport) {
       const currentPending = userSnap.data()?.pendingReports ?? 0;
-      if (currentPending <= 1) {
-        userUpdate.pendingReports = 0;
-      }
+      userUpdate.pendingReports = Math.max(0, currentPending - 1);
     }
 
     // Update in a transaction or write batch
@@ -166,9 +166,10 @@ export const applyModerationAction = onCall(
       expiresAt: action === 'suspend' ? userUpdate.suspendedUntil : null,
     });
 
-    // Update report status if applicable
-    if (typeof reportId === 'string' && reportId.length > 0) {
-      const reportRef = db.collection('reports').doc(reportId);
+    // Update report status if applicable. (pendingReports decrement was
+    // already folded into userUpdate above via consumesPendingReport.)
+    if (consumesPendingReport) {
+      const reportRef = db.collection('reports').doc(reportId as string);
       const reportStatus = action === 'dismiss' ? 'dismissed' : 'actioned';
       batch.update(reportRef, {
         status: reportStatus,
@@ -176,13 +177,6 @@ export const applyModerationAction = onCall(
         actionedAt: FieldValue.serverTimestamp(),
         adminNote: reason,
       });
-
-      // Dec pendingReports if we actioned it (for non-dismiss, we also resolve the report)
-      if (action !== 'dismiss') {
-        const currentPending = userSnap.data()?.pendingReports ?? 0;
-        const newPending = Math.max(0, currentPending - 1);
-        batch.update(userRef, { pendingReports: newPending });
-      }
     }
 
     await batch.commit();

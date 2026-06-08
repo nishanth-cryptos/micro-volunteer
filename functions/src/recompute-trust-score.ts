@@ -1,15 +1,25 @@
 import { Firestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 
+// Saturation caps: a volunteer reaches the maximum contribution from these
+// counters at TASK_SATURATION tasks / HOURS_SATURATION verified hours. Above
+// that, the marginal benefit is zero. Without these caps, raw counts dominate
+// the rawScore and every active volunteer pegs at 100 within a week.
+const TASK_SATURATION = 20;
+const HOURS_SATURATION = 40;
+
 /**
- * Recomputes the trust score for a user (volunteer) based on the formula:
- * trustScore = (verifiedTaskCount * 0.35)
- *            + (avgRating * 0.30)           // avgRating 0-5, scaled to 0-1 internally
- *            + (verifiedHours * 0.15)
- *            + (idVerified ? 0.10 : 0)
- *            + (reportPenalty * -1)
+ * Recomputes the trust score for a user (volunteer).
  *
- * Clamped to [0.3, 1.0] as floor/ceiling, and stored in user doc as 0-100.
+ * Each component is normalised to [0,1] before applying its weight, so the
+ * weighted sum stays in [0, 0.9]. Then we subtract penalties, clamp to
+ * [0.3, 1.0], and store as 0-100.
+ *
+ *   rawScore = 0.35 * min(1, verifiedTaskCount / TASK_SATURATION)
+ *            + 0.30 * scaledAvgRating
+ *            + 0.15 * min(1, verifiedHours / HOURS_SATURATION)
+ *            + 0.10 * (idVerified ? 1 : 0)
+ *            - reportPenalty
  */
 export async function recomputeTrustScore(
   db: Firestore,
@@ -47,14 +57,18 @@ export async function recomputeTrustScore(
     }
   });
 
-  // If no ratings exist yet, default to 5.0 (perfect) so they aren't penalized
+  // No ratings yet → default scaledAvgRating to 1.0 so newcomers aren't
+  // penalised on the rating component.
   const avgRating = ratedCount > 0 ? totalRating / ratedCount : 5.0;
-  const scaledAvgRating = avgRating / 5.0; // scales 0-5 to 0-1
+  const scaledAvgRating = avgRating / 5.0;
+
+  const taskNorm = Math.min(1, verifiedTaskCount / TASK_SATURATION);
+  const hoursNorm = Math.min(1, verifiedHours / HOURS_SATURATION);
 
   const rawScore =
-    verifiedTaskCount * 0.35 +
-    scaledAvgRating * 0.30 +
-    verifiedHours * 0.15 +
+    0.35 * taskNorm +
+    0.30 * scaledAvgRating +
+    0.15 * hoursNorm +
     (idVerified ? 0.10 : 0) -
     reportPenalty;
 
