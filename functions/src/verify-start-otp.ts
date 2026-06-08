@@ -8,6 +8,7 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { checkActiveStatus } from './moderation-helper';
 import { writeAuditEvent } from './audit';
 import { constantTimeEquals, hashOtp } from './otp';
 
@@ -38,6 +39,7 @@ export const verifyStartOtp = onCall(
     const callerUid = request.auth.uid;
 
     const db = getFirestore();
+    await checkActiveStatus(db, callerUid);
     const taskRef = db.collection('tasks').doc(taskId);
 
     await db.runTransaction(async (tx) => {

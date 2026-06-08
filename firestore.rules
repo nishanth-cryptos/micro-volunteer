@@ -15,6 +15,18 @@ service cloud.firestore {
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
+    function isAdmin() {
+      return isSignedIn()
+        && 'isAdmin' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    function isSuspendedOrBanned(uid) {
+      let path = /databases/$(database)/documents/users/$(uid);
+      return exists(path) && (
+        ('accountStatus' in get(path).data.keys() && get(path).data.accountStatus == 'banned')
+        || ('accountStatus' in get(path).data.keys() && get(path).data.accountStatus == 'suspended' && 'suspendedUntil' in get(path).data.keys() && get(path).data.suspendedUntil > request.time)
+      );
+    }
 
     // Fields a client may set on their initial users/{uid} document.
     function userCreateAllowedKeys() {
@@ -63,7 +75,11 @@ service cloud.firestore {
         'warningsCount',
         'suspendedUntil',
         'banned',
-        'lastSeenAt'
+        'lastSeenAt',
+        'isAdmin',
+        'pendingReports',
+        'accountStatus',
+        'moderationReason'
       ];
     }
 
@@ -90,6 +106,8 @@ service cloud.firestore {
     function taskCreateAllowedKeys() {
       return [
         'customerId',
+        'customerName',
+        'customerPhotoURL',
         'title',
         'category',
         'requiredSkills',
@@ -124,6 +142,8 @@ service cloud.firestore {
     function taskFieldsValid() {
       let d = request.resource.data;
       return d.title is string && d.title.size() > 0 && d.title.size() <= 80
+        && d.customerName is string && d.customerName.size() > 0 && d.customerName.size() <= 80
+        && (!('customerPhotoURL' in d.keys()) || (d.customerPhotoURL is string))
         && d.category is string && d.category.size() > 0
         && d.requiredSkills is list && d.requiredSkills.size() > 0
         && d.requiredSkills.size() <= 5
@@ -143,12 +163,19 @@ service cloud.firestore {
       // Read access:
       //   - the task's customer always
       //   - the accepted volunteer (after they accept)
+      //   - administrators
+      // Restricted: suspended/banned users cannot read active task assignments.
       allow read: if isSignedIn() && (
-        request.auth.uid == resource.data.customerId
-        || request.auth.uid == resource.data.acceptedVolunteerId
+        isAdmin() || (
+          !isSuspendedOrBanned(request.auth.uid) && (
+            request.auth.uid == resource.data.customerId
+            || request.auth.uid == resource.data.acceptedVolunteerId
+          )
+        )
       );
 
       allow create: if isSignedIn()
+        && !isSuspendedOrBanned(request.auth.uid)
         && request.resource.data.customerId == request.auth.uid
         && request.resource.data.keys().hasOnly(taskCreateAllowedKeys())
         && taskFieldsValid();
@@ -163,6 +190,7 @@ service cloud.firestore {
       // Subcollection match (also covered by the wildcard rule below).
       match /offers/{volunteerId} {
         allow read: if isSignedIn()
+          && !isSuspendedOrBanned(request.auth.uid)
           && request.auth.uid
              == get(/databases/$(database)/documents/tasks/$(taskId)).data.customerId;
         allow write: if false;
@@ -173,10 +201,14 @@ service cloud.firestore {
       // everyone else denied.
       match /events/{eventId} {
         allow read: if isSignedIn() && (
-          request.auth.uid
-            == get(/databases/$(database)/documents/tasks/$(taskId)).data.customerId
-          || request.auth.uid
-            == get(/databases/$(database)/documents/tasks/$(taskId)).data.acceptedVolunteerId
+          isAdmin() || (
+            !isSuspendedOrBanned(request.auth.uid) && (
+              request.auth.uid
+                == get(/databases/$(database)/documents/tasks/$(taskId)).data.customerId
+              || ('acceptedVolunteerId' in get(/databases/$(database)/documents/tasks/$(taskId)).data.keys()
+                  && request.auth.uid == get(/databases/$(database)/documents/tasks/$(taskId)).data.acceptedVolunteerId)
+            )
+          )
         );
         allow write: if false;
       }
@@ -194,7 +226,7 @@ service cloud.firestore {
 
     // ----- users/{userId} -----
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
 
       allow create: if isOwner(userId)
         && request.resource.data.keys().hasOnly(userCreateAllowedKeys())
@@ -203,11 +235,47 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(userServerOnlyKeys());
 
       allow update: if isOwner(userId)
+        && !isSuspendedOrBanned(userId)
         && request.resource.data.diff(resource.data)
              .affectedKeys().hasOnly(userUpdateAllowedKeys())
         && rolesIfPresentValid();
 
       allow delete: if false;
+    }
+
+    // ----- reports/{reportId} -----
+    match /reports/{reportId} {
+      allow read: if isSignedIn() && (
+        resource.data.reporterUid == request.auth.uid
+        || isAdmin()
+      );
+      allow create: if false; // Handled by Cloud Function
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // ----- blocks/{blockId} -----
+    match /blocks/{blockId} {
+      allow read: if isSignedIn() && (
+        resource.data.userA == request.auth.uid
+        || resource.data.userB == request.auth.uid
+      );
+      allow write: if false; // Handled by Cloud Function
+    }
+
+    // ----- adminActions/{actionId} -----
+    match /adminActions/{actionId} {
+      allow read: if isSignedIn() && (
+        resource.data.targetUid == request.auth.uid
+        || isAdmin()
+      );
+      allow write: if false; // Handled by Cloud Function
+    }
+
+    // ----- users/{userId}/moderationLog/{logId} -----
+    match /users/{userId}/moderationLog/{logId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Handled by Cloud Function
     }
 
     // Everything else stays deny-by-default until later milestones grant access.

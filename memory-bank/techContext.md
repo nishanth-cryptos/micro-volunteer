@@ -52,6 +52,7 @@ npm run typecheck            # tsc --noEmit
 npm run lint                 # eslint .
 npm run format               # prettier --write .
 npm run format:check         # prettier --check .
+npm run seed:admin           # seed default administrator in local emulators
 
 # Cloud Functions
 npm --prefix functions install

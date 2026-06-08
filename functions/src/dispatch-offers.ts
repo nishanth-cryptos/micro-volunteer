@@ -1,19 +1,14 @@
-// Firestore onCreate trigger on tasks/{taskId}.
-// On a new searching task, score eligible volunteers and write per-volunteer
-// offer documents at tasks/{taskId}/offers/{volunteerId}.
+// Firestore onCreate/onUpdate trigger on tasks/{taskId}.
+// On a new searching task, or when a task goes back to searching status (reassignment),
+// score eligible volunteers and write per-volunteer offer documents.
 //
 // Volunteers see their offers via a collection-group query (volunteerId ==
-// uid AND state == 'offered'). The offer's denormalised taskTitle + customerId
-// let the inbox render without a parent-task fetch per row.
-//
-// Idempotency: if the offers subcollection already has any document we
-// skip. Re-running the same trigger (e.g. on emulator hot-reload) won't
-// duplicate offers.
+// uid AND state == 'offered').
 
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { rankForTask, type TaskDoc } from './scoring';
 
 if (getApps().length === 0) {
@@ -23,36 +18,57 @@ if (getApps().length === 0) {
 const REGION = 'asia-south1';
 const INITIAL_BATCH_SIZE = 10;
 
-export const dispatchOffers = onDocumentCreated(
+export const dispatchOffers = onDocumentWritten(
   { document: 'tasks/{taskId}', region: REGION },
   async (event) => {
-    const snap = event.data;
-    if (!snap) {
-      logger.warn('dispatchOffers fired without a document snapshot');
+    const change = event.data;
+    if (!change) {
+      logger.warn('dispatchOffers fired without a change object');
+      return;
+    }
+    const beforeData = change.before?.data() as TaskDoc | undefined;
+    const afterData = change.after?.data() as TaskDoc | undefined;
+    if (!afterData) {
+      // Document was deleted
       return;
     }
     const taskId = event.params.taskId;
-    const task = snap.data() as TaskDoc;
-    if (task.status !== 'searching') {
-      logger.info('dispatchOffers skipped — task not in searching state', {
-        taskId,
-        status: task.status,
-      });
+
+    // We only proceed if:
+    // 1. Task was newly created with status == 'searching'
+    // OR
+    // 2. Task status transitioned from another state back to 'searching'
+    const wasCreatedSearching = !beforeData && afterData.status === 'searching';
+    const transitionedToSearching = beforeData && beforeData.status !== 'searching' && afterData.status === 'searching';
+
+    if (!wasCreatedSearching && !transitionedToSearching) {
       return;
     }
 
     const db = getFirestore();
     const offersRef = db.collection('tasks').doc(taskId).collection('offers');
 
-    const existing = await offersRef.limit(1).get();
-    if (!existing.empty) {
-      logger.info('dispatchOffers skipped — offers subcollection not empty', {
-        taskId,
-      });
-      return;
+    // If transitioned back to searching, clear existing offers first
+    if (transitionedToSearching) {
+      logger.info('dispatchOffers: clearing existing offers for reassignment', { taskId });
+      const existingOffers = await offersRef.get();
+      if (!existingOffers.empty) {
+        const deleteBatch = db.batch();
+        existingOffers.docs.forEach((doc) => deleteBatch.delete(doc.ref));
+        await deleteBatch.commit();
+      }
+    } else {
+      // For new tasks, verify subcollection is empty (idempotency check)
+      const existing = await offersRef.limit(1).get();
+      if (!existing.empty) {
+        logger.info('dispatchOffers skipped — offers subcollection not empty', {
+          taskId,
+        });
+        return;
+      }
     }
 
-    const ranked = await rankForTask(task);
+    const ranked = await rankForTask(afterData);
     const top = ranked.slice(0, INITIAL_BATCH_SIZE);
     if (top.length === 0) {
       logger.info('dispatchOffers: no eligible volunteers', { taskId });
@@ -66,10 +82,10 @@ export const dispatchOffers = onDocumentCreated(
         taskId,
         // Denormalised for the volunteer inbox so it can render without
         // looking up the parent task on every row.
-        customerId: task.customerId,
-        taskTitle: task.title,
-        taskCategory: task.category,
-        taskRiskLevel: task.riskLevel,
+        customerId: afterData.customerId,
+        taskTitle: afterData.title,
+        taskCategory: afterData.category,
+        taskRiskLevel: afterData.riskLevel,
         // Denormalised volunteer profile so the customer's task detail
         // can render names + avatars without reading users/{uid}
         // (which is owner-scoped by rules).

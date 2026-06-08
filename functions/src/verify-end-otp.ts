@@ -9,15 +9,13 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { writeAuditEvent } from './audit';
+import { checkActiveStatus } from './moderation-helper';
 import { constantTimeEquals, hashOtp } from './otp';
 
 if (getApps().length === 0) {
   initializeApp();
 }
-
 const REGION = 'asia-south1';
-const POINTS_PER_TASK = 10;
 
 export const verifyEndOtp = onCall(
   { region: REGION },
@@ -40,11 +38,8 @@ export const verifyEndOtp = onCall(
     const callerUid = request.auth.uid;
 
     const db = getFirestore();
+    await checkActiveStatus(db, callerUid);
     const taskRef = db.collection('tasks').doc(taskId);
-    const userRef = db.collection('users').doc(callerUid);
-
-    let estimatedMinutes = 0;
-    let requiredSkills: string[] = [];
 
     await db.runTransaction(async (tx) => {
       const taskSnap = await tx.get(taskRef);
@@ -92,8 +87,7 @@ export const verifyEndOtp = onCall(
         );
       }
 
-      estimatedMinutes = task.estimatedMinutes ?? 0;
-      requiredSkills = task.requiredSkills ?? [];
+
 
       tx.update(taskRef, {
         status: 'completed',
@@ -102,25 +96,6 @@ export const verifyEndOtp = onCall(
         endOtpSalt: FieldValue.delete(),
         endOtpExpiresAt: FieldValue.delete(),
       });
-    });
-
-    // Reputation bumps run outside the transaction. Not strictly atomic
-    // with the task flip, but safe — task.status='completed' is the
-    // authoritative signal of completion. A retry would attempt a double
-    // award, which we guard against in the rating function later.
-    const skillPointUpdate: Record<string, FieldValue> = {};
-    for (const s of requiredSkills) {
-      skillPointUpdate[`skillPoints.${s}`] = FieldValue.increment(1);
-    }
-    await userRef.update({
-      verifiedTaskCount: FieldValue.increment(1),
-      verifiedHours: FieldValue.increment(estimatedMinutes / 60),
-      points: FieldValue.increment(POINTS_PER_TASK),
-      ...skillPointUpdate,
-    });
-
-    await writeAuditEvent(taskId, 'completed', callerUid, {
-      pointsAwarded: POINTS_PER_TASK,
     });
 
     return { taskId, status: 'completed' };

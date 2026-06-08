@@ -41,6 +41,7 @@ export interface UserDoc {
   warningsCount?: number;
   banned?: boolean;
   suspendedUntil?: Timestamp;
+  accountStatus?: string;
 }
 
 export interface ScoreBreakdown {
@@ -64,8 +65,9 @@ export interface RankedVolunteer {
 
 export function isEligible(uid: string, u: UserDoc, task: TaskDoc): boolean {
   if (uid === task.customerId) return false;
-  if (u.banned === true) return false;
-  if (u.suspendedUntil && u.suspendedUntil.toMillis() > Date.now()) return false;
+  const isBanned = u.accountStatus === 'banned' || u.banned === true;
+  const isSuspended = u.accountStatus === 'suspended' && u.suspendedUntil && u.suspendedUntil.toMillis() > Date.now();
+  if (isBanned || isSuspended) return false;
   if (!u.roles?.includes('volunteer')) return false;
   if (!u.lastKnownLocation) return false;
   if (!u.skills || u.skills.length === 0) return false;
@@ -97,7 +99,7 @@ export function score(u: UserDoc, task: TaskDoc): ScoreBreakdown {
   const required = task.requiredSkills.length || 1;
   const skill = matched / required;
 
-  const trust = (u.trustScore ?? 50) / 100;
+  const trust = (u.trustScore ?? 30) / 100;
   const availability = 1;
 
   const verified = u.verifiedTaskCount ?? 0;
@@ -147,6 +149,22 @@ export function haversineM(
 // ranked descending. Shared by both callable + trigger.
 export async function rankForTask(task: TaskDoc): Promise<RankedVolunteer[]> {
   const db = getFirestore();
+
+  // Query all blocks involving the customer to filter out mutual blocks
+  const blockedUserIds = new Set<string>();
+  const [blocksSnapA, blocksSnapB] = await Promise.all([
+    db.collection('blocks').where('userA', '==', task.customerId).get(),
+    db.collection('blocks').where('userB', '==', task.customerId).get(),
+  ]);
+  blocksSnapA.forEach((doc) => {
+    const data = doc.data() as { userB: string };
+    blockedUserIds.add(data.userB);
+  });
+  blocksSnapB.forEach((doc) => {
+    const data = doc.data() as { userA: string };
+    blockedUserIds.add(data.userA);
+  });
+
   const availSnap = await db
     .collection('users')
     .where('availableNow', '==', true)
@@ -155,7 +173,9 @@ export async function rankForTask(task: TaskDoc): Promise<RankedVolunteer[]> {
 
   const candidates = availSnap.docs
     .map((d) => ({ uid: d.id, doc: d.data() as UserDoc }))
-    .filter(({ uid, doc }) => isEligible(uid, doc, task));
+    .filter(
+      ({ uid, doc }) => isEligible(uid, doc, task) && !blockedUserIds.has(uid),
+    );
 
   return candidates
     .map(({ uid, doc: u }) => {

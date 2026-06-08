@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data"
+    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data",
+    "seed:admin": "node scripts/seed-admin.js",
+    "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {
     "@headlessui/react": "2.2.10",

@@ -6,8 +6,8 @@
 // queue. When 'accepted' it shows only the accepted volunteer prominently.
 // Chat (M7), Start/End OTP (M6) hook in here in later milestones.
 
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   collection,
   doc,
@@ -22,6 +22,9 @@ import { getCategory, getSkillLabel } from '../lib/catalog';
 import { CustomerOtpPanel } from '../components/CustomerOtpPanel';
 import { VolunteerOtpPanel } from '../components/VolunteerOtpPanel';
 import { CustomerRatingPanel } from '../components/CustomerRatingPanel';
+import { ReportBlockPanel } from '../components/ReportBlockPanel';
+import { KarmaBadge } from '../components/KarmaBadge';
+import { KarmaToast } from '../components/KarmaToast';
 
 type TaskStatus =
   | 'searching'
@@ -55,6 +58,8 @@ interface TaskDoc {
   completedAt?: Timestamp;
   customerRating?: number;
   customerRatingComment?: string;
+  customerName?: string;
+  customerPhotoURL?: string;
 }
 
 type OfferState = 'offered' | 'accepted' | 'rejected' | 'superseded' | 'expired';
@@ -78,13 +83,33 @@ interface OfferDoc {
   offeredAt: Timestamp | null;
 }
 
+export interface EventDoc {
+  type: string;
+  actorUid: string;
+  at: Timestamp;
+  payload?: {
+    pointsAwarded?: number;
+    durationBonus?: number;
+    customerPointsAwarded?: number;
+    skillsCredited?: string[];
+  };
+}
+
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
+  const navigate = useNavigate();
   const state = useAuthState();
   const [task, setTask] = useState<TaskDoc | null>(null);
   const [offers, setOffers] = useState<OfferDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [completedEvent, setCompletedEvent] = useState<EventDoc | null>(null);
+  const [hasReassignedEvent, setHasReassignedEvent] = useState(false);
+  const prevStatusRef = useRef<TaskStatus | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [toastPoints, setToastPoints] = useState<number>(0);
+  const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
 
   useEffect(() => {
     if (!taskId || state.status !== 'ready') return;
@@ -125,11 +150,84 @@ export default function TaskDetailPage() {
       },
     );
 
+    // Subscribe to task events for completion points payload & reassignment checking
+    const eventsRef = collection(db(), 'tasks', taskId, 'events');
+    const eventsUnsub = onSnapshot(
+      eventsRef,
+      (snap) => {
+        const found = snap.docs.find((d) => d.data().type === 'completed');
+        if (found) {
+          setCompletedEvent(found.data() as EventDoc);
+        } else {
+          setCompletedEvent(null);
+        }
+
+        const foundReassigned = snap.docs.some((d) => d.data().type === 'reassigned');
+        setHasReassignedEvent(foundReassigned);
+      },
+      () => {
+        // Safe to ignore read permission or missing event errors
+      }
+    );
+
     return () => {
       taskUnsub();
       offersUnsub();
+      eventsUnsub();
     };
   }, [taskId, state.status]);
+
+  // Hook to watch task status transitions and trigger toast alerts
+  useEffect(() => {
+    if (!task) return;
+
+    if (prevStatusRef.current === null) {
+      prevStatusRef.current = task.status;
+      return;
+    }
+
+    if (task.status === 'completed' && prevStatusRef.current !== 'completed' && !hasTriggeredToast) {
+      const isVolunteer = state.status === 'ready' && state.user.uid === task.acceptedVolunteerId;
+      const isCustomer = state.status === 'ready' && state.user.uid === task.customerId;
+      const viewerIsVolunteer = state.status === 'ready' && (state.userDoc.roles?.includes('volunteer') ?? false);
+
+      if (completedEvent) {
+        const payload = completedEvent.payload || {};
+        const pts = isVolunteer
+          ? (payload.pointsAwarded as number || 0)
+          : (isCustomer && viewerIsVolunteer)
+            ? (payload.customerPointsAwarded as number || 0)
+            : 0;
+
+        if (pts > 0) {
+          setTimeout(() => {
+            setToastPoints(pts);
+            setShowToast(true);
+            setHasTriggeredToast(true);
+          }, 0);
+        }
+      }
+    }
+    prevStatusRef.current = task.status;
+  }, [task, completedEvent, hasTriggeredToast, state]);
+
+  // Hook to watch if volunteer is unassigned or task is no longer available to them,
+  // and redirect them back to the app home with a toast.
+  useEffect(() => {
+    if (!task || state.status !== 'ready') return;
+
+    const isVolunteer = state.userDoc.roles?.includes('volunteer') ?? false;
+    const isCustomer = state.user.uid === task.customerId;
+
+    // If the viewer is a volunteer, and they are NOT the customer,
+    // and the task status is 'searching', it means the task is no longer assigned to them.
+    if (isVolunteer && !isCustomer && task.status === 'searching') {
+      void navigate('/app', {
+        replace: true,
+        state: { toastMessage: 'This task is no longer available.' },
+      });
+    }
+  }, [task, state, navigate]);
 
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
@@ -148,11 +246,50 @@ export default function TaskDetailPage() {
         )}
         {task && <TaskSummary task={task} />}
         {task && state.status === 'ready' && taskId && (
-          <OffersSection
-            task={{ ...task, taskId }}
-            offers={offers}
-            viewerUid={state.user.uid}
-            viewerName={state.userDoc.displayName ?? null}
+          <>
+            <OffersSection
+              task={{ ...task, taskId }}
+              offers={offers}
+              viewerUid={state.user.uid}
+              viewerName={state.userDoc.displayName ?? null}
+              completedEvent={completedEvent}
+              viewerIsVolunteer={state.userDoc.roles?.includes('volunteer') ?? false}
+              hasReassignedEvent={hasReassignedEvent}
+            />
+            {(() => {
+              const viewerUid = state.user.uid;
+              const isCustomer = viewerUid === task.customerId;
+              const isVolunteer = viewerUid === task.acceptedVolunteerId;
+              const hasAcceptedVol = !!task.acceptedVolunteerId;
+              const showReportBlock =
+                hasAcceptedVol &&
+                (isCustomer || isVolunteer) &&
+                ['accepted', 'in_progress', 'completed'].includes(task.status);
+
+              if (!showReportBlock) return null;
+
+              const acceptedOffer = offers.find((o) => o.state === 'accepted');
+              const reportedUserId = isCustomer
+                ? task.acceptedVolunteerId!
+                : task.customerId;
+              const reportedUserName = isCustomer
+                ? acceptedOffer?.displayName || 'Volunteer'
+                : 'Customer';
+
+              return (
+                <ReportBlockPanel
+                  taskId={taskId}
+                  reportedUserId={reportedUserId}
+                  reportedUserName={reportedUserName}
+                />
+              );
+            })()}
+          </>
+        )}
+        {showToast && (
+          <KarmaToast
+            points={toastPoints}
+            onClose={() => setShowToast(false)}
           />
         )}
       </div>
@@ -223,27 +360,51 @@ function OffersSection({
   offers,
   viewerUid,
   viewerName,
+  completedEvent,
+  viewerIsVolunteer = false,
+  hasReassignedEvent = false,
 }: {
   task: TaskDoc & { taskId?: string };
   offers: OfferDoc[];
   viewerUid: string;
   viewerName: string | null;
+  completedEvent?: EventDoc | null;
+  viewerIsVolunteer?: boolean;
+  hasReassignedEvent?: boolean;
 }) {
   const viewerIsCustomer = viewerUid === task.customerId;
   const viewerIsAcceptedVolunteer = viewerUid === task.acceptedVolunteerId;
 
   if (task.status === 'accepted' || task.status === 'in_progress') {
     const accepted = offers.find((o) => o.state === 'accepted');
-    const acceptedName =
-      accepted?.displayName
-      || (viewerIsAcceptedVolunteer ? viewerName : null)
-      || 'Volunteer';
+    
+    // Choose target display details based on who is viewing
+    const targetName = viewerIsAcceptedVolunteer
+      ? (task.customerName || 'Customer')
+      : (accepted?.displayName || 'Volunteer');
+
+    const subtitle = viewerIsAcceptedVolunteer ? (
+      <p className="mt-1 text-sm text-neutral-600">Customer</p>
+    ) : (
+      accepted && (
+        <p className="mt-1 text-sm text-neutral-600">
+          {formatDistance(accepted.distanceM)} away · score{' '}
+          {accepted.score.toFixed(2)}
+        </p>
+      )
+    );
+
     const headline =
       task.status === 'in_progress'
         ? 'In progress'
         : viewerIsAcceptedVolunteer
           ? 'You accepted this task'
           : 'Task accepted';
+
+    const chatInstruction = viewerIsAcceptedVolunteer
+      ? 'Chat with the customer opens here in M7.'
+      : 'Chat with the volunteer opens here in M7.';
+
     const phase = task.status === 'accepted' ? 'start' : 'end';
     return (
       <>
@@ -251,22 +412,17 @@ function OffersSection({
           <p className="text-sm font-medium text-emerald-700">{headline}</p>
           <div className="mt-4 flex items-center gap-4">
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-200 text-base font-medium text-emerald-800">
-              {acceptedName.charAt(0).toUpperCase()}
+              {targetName.charAt(0).toUpperCase()}
             </div>
             <div>
               <p className="text-base font-medium text-neutral-900">
-                {acceptedName}
+                {targetName}
               </p>
-              {accepted && (
-                <p className="mt-1 text-sm text-neutral-600">
-                  {formatDistance(accepted.distanceM)} away · score{' '}
-                  {accepted.score.toFixed(2)}
-                </p>
-              )}
+              {subtitle}
             </div>
           </div>
           <p className="mt-4 text-xs text-neutral-500">
-            Chat with the volunteer opens here in M7.
+            {chatInstruction}
           </p>
         </section>
         {viewerIsCustomer && (
@@ -285,19 +441,47 @@ function OffersSection({
       accepted?.displayName
       || (viewerIsAcceptedVolunteer ? viewerName : null)
       || 'Volunteer';
+
+    const payload = completedEvent?.payload || {};
+    const volunteerPoints = payload.pointsAwarded as number ?? (10 + Math.min(8, Math.floor((task.estimatedMinutes || 0) / 15)));
+    const customerPoints = payload.customerPointsAwarded as number ?? 2;
+
     return (
       <>
         <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
           <p className="text-sm font-medium text-emerald-700">Completed</p>
           {viewerIsAcceptedVolunteer && (
-            <p className="mt-2 text-sm text-neutral-700">
-              Nice work. Your reputation just got a small bump.
-            </p>
+            <div className="mt-3">
+              <p className="text-sm text-neutral-700">
+                Nice work. You earned:
+              </p>
+              <div className="mt-2.5">
+                <KarmaBadge points={volunteerPoints} />
+              </div>
+            </div>
           )}
-          {viewerIsCustomer && typeof task.customerRating === 'number' && (
-            <p className="mt-2 text-sm text-neutral-700">
-              You rated this {String(task.customerRating)} / 5.
-            </p>
+          {viewerIsCustomer && (
+            <div className="mt-3">
+              {viewerIsVolunteer ? (
+                <>
+                  <p className="text-sm text-neutral-700">
+                    Task completed successfully. You earned:
+                  </p>
+                  <div className="mt-2.5">
+                    <KarmaBadge points={customerPoints} />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-neutral-700">
+                  Task completed successfully.
+                </p>
+              )}
+              {typeof task.customerRating === 'number' && (
+                <p className="mt-4 text-xs text-neutral-500">
+                  You rated this volunteer {String(task.customerRating)} / 5.
+                </p>
+              )}
+            </div>
           )}
         </section>
         {viewerIsCustomer && typeof task.customerRating !== 'number' && (
@@ -337,6 +521,31 @@ function OffersSection({
   const pending = offers.filter((o) => o.state === 'offered');
   return (
     <section className="mt-12">
+      {hasReassignedEvent && (
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm flex gap-3">
+          <svg
+            className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5 animate-spin"
+            style={{ animationDuration: '3s' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.253 8H18"
+            />
+          </svg>
+          <div>
+            <p className="font-semibold text-sm">Reassigning your task to nearby volunteers...</p>
+            <p className="mt-1 text-xs text-blue-800">
+              The assigned volunteer is no longer available. We are automatically looking for another volunteer to take over.
+            </p>
+          </div>
+        </div>
+      )}
       <h2 className="text-lg font-semibold text-neutral-900">
         Pending offers
       </h2>

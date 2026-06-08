@@ -5,7 +5,9 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { checkActiveStatus } from './moderation-helper';
 import { writeAuditEvent } from './audit';
+import { recomputeTrustScore } from './recompute-trust-score';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -52,7 +54,10 @@ export const submitCustomerRating = onCall(
     const callerUid = request.auth.uid;
 
     const db = getFirestore();
+    await checkActiveStatus(db, callerUid);
     const taskRef = db.collection('tasks').doc(taskId);
+
+    let volunteerId: string | undefined;
 
     await db.runTransaction(async (tx) => {
       const taskSnap = await tx.get(taskRef);
@@ -63,6 +68,7 @@ export const submitCustomerRating = onCall(
         customerId?: string;
         status?: string;
         customerRating?: number;
+        acceptedVolunteerId?: string;
       };
       if (task.customerId !== callerUid) {
         throw new HttpsError(
@@ -82,6 +88,7 @@ export const submitCustomerRating = onCall(
           'You’ve already rated this task.',
         );
       }
+      volunteerId = task.acceptedVolunteerId;
       const update: Record<string, unknown> = {
         customerRating: rating,
         customerRatedAt: FieldValue.serverTimestamp(),
@@ -89,6 +96,10 @@ export const submitCustomerRating = onCall(
       if (trimmedComment) update.customerRatingComment = trimmedComment;
       tx.update(taskRef, update);
     });
+
+    if (volunteerId) {
+      await recomputeTrustScore(db, volunteerId);
+    }
 
     await writeAuditEvent(taskId, 'rated', callerUid, { rating });
     return { taskId };

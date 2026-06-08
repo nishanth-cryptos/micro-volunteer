@@ -5,6 +5,7 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { checkActiveStatus } from './moderation-helper';
 import { writeAuditEvent } from './audit';
 import {
   OTP_TTL_MS,
@@ -38,6 +39,7 @@ export const generateEndOtp = onCall(
     const callerUid = request.auth.uid;
 
     const db = getFirestore();
+    await checkActiveStatus(db, callerUid);
     const taskRef = db.collection('tasks').doc(taskId);
     const taskSnap = await taskRef.get();
     if (!taskSnap.exists) {

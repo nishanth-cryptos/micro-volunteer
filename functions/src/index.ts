@@ -12,3 +12,9 @@ export { verifyStartOtp } from './verify-start-otp';
 export { generateEndOtp } from './generate-end-otp';
 export { verifyEndOtp } from './verify-end-otp';
 export { submitCustomerRating } from './submit-customer-rating';
+export { awardPointsOnCompletion } from './award-points-on-completion';
+export { reportUser } from './report-user';
+export { blockUser } from './block-user';
+export { applyModerationAction } from './apply-moderation-action';
+
+

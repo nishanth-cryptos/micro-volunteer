@@ -36,9 +36,13 @@
 - `src/components/OnboardingProgress.tsx` — three-step numbered stepper used on `/signup`, `/onboarding/role`, and `/onboarding/profile`. Consent gate is unnumbered.
 - `src/components/MyTasksList.tsx` — live customer-side list of own tasks via `onSnapshot(customerId == uid, orderBy createdAt desc)`. Rows show status badge, risk colour, and link to task detail.
 - `src/components/OfferInbox.tsx` — volunteer-side inbox shown on `/app`. Collection-group query on `offers` where `volunteerId == uid AND state == 'offered'`. Each row renders denormalised task info and `Accept` / `Reject` buttons calling the corresponding Cloud Functions.
+- `src/components/ReportBlockPanel.tsx` — Report/Block reason submission form overlays.
+- `src/components/KarmaBadge.tsx` — Lotus SVG symbol alongside point reward number with custom Tailwind CSS-only hover tooltip.
+- `src/components/KarmaToast.tsx` — Screen-bottom overlay notification showing earned points on task completion with auto-fade and reduced motion respect.
 - `src/lib/catalog.ts` — typed re-export of `scripts/seed/catalog.json`. Exposes `CATEGORIES`, `SKILLS`, `getCategory()`, `getSkillLabel()`, and `deriveRisk(categoryKey)`.
 - `src/pages/CreateTaskPage.tsx` — customer creates a task. Structured chips for category + skills, numeric duration, four short textareas, map pin. Risk auto-derived from category. `addDoc` to `tasks/{auto-id}` with status='searching' and 24h expiry; navigates to `/tasks/{id}` on success.
 - `src/pages/TaskDetailPage.tsx` — customer view of a task + ranked volunteers list via `httpsCallable('rankNearbyVolunteers')`. Shows task summary, skill chips, and per-candidate score breakdown chips (Dist / Skill / Trust / Past, plus a Reports penalty chip when present).
+- `src/pages/AdminDashboard.tsx` — Admin-only dashboard with global stats, reports queue, user lookup/moderation history, task audit trails.
 - `src/lib/geolocation.ts` — `getCurrentLocation()` Promise wrapper over `navigator.geolocation.getCurrentPosition`, plus a `GeolocationError` class with a `userMessage` mapped from the W3C error codes.
 - `src/pages/HomePage.tsx` — public landing.
 - `src/pages/LoginPage.tsx` — sign-in page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
@@ -50,6 +54,10 @@
 
 ## Scripts / seed
 - `scripts/seed/catalog.json` — starter seed for `catalog/categories` and `catalog/skills`. Reviewed pre-launch; loaded into Firestore by an admin-only callable in M1. Replaced by the M8 admin UI for live edits.
+- `scripts/seed-admin.js` — root redirect wrapper that executes the Admin SDK seed script to create the local administrator.
+- `scripts/seed-users.js` — root redirect wrapper that executes the Admin SDK seed script to create test volunteer + customer accounts.
+- `functions/scripts/seed-admin.js` — database seed script using the Admin SDK to create the default administrator user and profile.
+- `functions/scripts/seed-users.js` — database seed script using the Admin SDK to create 4 test volunteers (varying trust/skills) and 2 test customers, all with Mumbai-area H3 locations.
 
 ## Cloud Functions
 - `functions/package.json` — `firebase-functions@7.2.5`, `firebase-admin@13.10.0`, Node 22 runtime.
@@ -60,6 +68,12 @@
 - `functions/src/dispatch-offers.ts` — Firestore onCreate trigger on `tasks/{taskId}`. Scores eligible volunteers and writes per-volunteer offer documents at `tasks/{taskId}/offers/{volunteerId}` with denormalised `taskTitle` / `taskCategory` / `taskRiskLevel` / `customerId` so the volunteer inbox renders without a parent-task fetch. Idempotent (skips if subcollection already has docs). Top batch capped at 10.
 - `functions/src/accept-offer.ts` — HTTPS callable. Race-safe Firestore transaction flips `tasks/{id}.status` from 'searching' to 'accepted' and the corresponding offer to 'accepted'. Outside the transaction, marks sibling 'offered' offers as 'superseded'.
 - `functions/src/reject-offer.ts` — HTTPS callable. Marks one offer 'rejected'.
+- `functions/src/award-points-on-completion.ts` — Triggers on task completion to award points to volunteer and customer, log audit event, and run trust score recomputation.
+- `functions/src/recompute-trust-score.ts` — Recalculates user trust score based on completed rated tasks, ID verification status, and report penalties. Clamped to `[30, 100]`.
+- `functions/src/report-user.ts` — Context-bound reporting HTTPS callable.
+- `functions/src/block-user.ts` — Mutual block creation HTTPS callable.
+- `functions/src/apply-moderation-action.ts` — Admin-only action (warn/suspend/ban/unban) HTTPS callable.
+- `functions/src/moderation-helper.ts` — Shared helpers for enforcing suspension/ban checks across all callable functions.
 
 ## Documentation
 - `CHECKPOINT.md` — thin pointer to `memory-bank/`.
