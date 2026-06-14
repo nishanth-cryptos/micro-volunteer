@@ -15,7 +15,7 @@
 // task data, no PII logging).
 
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import {
   collection,
@@ -23,15 +23,17 @@ import {
   orderBy,
   query,
   where,
+  type QuerySnapshot,
   type Timestamp,
 } from 'firebase/firestore';
+import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { auth, db } from '../lib/firebase';
+import { auth, db, storage } from '../lib/firebase';
 import type { UserDoc } from '../lib/auth-context';
 
 // Leaflet default-icon fix (same pattern as TaskLocationPicker).
@@ -68,6 +70,25 @@ interface TaskRow {
   acceptedVolunteerId?: string | null;
 }
 
+interface BlockedRow {
+  blockId: string;
+  otherUid: string;
+  otherName: string;
+  otherPhotoPath: string | null;
+  createdAt: Timestamp | null;
+}
+
+interface BlockDocShape {
+  userA: string;
+  userB: string;
+  blockedBy?: string;
+  userANameSnapshot?: string;
+  userAPhotoSnapshot?: string | null;
+  userBNameSnapshot?: string;
+  userBPhotoSnapshot?: string | null;
+  createdAt: Timestamp | null;
+}
+
 type ScreenKey = 'tasks' | 'profile';
 
 type HistoryFilter = 'all' | 'completed' | 'accepted' | 'blocked';
@@ -81,7 +102,7 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
   const navigate = useNavigate();
   const [screen, setScreen] = useState<ScreenKey>('tasks');
   const [rows, setRows] = useState<TaskRow[]>([]);
-  const [blockedCount, setBlockedCount] = useState<number>(0);
+  const [blocked, setBlocked] = useState<BlockedRow[]>([]);
   const [filter, setFilter] = useState<HistoryFilter>('all');
 
   // Subscribe to all of the customer's tasks ordered by createdAt desc.
@@ -119,19 +140,52 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
     return unsub;
   }, [uid]);
 
-  // Subscribe to blocks initiated by this customer for the "Blocked" tab
-  // count and list. Rules already restrict block reads to participants.
+  // Subscribe to blocks this customer participates in. Rules restrict
+  // reads to participants (userA == uid || userB == uid) — querying
+  // `blockedBy == uid` directly is denied by the rule, which is why the
+  // old version silently showed zero. We merge both directional queries
+  // and then keep only blocks this user initiated.
   useEffect(() => {
-    const q = query(
-      collection(db(), 'blocks'),
-      where('blockedBy', '==', uid),
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => setBlockedCount(snap.size),
-      () => setBlockedCount(0),
-    );
-    return unsub;
+    const qA = query(collection(db(), 'blocks'), where('userA', '==', uid));
+    const qB = query(collection(db(), 'blocks'), where('userB', '==', uid));
+    const merged = new Map<string, BlockedRow>();
+
+    function applySnapshot(snap: QuerySnapshot) {
+      for (const d of snap.docs) {
+        const data = d.data() as BlockDocShape;
+        if (data.blockedBy !== uid) continue;
+        const callerIsA = data.userA === uid;
+        const otherUid = callerIsA ? data.userB : data.userA;
+        const otherName = callerIsA
+          ? (data.userBNameSnapshot ?? '')
+          : (data.userANameSnapshot ?? '');
+        const otherPhotoPath = callerIsA
+          ? (data.userBPhotoSnapshot ?? null)
+          : (data.userAPhotoSnapshot ?? null);
+        merged.set(d.id, {
+          blockId: d.id,
+          otherUid,
+          otherName,
+          otherPhotoPath,
+          createdAt: data.createdAt,
+        });
+      }
+      setBlocked(
+        [...merged.values()].sort((a, b) => {
+          const ma = a.createdAt?.toMillis() ?? 0;
+          const mb = b.createdAt?.toMillis() ?? 0;
+          return mb - ma;
+        }),
+      );
+    }
+
+    const unsubA = onSnapshot(qA, applySnapshot, () => setBlocked([]));
+    const unsubB = onSnapshot(qB, applySnapshot, () => setBlocked([]));
+    return () => {
+      unsubA();
+      unsubB();
+      merged.clear();
+    };
   }, [uid]);
 
   const ongoing = rows.filter(
@@ -164,10 +218,10 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
     all:
       historyBuckets.completed.length +
       historyBuckets.accepted.length +
-      blockedCount,
+      blocked.length,
     completed: historyBuckets.completed.length,
     accepted: historyBuckets.accepted.length,
-    blocked: blockedCount,
+    blocked: blocked.length,
   };
 
   const completionPct =
@@ -182,7 +236,12 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
 
   return (
     <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
-      <TopBar initial={initialOf(userDoc.displayName)} />
+      <TopBar
+        displayName={userDoc.displayName ?? 'You'}
+        email={userDoc.email}
+        photoPath={userDoc.photoURL ?? null}
+        onSignOut={() => void handleSignOut()}
+      />
       <div className="mx-auto max-w-7xl px-8 pt-10 pb-[124px]">
         <div key={screen} className="vc-screen-enter">
           {screen === 'tasks' && (
@@ -198,7 +257,7 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
               tasksPosted={rows.length}
               completionPct={completionPct}
               buckets={historyBuckets}
-              blockedCount={blockedCount}
+              blocked={blocked}
               counts={counts}
               filter={filter}
               onFilter={setFilter}
@@ -221,7 +280,47 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
 
 // ----- Top bar ---------------------------------------------------------
 
-function TopBar({ initial }: { initial: string }) {
+function TopBar({
+  displayName,
+  email,
+  photoPath,
+  onSignOut,
+}: {
+  displayName: string;
+  email: string | undefined;
+  photoPath: string | null;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const initial = initialOf(displayName);
+  const photoUrl = usePhotoUrl(photoPath);
+
+  // Close on outside click + Escape.
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(e: MouseEvent) {
+      const t = e.target as Node;
+      if (
+        popoverRef.current?.contains(t) ||
+        triggerRef.current?.contains(t)
+      ) {
+        return;
+      }
+      setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#ececea] bg-white px-7">
       <div className="flex items-center gap-2.5 text-[15px] font-bold tracking-tight">
@@ -241,13 +340,82 @@ function TopBar({ initial }: { initial: string }) {
         </span>
         Volunteer Connector
       </div>
-      <div className="flex items-center gap-3.5 text-[13px] text-[#4f4b46]">
-        <span
-          className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900]"
-          aria-hidden="true"
+      <div className="relative flex items-center gap-3.5 text-[13px] text-[#4f4b46]">
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label="Account menu"
+          onClick={() => setOpen((o) => !o)}
+          className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900] ring-2 ring-transparent transition hover:ring-[#1f6f5c]/30 focus:outline-none focus-visible:ring-[#1f6f5c]/40"
         >
-          {initial}
-        </span>
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span aria-hidden="true">{initial}</span>
+          )}
+        </button>
+        {open && (
+          <div
+            ref={popoverRef}
+            role="dialog"
+            aria-label="Account"
+            className="vc-fade-up absolute right-0 top-[44px] z-50 w-64 overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-[0_20px_40px_-16px_rgba(20,18,15,0.18)]"
+          >
+            <div className="flex items-center gap-3 border-b border-[#f3f1ec] px-4 py-4">
+              <span className="grid h-12 w-12 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900]">
+                {photoUrl ? (
+                  <img
+                    src={photoUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initial
+                )}
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-[14px] font-semibold text-[#131312]">
+                  {displayName}
+                </div>
+                {email && (
+                  <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
+                    {email}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onSignOut();
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#a32a22] transition hover:bg-[#fdf0ef]"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="m16 17 5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
@@ -517,7 +685,7 @@ function ProfileScreen({
   tasksPosted,
   completionPct,
   buckets,
-  blockedCount,
+  blocked,
   counts,
   filter,
   onFilter,
@@ -527,7 +695,7 @@ function ProfileScreen({
   tasksPosted: number;
   completionPct: number | null;
   buckets: HistoryBuckets;
-  blockedCount: number;
+  blocked: BlockedRow[];
   counts: Record<HistoryFilter, number>;
   filter: HistoryFilter;
   onFilter: (f: HistoryFilter) => void;
@@ -562,9 +730,10 @@ function ProfileScreen({
             aria-hidden="true"
           />
           <div className="relative flex items-center gap-[18px]">
-            <span className="grid h-[76px] w-[76px] place-items-center rounded-full border-4 border-white/25 bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-[28px] font-bold text-[#5a2900]">
-              {initialOf(userDoc.displayName)}
-            </span>
+            <HeroAvatar
+              displayName={userDoc.displayName}
+              photoPath={userDoc.photoURL ?? null}
+            />
             <div className="min-w-0 flex-1">
               <div className="truncate text-2xl font-bold tracking-tight">
                 {userDoc.displayName ?? 'You'}
@@ -719,11 +888,7 @@ function ProfileScreen({
         })}
       </div>
 
-      <HistoryList
-        filter={filter}
-        buckets={buckets}
-        blockedCount={blockedCount}
-      />
+      <HistoryList filter={filter} buckets={buckets} blocked={blocked} />
     </section>
   );
 }
@@ -757,20 +922,23 @@ function DetailRow({
 function HistoryList({
   filter,
   buckets,
-  blockedCount,
+  blocked,
 }: {
   filter: HistoryFilter;
   buckets: HistoryBuckets;
-  blockedCount: number;
+  blocked: BlockedRow[];
 }) {
-  let items: Array<{
+  type HistoryItem = {
     key: string;
     title: string;
     sub: string;
     badge: { label: string; bg: string; ink: string };
-  }> = [];
+    avatarInitial?: string;
+    avatarPhotoPath?: string | null;
+  };
+  let items: HistoryItem[] = [];
 
-  function row(task: TaskRow, status: 'completed' | 'accepted') {
+  function row(task: TaskRow, status: 'completed' | 'accepted'): HistoryItem {
     const when = task.completedAt ?? task.createdAt;
     return {
       key: task.id,
@@ -780,34 +948,42 @@ function HistoryList({
     };
   }
 
+  function blockedRow(b: BlockedRow): HistoryItem {
+    return {
+      key: b.blockId,
+      title: b.otherName || 'Blocked user',
+      sub: b.createdAt
+        ? `Blocked ${formatDate(b.createdAt)}`
+        : 'Blocked',
+      badge: badgeForHistoryStatus('blocked'),
+      avatarInitial: (b.otherName || '?').slice(0, 1).toUpperCase(),
+      avatarPhotoPath: b.otherPhotoPath,
+    };
+  }
+
   if (filter === 'all') {
     items = [
       ...buckets.completed.map((t) => row(t, 'completed')),
       ...buckets.accepted.map((t) => row(t, 'accepted')),
+      ...blocked.map(blockedRow),
     ];
-    if (blockedCount > 0) {
-      items.push({
-        key: '__blocked',
-        title: `${blockedCount} blocked ${blockedCount === 1 ? 'user' : 'users'}`,
-        sub: 'These users can no longer be matched with your tasks',
-        badge: badgeForHistoryStatus('blocked'),
-      });
-    }
   } else if (filter === 'completed') {
     items = buckets.completed.map((t) => row(t, 'completed'));
   } else if (filter === 'accepted') {
     items = buckets.accepted.map((t) => row(t, 'accepted'));
   } else if (filter === 'blocked') {
-    if (blockedCount > 0) {
-      items = [
-        {
-          key: '__blocked',
-          title: `${blockedCount} blocked ${blockedCount === 1 ? 'user' : 'users'}`,
-          sub: 'Manage blocks from your task details pages',
-          badge: badgeForHistoryStatus('blocked'),
-        },
-      ];
-    }
+    items = blocked.map(blockedRow);
+  }
+
+  const [pageSize, setPageSize] = useState<number>(5);
+  const [page, setPage] = useState<number>(1);
+  // Reset to page 1 whenever the filter prop changes. Render-phase state
+  // update is the React 18+ idiom for "derive state from a prop change"
+  // — preferred over useEffect by the react-hooks/set-state-in-effect rule.
+  const [filterAtPage, setFilterAtPage] = useState<HistoryFilter>(filter);
+  if (filter !== filterAtPage) {
+    setFilterAtPage(filter);
+    setPage(1);
   }
 
   if (items.length === 0) {
@@ -818,28 +994,24 @@ function HistoryList({
     );
   }
 
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
+  const visible = items.slice(start, start + pageSize);
+  const rangeStart = start + 1;
+  const rangeEnd = Math.min(items.length, start + pageSize);
+
   return (
     <div>
-      {items.map((row) => (
+      {visible.map((row) => (
         <div
           key={row.key}
           className="vc-fade-up mb-2.5 flex items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition hover:border-[#d8d4cc]"
         >
-          <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#e3efe9]">
-            <svg
-              viewBox="0 0 24 24"
-              className="h-[18px] w-[18px] text-[#1f6f5c]"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
-          </span>
+          <HistoryAvatar
+            initial={row.avatarInitial}
+            photoPath={row.avatarPhotoPath ?? null}
+          />
           <span className="min-w-0 flex-1">
             <span className="block text-[15px] font-semibold text-[#131312]">
               {row.title}
@@ -855,8 +1027,154 @@ function HistoryList({
           </span>
         </div>
       ))}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[12px] text-[#8a847d]">
+          <label htmlFor="vc-page-size" className="font-medium">
+            Per page
+          </label>
+          <select
+            id="vc-page-size"
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(parseInt(e.target.value, 10));
+              setPage(1);
+            }}
+            className="rounded-full border border-[#ececea] bg-white px-3 py-1.5 text-[12px] font-medium text-[#131312] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-2 focus:ring-[#1f6f5c]/20"
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={30}>30</option>
+          </select>
+          <span className="font-mono text-[11px] text-[#8a847d]">
+            {rangeStart}–{rangeEnd} of {items.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={safePage <= 1}
+            className="inline-flex items-center gap-1 rounded-full border border-[#ececea] bg-white px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#1f6f5c] hover:text-[#131312] disabled:cursor-not-allowed disabled:border-[#f3f1ec] disabled:text-[#b8b3ad] disabled:hover:border-[#f3f1ec]"
+            aria-label="Previous page"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Prev
+          </button>
+          <span className="px-2 font-mono text-[11px] text-[#8a847d]">
+            {safePage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage >= totalPages}
+            className="inline-flex items-center gap-1 rounded-full border border-[#ececea] bg-white px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#1f6f5c] hover:text-[#131312] disabled:cursor-not-allowed disabled:border-[#f3f1ec] disabled:text-[#b8b3ad] disabled:hover:border-[#f3f1ec]"
+            aria-label="Next page"
+          >
+            Next
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   );
+}
+
+// Hero avatar for the Profile screen. Same gradient ring as the design
+// fallback, but renders the user's onboarding photo when available.
+function HeroAvatar({
+  displayName,
+  photoPath,
+}: {
+  displayName: string | undefined;
+  photoPath: string | null;
+}) {
+  const url = usePhotoUrl(photoPath);
+  return (
+    <span className="grid h-[76px] w-[76px] flex-shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white/25 bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-[28px] font-bold text-[#5a2900]">
+      {url ? (
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span aria-hidden="true">{initialOf(displayName)}</span>
+      )}
+    </span>
+  );
+}
+
+// Avatar for a history-list row. If a Storage `photoPath` is provided,
+// resolves it to a download URL; otherwise renders the clock icon (for
+// task rows) or the user's initial (for blocked-user rows).
+function HistoryAvatar({
+  initial,
+  photoPath,
+}: {
+  initial: string | undefined;
+  photoPath: string | null;
+}) {
+  const url = usePhotoUrl(photoPath);
+  if (initial && url) {
+    return (
+      <span className="grid h-10 w-10 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-[#e3efe9]">
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      </span>
+    );
+  }
+  if (initial) {
+    return (
+      <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-sm font-bold text-[#5a2900]">
+        {initial}
+      </span>
+    );
+  }
+  return (
+    <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#e3efe9]">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-[18px] w-[18px] text-[#1f6f5c]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 6v6l4 2" />
+      </svg>
+    </span>
+  );
+}
+
+// Resolve a Storage path to a download URL once. `null` on failure so
+// the caller can fall back to an initial. Storage rules allow any
+// signed-in user to read `/users/{uid}/photo`. Keyed by `path` so a
+// path change re-mounts a fresh null state without a setter call.
+function usePhotoUrl(path: string | null): string | null {
+  // We key the cache on `path` so swapping paths re-runs the effect
+  // and the previous URL is dropped before the new fetch resolves.
+  const [cache, setCache] = useState<{ path: string | null; url: string | null }>(
+    { path, url: null },
+  );
+  useEffect(() => {
+    if (!path) return;
+    let cancelled = false;
+    void getDownloadURL(storageRef(storage(), path))
+      .then((u) => {
+        if (!cancelled) setCache({ path, url: u });
+      })
+      .catch(() => {
+        if (!cancelled) setCache({ path, url: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+  return cache.path === path ? cache.url : null;
 }
 
 // ----- Bottom nav ------------------------------------------------------

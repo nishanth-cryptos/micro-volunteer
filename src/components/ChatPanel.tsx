@@ -109,32 +109,69 @@ export function ChatPanel({
   const ensuredRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Subscribe to the message stream.
+  // Subscribe to the message stream — but only once the chat doc itself
+  // exists, because the firestore rule for /messages does a get() on the
+  // parent chat and denies until the chat is visible to this client. If
+  // we attach the messages listener too early, Firestore tears it down on
+  // the first permission-denied and never re-fires (the user has to
+  // refresh). The chat-doc listener stays alive across permission flips
+  // and we (re)attach messages whenever existence is confirmed.
   useEffect(() => {
     const chatRef = doc(db(), 'chats', taskId);
-    const messagesQ = query(
-      collection(chatRef, 'messages'),
-      orderBy('sentAt', 'asc'),
-    );
-    const unsub = onSnapshot(
-      messagesQ,
+    let messagesUnsub: (() => void) | null = null;
+
+    function attachMessages() {
+      if (messagesUnsub) return;
+      const messagesQ = query(
+        collection(chatRef, 'messages'),
+        orderBy('sentAt', 'asc'),
+      );
+      messagesUnsub = onSnapshot(
+        messagesQ,
+        (snap) => {
+          setMessages(
+            snap.docs.map((d) => {
+              const data = d.data() as Omit<ChatMessage, 'id'>;
+              return { id: d.id, ...data };
+            }),
+          );
+          setLoadError(null);
+        },
+        (err) => {
+          setLoadError(err.message);
+          // Listener is dead after error — drop it so the chat-doc
+          // watcher can re-attach a fresh one on the next existence ping.
+          messagesUnsub?.();
+          messagesUnsub = null;
+        },
+      );
+    }
+
+    const chatUnsub = onSnapshot(
+      chatRef,
       (snap) => {
-        setMessages(
-          snap.docs.map((d) => {
-            const data = d.data() as Omit<ChatMessage, 'id'>;
-            return { id: d.id, ...data };
-          }),
-        );
-        setLoadError(null);
+        if (snap.exists()) {
+          attachMessages();
+        } else if (messagesUnsub) {
+          messagesUnsub();
+          messagesUnsub = null;
+          setMessages([]);
+        }
       },
       (err) => setLoadError(err.message),
     );
-    return () => unsub();
+
+    return () => {
+      chatUnsub();
+      messagesUnsub?.();
+    };
   }, [taskId]);
 
   // Ensure the chat doc exists. New accepts create it server-side in
-  // acceptOffer; this covers legacy/seeded tasks accepted before M7. A
-  // concurrent create (server or another tab) is harmless.
+  // acceptOffer; this covers legacy/seeded tasks accepted before M7 and
+  // the small race window where the customer mounts the panel before the
+  // server-side create lands on their client. A concurrent create
+  // (server or another tab) is harmless.
   useEffect(() => {
     if (readOnly || ensuredRef.current) return;
     ensuredRef.current = true;

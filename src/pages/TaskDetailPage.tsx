@@ -483,14 +483,6 @@ function OffersSection({
               )}
             </div>
           </div>
-          <p className="relative mt-5 inline-flex items-center gap-1.5 text-[12px] text-white/85">
-            {chatInstruction}
-            <span className="vc-dot-bounce inline-flex" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
-          </p>
         </section>
         {task.taskId && otherPartyUid && (
           <ChatPanel
