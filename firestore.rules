@@ -290,6 +290,89 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ----- chats/{chatId} (chatId === taskId; opens on acceptance) -----
+    // M7 in-app chat. Participant-only read/write. Messages are immutable
+    // for clients (no update/delete) — system messages and the `reportedBy`
+    // marker are written by Cloud Functions (Admin SDK bypasses these rules).
+    // No new messages once either party has blocked the other.
+
+    function chatParticipants(chatId) {
+      return get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+
+    // May the caller post a new message? Binds the chat doc once (one get)
+    // and probes both orderings of the mutual-block doc id (blocks are keyed
+    // `${min}_${max}` with sorted UIDs, which rules can't reproduce).
+    function canPostMessage(chatId) {
+      let parts = get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      return request.auth.uid in parts
+        && !(exists(/databases/$(database)/documents/blocks/$(parts[0] + '_' + parts[1]))
+             || exists(/databases/$(database)/documents/blocks/$(parts[1] + '_' + parts[0])));
+    }
+
+    // A participant of an accepted/in-progress/completed task may open its
+    // chat. Participants must be exactly the task's customer + accepted
+    // volunteer; chatId must equal the taskId.
+    function validChatCreate(chatId) {
+      let task = get(/databases/$(database)/documents/tasks/$(chatId)).data;
+      return chatId == request.resource.data.taskId
+        && 'acceptedVolunteerId' in task.keys()
+        && task.status in ['accepted', 'in_progress', 'completed']
+        && request.resource.data.participants
+             .hasOnly([task.customerId, task.acceptedVolunteerId])
+        && request.resource.data.participants
+             .hasAll([task.customerId, task.acceptedVolunteerId])
+        && request.auth.uid in request.resource.data.participants;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isSignedIn()
+        && !isSuspendedOrBanned(request.auth.uid)
+        && request.auth.uid in resource.data.participants;
+
+      allow create: if isSignedIn()
+        && !isSuspendedOrBanned(request.auth.uid)
+        && request.resource.data.keys().hasOnly(
+             ['taskId', 'participants', 'createdAt', 'lastMessageAt', 'lastMessagePreview'])
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.lastMessageAt is timestamp
+        && request.resource.data.lastMessagePreview is string
+        && validChatCreate(chatId);
+
+      // Participants may only bump the inbox preview fields.
+      allow update: if isSignedIn()
+        && !isSuspendedOrBanned(request.auth.uid)
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['lastMessageAt', 'lastMessagePreview'])
+        && request.resource.data.lastMessageAt is timestamp
+        && request.resource.data.lastMessagePreview is string;
+
+      allow delete: if false;
+
+      match /messages/{msgId} {
+        allow read: if isSignedIn()
+          && !isSuspendedOrBanned(request.auth.uid)
+          && request.auth.uid in chatParticipants(chatId);
+
+        allow create: if isSignedIn()
+          && !isSuspendedOrBanned(request.auth.uid)
+          && request.resource.data.keys().hasOnly(['senderUid', 'text', 'sentAt', 'system'])
+          && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.system == false
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.sentAt is timestamp
+          && canPostMessage(chatId);
+
+        // Immutable for clients. reportedBy + system messages are server-only.
+        allow update, delete: if false;
+      }
+    }
+
     // Everything else stays deny-by-default until later milestones grant access.
     match /{document=**} {
       allow read, write: if false;

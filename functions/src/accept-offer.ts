@@ -18,6 +18,7 @@ import { logger } from 'firebase-functions/v2';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { appendActivityLog, safeDisplayName } from './activity-log';
+import { appendSystemMessage, ensureChatForTask } from './chat';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -133,6 +134,28 @@ export const acceptOffer = onCall(
       userId: volunteerId,
       taskId,
     });
+
+    // Open the in-app chat (M7). Best-effort — a chat failure must not
+    // unwind the accept, which has already committed. ensureChatForTask
+    // also re-keys the chat to the new volunteer if the task was reassigned.
+    try {
+      const taskSnap = await taskRef.get();
+      const customerId = (taskSnap.data() as { customerId?: string } | undefined)
+        ?.customerId;
+      if (customerId) {
+        await ensureChatForTask(db, taskId, customerId, volunteerId);
+        await appendSystemMessage(
+          db,
+          taskId,
+          'You’re connected. Use this chat to coordinate the task — meeting point, timing, and anything you need to bring.',
+        );
+      }
+    } catch (err) {
+      logger.warn('Failed to set up chat (non-fatal)', {
+        taskId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return { taskId, acceptedAt: acceptedAtMs };
   },

@@ -23,6 +23,7 @@ import { CustomerOtpPanel } from '../components/CustomerOtpPanel';
 import { VolunteerOtpPanel } from '../components/VolunteerOtpPanel';
 import { CustomerRatingPanel } from '../components/CustomerRatingPanel';
 import { ReportBlockPanel } from '../components/ReportBlockPanel';
+import { ChatPanel } from '../components/ChatPanel';
 import { KarmaBadge } from '../components/KarmaBadge';
 import { KarmaToast } from '../components/KarmaToast';
 
@@ -266,20 +267,19 @@ export default function TaskDetailPage() {
               const isVolunteer = viewerUid === task.acceptedVolunteerId;
               const hasAcceptedVol = !!task.acceptedVolunteerId;
 
-              // Reporting window (mirrors functions/src/report-user.ts):
-              //   - accepted / in_progress: always inside the window
+              // Report/block during accepted + in_progress now live in the
+              // chat header (ChatPanel). This standalone panel only covers the
+              // post-completion window, where the chat is read-only:
               //   - completed: only if completedAt is within 24h
               //   - volunteer side additionally requires status !== 'accepted'
-              //     (i.e., Start OTP must have been verified)
+              //     (always true once completed)
               const REPORT_WINDOW_AFTER_COMPLETION_MS = 24 * 60 * 60 * 1000;
-              const insideLifecycle =
-                task.status === 'accepted' || task.status === 'in_progress';
               const insidePostCompletionWindow =
                 task.status === 'completed' &&
                 !!task.completedAt &&
                 now - task.completedAt.toMillis() <
                   REPORT_WINDOW_AFTER_COMPLETION_MS;
-              const inWindow = insideLifecycle || insidePostCompletionWindow;
+              const inWindow = insidePostCompletionWindow;
 
               // Volunteer can only report once status has moved past
               // 'accepted'. Customer can report anytime in-window.
@@ -424,11 +424,16 @@ function OffersSection({
           ? 'You accepted this task'
           : 'Task accepted';
 
-    const chatInstruction = viewerIsAcceptedVolunteer
-      ? 'Chat with the customer opens here in M7.'
-      : 'Chat with the volunteer opens here in M7.';
-
     const phase = task.status === 'accepted' ? 'start' : 'end';
+
+    // Chat opens on acceptance. Other party = the person the viewer is NOT.
+    const otherPartyUid = viewerIsAcceptedVolunteer
+      ? task.customerId
+      : (task.acceptedVolunteerId ?? '');
+    // Volunteers can only report once the task has started (Start OTP
+    // verified). Customers can report any time post-acceptance.
+    const canReport = viewerIsCustomer || task.status !== 'accepted';
+
     return (
       <>
         <section className="vc-fade-up relative mt-10 overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f6f5c] to-[#15493b] p-7 text-white shadow-[0_18px_40px_-20px_rgba(31,111,92,0.45)]">
@@ -487,6 +492,19 @@ function OffersSection({
             </span>
           </p>
         </section>
+        {task.taskId && otherPartyUid && (
+          <ChatPanel
+            taskId={task.taskId}
+            customerId={task.customerId}
+            acceptedVolunteerId={task.acceptedVolunteerId ?? ''}
+            status={task.status}
+            viewerUid={viewerUid}
+            viewerRole={viewerIsCustomer ? 'customer' : 'volunteer'}
+            otherPartyUid={otherPartyUid}
+            otherPartyName={targetName}
+            canReport={canReport}
+          />
+        )}
         {viewerIsCustomer && (
           <CustomerOtpPanel taskId={task.taskId ?? ''} phase={phase} />
         )}
@@ -546,6 +564,27 @@ function OffersSection({
             </div>
           )}
         </section>
+        {task.taskId && task.acceptedVolunteerId && (
+          <ChatPanel
+            taskId={task.taskId}
+            customerId={task.customerId}
+            acceptedVolunteerId={task.acceptedVolunteerId}
+            status="completed"
+            viewerUid={viewerUid}
+            viewerRole={viewerIsCustomer ? 'customer' : 'volunteer'}
+            otherPartyUid={
+              viewerIsAcceptedVolunteer
+                ? task.customerId
+                : task.acceptedVolunteerId
+            }
+            otherPartyName={
+              viewerIsAcceptedVolunteer
+                ? task.customerName || 'Customer'
+                : acceptedName
+            }
+            canReport={false}
+          />
+        )}
         {viewerIsCustomer && typeof task.customerRating !== 'number' && (
           <CustomerRatingPanel
             taskId={task.taskId ?? ''}

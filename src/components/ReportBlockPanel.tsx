@@ -10,6 +10,9 @@ interface Props {
   // Role of the user currently viewing this panel. Volunteers do not see
   // the Block button — block remains a customer-only action.
   viewerRole: 'customer' | 'volunteer';
+  // 'card' (default) renders the full bordered Safety & Trust panel.
+  // 'inline' renders just the action buttons (used in the chat header).
+  variant?: 'card' | 'inline';
 }
 
 export function ReportBlockPanel({
@@ -17,6 +20,7 @@ export function ReportBlockPanel({
   reportedUserId,
   reportedUserName,
   viewerRole,
+  variant = 'card',
 }: Props) {
   const navigate = useNavigate();
   const [showReportModal, setShowReportModal] = useState(false);
@@ -111,34 +115,52 @@ export function ReportBlockPanel({
     }
   }
 
-  return (
-    <div className="mt-8 rounded-2xl border border-red-100 bg-red-50/30 p-6">
-      <h3 className="text-base font-semibold text-neutral-900">Safety & Trust</h3>
-      <p className="mt-1 text-sm text-neutral-600">
-        If you experience any safety issues, rudeness, or a no-show, please report it.
-        {viewerRole === 'customer'
-          ? ' You can also block this user to prevent matching again.'
-          : ''}
-      </p>
-
-      <div className="mt-4 flex flex-wrap gap-3">
+  const actions = (
+    <div
+      className={
+        variant === 'inline'
+          ? 'flex flex-wrap gap-2'
+          : 'mt-4 flex flex-wrap gap-3'
+      }
+    >
+      <button
+        type="button"
+        onClick={() => setShowReportModal(true)}
+        className="rounded-full bg-white border border-neutral-300 px-4 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 hover:text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2"
+      >
+        Report {variant === 'inline' ? '' : reportedUserName}
+      </button>
+      {viewerRole === 'customer' && (
         <button
           type="button"
-          onClick={() => setShowReportModal(true)}
-          className="rounded-full bg-white border border-neutral-300 px-4 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 hover:text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2"
+          onClick={() => setShowBlockModal(true)}
+          className="rounded-full bg-white border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
         >
-          Report {reportedUserName}
+          Block {variant === 'inline' ? '' : reportedUserName}
         </button>
-        {viewerRole === 'customer' && (
-          <button
-            type="button"
-            onClick={() => setShowBlockModal(true)}
-            className="rounded-full bg-white border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-          >
-            Block {reportedUserName}
-          </button>
-        )}
-      </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {variant === 'card' ? (
+        <div className="mt-8 rounded-2xl border border-red-100 bg-red-50/30 p-6">
+          <h3 className="text-base font-semibold text-neutral-900">
+            Safety &amp; Trust
+          </h3>
+          <p className="mt-1 text-sm text-neutral-600">
+            If you experience any safety issues, rudeness, or a no-show, please
+            report it.
+            {viewerRole === 'customer'
+              ? ' You can also block this user to prevent matching again.'
+              : ''}
+          </p>
+          {actions}
+        </div>
+      ) : (
+        actions
+      )}
 
       {/* REPORT MODAL */}
       {showReportModal && (
@@ -285,6 +307,6 @@ export function ReportBlockPanel({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
