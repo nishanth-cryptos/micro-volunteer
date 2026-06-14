@@ -1,11 +1,14 @@
 // Customer creates a task. Structured inputs (chips for category +
-// skills, numeric duration, short textareas for instructions, map pin
-// for location). Risk auto-derived from category; server rules enforce
-// the allowed set. On submit, addDoc to tasks/{auto-id} with status=
-// 'searching' and a 24-hour expiry.
+// skills, time stepper for duration, short textareas for instructions,
+// map pin for location). Risk auto-derived from category; server rules
+// enforce the allowed set. On submit, addDoc to tasks/{auto-id} with
+// status='searching' and a 24-hour expiry.
+// Visual theme + animations ported from Claude Design handoff bundle
+// (Volunteer Dashboard.html, 2026-06-14). Form fields + Firestore write
+// logic preserved verbatim; only the chrome/styling changed.
 
-import { useCallback, useId, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useId, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Timestamp,
   addDoc,
@@ -25,6 +28,7 @@ import { TaskLocationPicker } from '../components/TaskLocationPicker';
 const INITIAL_SEARCH_RADIUS_M = 2000;
 const TASK_EXPIRY_MS = 24 * 60 * 60 * 1000;
 const MAX_SKILLS = 5;
+const DURATION_PRESETS = [15, 30, 60, 120];
 
 interface PickedLocation {
   lat: number;
@@ -49,7 +53,6 @@ export default function CreateTaskPage() {
   const [busy, setBusy] = useState(false);
 
   const titleId = useId();
-  const durationId = useId();
   const meetingId = useId();
   const bringId = useId();
   const preferenceId = useId();
@@ -75,6 +78,19 @@ export default function CreateTaskPage() {
   );
   const derivedRisk = selectedCategory ? deriveRisk(selectedCategory.key) : null;
 
+  // 6 required fields drive the progress strip — title, category, ≥1 skill,
+  // valid duration, meeting point, location pin. Optional textareas don't
+  // count against progress so the user isn't pushed to fill them.
+  const filledRequired =
+    (title.trim() ? 1 : 0) +
+    (selectedCategory ? 1 : 0) +
+    (selectedSkills.length > 0 ? 1 : 0) +
+    (estimatedMinutes >= 5 && estimatedMinutes <= 480 ? 1 : 0) +
+    (meetingPoint.trim() ? 1 : 0) +
+    (location ? 1 : 0);
+  const progressPct = Math.round((filledRequired / 6) * 100);
+  const canPost = filledRequired === 6 && !busy;
+
   function toggleSkill(key: string) {
     setSelectedSkills((prev) =>
       prev.includes(key)
@@ -82,6 +98,12 @@ export default function CreateTaskPage() {
         : prev.length >= MAX_SKILLS
           ? prev
           : [...prev, key],
+    );
+  }
+
+  function bumpDuration(delta: number) {
+    setEstimatedMinutes((m) =>
+      Math.max(5, Math.min(480, Math.round((m + delta) / 5) * 5)),
     );
   }
 
@@ -140,249 +162,452 @@ export default function CreateTaskPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
-        <h1 className="text-3xl font-semibold tracking-tight">Post a task</h1>
-        <p className="mt-3 text-neutral-600">
-          Tell us what you need help with. Stick to small, safe asks.
-        </p>
-
-        <div className="mt-10 space-y-10">
-          {/* Title */}
-          <Section
-            label="Title"
-            description="A short summary. Other people will see this first."
+    <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
+      {/* Sticky progress strip */}
+      <div className="sticky top-0 z-30 border-b border-[#ececea] bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-3">
+          <Link
+            to="/app"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec]"
           >
-            <input
-              id={titleId}
-              type="text"
-              maxLength={80}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Pick up medicine from the pharmacy"
-              className="w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-              aria-label="Title"
-            />
-          </Section>
-
-          {/* Category */}
-          <Section
-            label="Category"
-            description="Pick the one closest fit. This determines the risk level."
-          >
-            <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((c) => (
-                <ChipButton
-                  key={c.key}
-                  selected={categoryKey === c.key}
-                  onClick={() => setCategoryKey(c.key)}
-                >
-                  {c.label}
-                </ChipButton>
-              ))}
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Back
+          </Link>
+          <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[#f3f1ec]">
+            <div
+              className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#1f6f5c] to-[#185845] transition-[width] duration-500 ease-out"
+              style={{ width: `${String(progressPct)}%` }}
+            >
+              <div className="vc-shimmer absolute inset-0" aria-hidden="true" />
             </div>
-            {selectedCategory && (
-              <p className="mt-3 text-sm text-neutral-600">
-                {selectedCategory.description}
-              </p>
-            )}
-            {derivedRisk && (
-              <p className="mt-2 text-sm">
-                <span className="text-neutral-600">Risk: </span>
-                <span
-                  className={
-                    derivedRisk === 'medium'
-                      ? 'font-medium text-amber-700'
-                      : 'font-medium text-emerald-700'
-                  }
-                >
-                  {derivedRisk === 'medium' ? 'Medium — verified ID needed' : 'Low'}
-                </span>
-              </p>
-            )}
-          </Section>
-
-          {/* Skills */}
-          <Section
-            label="Skills needed"
-            description={`Choose up to ${String(MAX_SKILLS)}. A volunteer matching any one is enough.`}
-          >
-            <div className="flex flex-wrap gap-2">
-              {SKILLS.map((s) => (
-                <ChipButton
-                  key={s.key}
-                  selected={selectedSkills.includes(s.key)}
-                  onClick={() => toggleSkill(s.key)}
-                >
-                  {s.label}
-                </ChipButton>
-              ))}
-            </div>
-          </Section>
-
-          {/* Duration */}
-          <Section
-            label="Estimated time"
-            description="How long should this take, end to end?"
-          >
-            <div className="flex items-center gap-3">
-              <input
-                id={durationId}
-                type="number"
-                min={5}
-                max={480}
-                step={5}
-                value={estimatedMinutes}
-                onChange={(e) =>
-                  setEstimatedMinutes(parseInt(e.target.value, 10) || 0)
-                }
-                aria-label="Estimated minutes"
-                className="w-28 rounded-lg border border-neutral-300 px-3 py-2 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-              />
-              <span className="text-sm text-neutral-600">minutes</span>
-            </div>
-          </Section>
-
-          {/* Location */}
-          <Section
-            label="Where"
-            description="Drag the pin to the exact meeting point. We use this to find nearby volunteers."
-          >
-            <TaskLocationPicker onLocationChange={onLocationChange} />
-          </Section>
-
-          {/* Structured instructions */}
-          <Section label="Instructions">
-            <label
-              htmlFor={meetingId}
-              className="block text-sm font-medium text-neutral-900"
-            >
-              Meeting point details
-            </label>
-            <textarea
-              id={meetingId}
-              rows={2}
-              maxLength={280}
-              value={meetingPoint}
-              onChange={(e) => setMeetingPoint(e.target.value)}
-              placeholder="e.g. Outside Gate 2 of XYZ Apartments"
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-            />
-
-            <label
-              htmlFor={bringId}
-              className="mt-6 block text-sm font-medium text-neutral-900"
-            >
-              What the volunteer should bring{' '}
-              <span className="font-normal text-neutral-500">(optional)</span>
-            </label>
-            <textarea
-              id={bringId}
-              rows={2}
-              maxLength={280}
-              value={whatToBring}
-              onChange={(e) => setWhatToBring(e.target.value)}
-              placeholder="e.g. A reusable bag"
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-            />
-
-            <label
-              htmlFor={preferenceId}
-              className="mt-6 block text-sm font-medium text-neutral-900"
-            >
-              Preferences{' '}
-              <span className="font-normal text-neutral-500">(optional)</span>
-            </label>
-            <textarea
-              id={preferenceId}
-              rows={2}
-              maxLength={280}
-              value={preference}
-              onChange={(e) => setPreference(e.target.value)}
-              placeholder="e.g. Someone who knows Tamil"
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-            />
-
-            <label
-              htmlFor={safetyId}
-              className="mt-6 block text-sm font-medium text-neutral-900"
-            >
-              Safety note{' '}
-              <span className="font-normal text-neutral-500">(optional)</span>
-            </label>
-            <textarea
-              id={safetyId}
-              rows={2}
-              maxLength={280}
-              value={safetyNote}
-              onChange={(e) => setSafetyNote(e.target.value)}
-              placeholder="e.g. Wheelchair user — slow walking pace"
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-            />
-          </Section>
+          </div>
+          <span className="font-mono text-[11px] text-[#4f4b46]" aria-live="polite">
+            {progressPct}%
+          </span>
         </div>
+      </div>
 
-        {error && (
-          <p id={errorId} role="alert" className="mt-8 text-sm text-red-700">
-            {error}
-          </p>
-        )}
+      <ContentBody
+        title={title}
+        setTitle={setTitle}
+        titleId={titleId}
+        categoryKey={categoryKey}
+        setCategoryKey={setCategoryKey}
+        selectedCategory={selectedCategory}
+        derivedRisk={derivedRisk}
+        selectedSkills={selectedSkills}
+        toggleSkill={toggleSkill}
+        estimatedMinutes={estimatedMinutes}
+        setEstimatedMinutes={setEstimatedMinutes}
+        bumpDuration={bumpDuration}
+        meetingPoint={meetingPoint}
+        setMeetingPoint={setMeetingPoint}
+        meetingId={meetingId}
+        whatToBring={whatToBring}
+        setWhatToBring={setWhatToBring}
+        bringId={bringId}
+        preference={preference}
+        setPreference={setPreference}
+        preferenceId={preferenceId}
+        safetyNote={safetyNote}
+        setSafetyNote={setSafetyNote}
+        safetyId={safetyId}
+        onLocationChange={onLocationChange}
+        location={location}
+        error={error}
+        errorId={errorId}
+      />
 
-        <button
-          type="button"
-          onClick={() => void handleSubmit()}
-          disabled={busy}
-          className="mt-10 rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-50"
-        >
-          {busy ? 'Posting…' : 'Post task'}
-        </button>
+      {/* Sticky bottom action bar */}
+      <div
+        className={
+          'fixed inset-x-0 bottom-0 z-30 border-t border-[#ececea] bg-white/95 backdrop-blur transition-all duration-300 ease-out ' +
+          (filledRequired > 0
+            ? 'translate-y-0 opacity-100'
+            : 'pointer-events-none translate-y-full opacity-0')
+        }
+      >
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-[#131312]">
+              {canPost
+                ? 'Your task is ready to post'
+                : `${String(filledRequired)} of 6 fields filled`}
+            </div>
+            <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
+              {selectedCategory?.label ?? 'Pick a category'}
+              {' · '}
+              {estimatedMinutes} min
+              {selectedSkills.length > 0 && (
+                <>
+                  {' · '}
+                  {selectedSkills.length}{' '}
+                  {selectedSkills.length === 1 ? 'skill' : 'skills'}
+                </>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={!canPost}
+            className={
+              'flex-shrink-0 rounded-full px-6 py-3 text-[14px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+              (canPost
+                ? 'bg-gradient-to-r from-[#1f6f5c] to-[#185845] text-white shadow-[0_8px_20px_-8px_rgba(31,111,92,0.55)] hover:from-[#1d6655] hover:to-[#14503e] focus-visible:ring-[#1f6f5c]'
+                : 'cursor-not-allowed bg-[#ececea] text-[#8a847d]')
+            }
+          >
+            {busy ? 'Posting…' : 'Post task'}
+          </button>
+        </div>
       </div>
     </main>
   );
 }
 
-function Section({
+interface BodyProps {
+  title: string;
+  setTitle: (v: string) => void;
+  titleId: string;
+  categoryKey: string;
+  setCategoryKey: (v: string) => void;
+  selectedCategory: Category | undefined;
+  derivedRisk: 'low' | 'medium' | null;
+  selectedSkills: string[];
+  toggleSkill: (k: string) => void;
+  estimatedMinutes: number;
+  setEstimatedMinutes: (n: number) => void;
+  bumpDuration: (delta: number) => void;
+  meetingPoint: string;
+  setMeetingPoint: (v: string) => void;
+  meetingId: string;
+  whatToBring: string;
+  setWhatToBring: (v: string) => void;
+  bringId: string;
+  preference: string;
+  setPreference: (v: string) => void;
+  preferenceId: string;
+  safetyNote: string;
+  setSafetyNote: (v: string) => void;
+  safetyId: string;
+  onLocationChange: (loc: PickedLocation) => void;
+  location: PickedLocation | null;
+  error: string | null;
+  errorId: string;
+}
+
+function ContentBody(p: BodyProps) {
+  const skillsAtCap = p.selectedSkills.length >= MAX_SKILLS;
+
+  return (
+    <div className="mx-auto max-w-3xl px-6 pt-10 pb-40">
+      <div className="vc-fade-up">
+        <h1 className="text-[32px] font-bold tracking-tight">Post a task</h1>
+        <p className="mt-2 text-sm text-[#4f4b46]">
+          Tell us what you need help with. Stick to small, safe asks.
+        </p>
+      </div>
+
+      <div className="mt-9 space-y-9">
+        <FormBlock label="Title" hint="A short summary nearby volunteers will see first.">
+          <div className="relative">
+            <input
+              id={p.titleId}
+              type="text"
+              maxLength={80}
+              value={p.title}
+              onChange={(e) => p.setTitle(e.target.value)}
+              placeholder="e.g. Pick up medicine from the pharmacy"
+              className="w-full rounded-xl border border-[#ececea] bg-white px-4 py-3 text-[15px] text-[#131312] placeholder-[#b8b3ad] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-4 focus:ring-[#1f6f5c]/10"
+              aria-label="Title"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[11px] text-[#8a847d]">
+              {p.title.length} / 80
+            </span>
+          </div>
+        </FormBlock>
+
+        <FormBlock label="Category" hint="Pick the closest fit. This sets the risk level.">
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map((c) => (
+              <Chip
+                key={c.key}
+                on={p.categoryKey === c.key}
+                onClick={() => p.setCategoryKey(c.key)}
+                label={c.label}
+              />
+            ))}
+          </div>
+          {p.selectedCategory && (
+            <p className="vc-fade-in mt-3 text-sm text-[#4f4b46]">
+              {p.selectedCategory.description}
+            </p>
+          )}
+          {p.derivedRisk && (
+            <p className="vc-fade-in mt-2 text-sm">
+              <span className="text-[#8a847d]">Risk: </span>
+              <span
+                className={
+                  p.derivedRisk === 'medium'
+                    ? 'font-semibold text-amber-700'
+                    : 'font-semibold text-[#1f6f5c]'
+                }
+              >
+                {p.derivedRisk === 'medium' ? 'Medium — verified ID needed' : 'Low'}
+              </span>
+            </p>
+          )}
+        </FormBlock>
+
+        <FormBlock
+          label="Skills needed"
+          hint={`Choose up to ${String(MAX_SKILLS)}. A volunteer matching any one is enough.`}
+          extra={
+            <span className="rounded-full bg-[#f3f1ec] px-2.5 py-0.5 font-mono text-[11px] text-[#4f4b46]">
+              {p.selectedSkills.length} / {MAX_SKILLS}
+            </span>
+          }
+        >
+          <div className="flex flex-wrap gap-2">
+            {SKILLS.map((s) => {
+              const on = p.selectedSkills.includes(s.key);
+              const disabled = !on && skillsAtCap;
+              return (
+                <Chip
+                  key={s.key}
+                  on={on}
+                  disabled={disabled}
+                  onClick={() => p.toggleSkill(s.key)}
+                  label={s.label}
+                />
+              );
+            })}
+          </div>
+        </FormBlock>
+
+        <FormBlock label="Estimated time" hint="How long, end to end?">
+          <TimeStepper
+            value={p.estimatedMinutes}
+            onChange={p.setEstimatedMinutes}
+            onBump={p.bumpDuration}
+          />
+        </FormBlock>
+
+        <FormBlock label="Where" hint="Drag the pin to the exact meeting point.">
+          <TaskLocationPicker onLocationChange={p.onLocationChange} />
+        </FormBlock>
+
+        <FormBlock label="Instructions">
+          <FieldTextarea
+            id={p.meetingId}
+            label="Meeting point details"
+            value={p.meetingPoint}
+            onChange={p.setMeetingPoint}
+            placeholder="e.g. Outside Gate 2 of XYZ Apartments"
+          />
+          <FieldTextarea
+            id={p.bringId}
+            label="What the volunteer should bring"
+            optional
+            value={p.whatToBring}
+            onChange={p.setWhatToBring}
+            placeholder="e.g. A reusable bag"
+          />
+          <FieldTextarea
+            id={p.preferenceId}
+            label="Preferences"
+            optional
+            value={p.preference}
+            onChange={p.setPreference}
+            placeholder="e.g. Someone who knows Tamil"
+          />
+          <FieldTextarea
+            id={p.safetyId}
+            label="Safety note"
+            optional
+            value={p.safetyNote}
+            onChange={p.setSafetyNote}
+            placeholder="e.g. Wheelchair user — slow walking pace"
+          />
+        </FormBlock>
+      </div>
+
+      {p.error && (
+        <p
+          id={p.errorId}
+          role="alert"
+          className="vc-fade-in mt-8 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {p.error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FormBlock({
   label,
-  description,
+  hint,
+  extra,
   children,
 }: {
   label: string;
-  description?: string;
+  hint?: string;
+  extra?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <h2 className="text-base font-semibold text-neutral-900">{label}</h2>
-      {description && (
-        <p className="mt-1 text-sm text-neutral-600">{description}</p>
-      )}
-      <div className="mt-4">{children}</div>
+    <section className="vc-fade-up">
+      <header className="mb-3 flex items-baseline justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-semibold text-[#131312]">{label}</h3>
+          {hint && <p className="mt-0.5 text-[12px] text-[#8a847d]">{hint}</p>}
+        </div>
+        {extra}
+      </header>
+      <div>{children}</div>
     </section>
   );
 }
 
-function ChipButton({
-  selected,
+function Chip({
+  on,
+  disabled = false,
   onClick,
-  children,
+  label,
 }: {
-  selected: boolean;
+  on: boolean;
+  disabled?: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  label: string;
 }) {
   return (
     <button
       type="button"
-      aria-pressed={selected}
+      aria-pressed={on}
       onClick={onClick}
+      disabled={disabled}
       className={
-        'rounded-full border px-4 py-2 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 ' +
-        (selected
-          ? 'border-neutral-900 bg-neutral-900 text-white'
-          : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-500')
+        'vc-chip inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 ' +
+        (on
+          ? 'is-on border-[#1f6f5c] bg-[#1f6f5c] text-white shadow-[0_6px_14px_-8px_rgba(31,111,92,0.55)]'
+          : disabled
+            ? 'cursor-not-allowed border-[#ececea] bg-[#f7f5f0] text-[#b8b3ad]'
+            : 'border-[#ececea] bg-white text-[#4f4b46] hover:border-[#1f6f5c] hover:text-[#131312]')
       }
     >
-      {children}
+      {on && (
+        <span className="vc-check-pop inline-flex">
+          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
+      )}
+      {label}
     </button>
+  );
+}
+
+function TimeStepper({
+  value,
+  onChange,
+  onBump,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  onBump: (delta: number) => void;
+}) {
+  // Pulse the number on change without rerendering layout.
+  const pulseKey = useMemo(() => value, [value]);
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <div className="inline-flex items-center gap-2 rounded-2xl border border-[#ececea] bg-white p-1.5">
+        <button
+          type="button"
+          aria-label="Decrease 5 minutes"
+          onClick={() => onBump(-5)}
+          className="grid h-9 w-9 place-items-center rounded-xl text-[18px] text-[#4f4b46] transition hover:bg-[#f3f1ec] active:scale-95"
+        >
+          −
+        </button>
+        <div className="min-w-[80px] text-center">
+          <span
+            key={pulseKey}
+            className="vc-fade-up inline-block font-mono text-[22px] font-semibold tracking-tight text-[#131312]"
+          >
+            {value}
+          </span>
+          <span className="ml-1 text-[12px] text-[#8a847d]">min</span>
+        </div>
+        <button
+          type="button"
+          aria-label="Increase 5 minutes"
+          onClick={() => onBump(5)}
+          className="grid h-9 w-9 place-items-center rounded-xl text-[18px] text-[#4f4b46] transition hover:bg-[#f3f1ec] active:scale-95"
+        >
+          +
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {DURATION_PRESETS.map((p) => {
+          const on = value === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onChange(p)}
+              aria-pressed={on}
+              className={
+                'vc-chip rounded-full border px-3 py-1.5 text-[12px] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 ' +
+                (on
+                  ? 'is-on border-[#1f6f5c] bg-[#e3efe9] text-[#1f6f5c]'
+                  : 'border-[#ececea] bg-white text-[#4f4b46] hover:border-[#1f6f5c] hover:text-[#131312]')
+              }
+            >
+              {p < 60 ? `${String(p)}m` : `${String(p / 60)}h`}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FieldTextarea({
+  id,
+  label,
+  optional = false,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  optional?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="mt-4 first:mt-0">
+      <label htmlFor={id} className="block text-[13px] font-medium text-[#131312]">
+        {label}{' '}
+        {optional && (
+          <span className="font-normal text-[#8a847d]">(optional)</span>
+        )}
+      </label>
+      <textarea
+        id={id}
+        rows={2}
+        maxLength={280}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-2 w-full resize-y rounded-xl border border-[#ececea] bg-white px-4 py-3 text-[14px] text-[#131312] placeholder-[#b8b3ad] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-4 focus:ring-[#1f6f5c]/10"
+      />
+    </div>
   );
 }

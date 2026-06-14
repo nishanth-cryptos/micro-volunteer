@@ -93,3 +93,13 @@
 - **Past-tasks tabs mapping:** All / Completed (`status == completed`) / Accepted (currently `accepted | in_progress`) / Rejected (`cancelled | expired` with no `acceptedVolunteerId`) / Blocked (count of `blocks` where `blockedBy == uid`).
 - **Rejected:** (a) Rebuilding the volunteer view to the same shell — out of scope per Q&A; (b) faking the nearby-volunteer pins with anonymised dots — would need a server-side callable for jittered counts, non-trivial; (c) adding `homeAddress` + `emergencyContact` to the schema in this change — scope discipline (CLAUDE.md rule 7).
 - **Verified:** typecheck + lint + vite build all clean. Runtime not yet verified in the browser.
+
+
+## 2026-06-14 — Customer-flow design pass 2 (second handoff bundle)
+- **Decision:** Implemented animation/polish layer + re-themed three customer-facing surfaces (`CreateTaskPage`, `TaskDetailPage` searching+accepted states, `CustomerOtpPanel`) to match the second Claude Design handoff bundle (`KOXU9t0cI1y5-j5b1jQ_bg`). Animation primitives live in `src/index.css` under a `vc-*` prefix and are shared across the redesigned surfaces.
+- **Scope locked with Nishanth before coding:** all four parts (dashboard polish, CreateTaskPage re-theme, radar visual, accepted-state re-theme) and CreateTaskPage fidelity = "visual match only, keep current form fields/logic."
+- **Form/logic preservation:** `CreateTaskPage` keeps every state value, validation rule, `addDoc` call, and the 24h `expiresAt` constant — only chrome changed. `CustomerOtpPanel` keeps the `generateStartOtp` / `generateEndOtp` callable wiring + the 10-min countdown logic — only the digit reveal + button styling changed. `TaskDetailPage` still drives the radar visual off the real `offers` collection-group subscription (no fake blip count).
+- **Radar:** rotating conic-gradient sweep from the design was deliberately omitted — the user removed it explicitly in the second design chat ("just remove the rotating triangle like thing and the rest is fine"). Only the concentric grid + pulsing ping rings + fade-in blips + center halo remain.
+- **Accessibility:** all `vc-*` animations are short (≤0.55s) and disabled under `@media (prefers-reduced-motion: reduce)`.
+- **Rejected:** (a) ripping out `TaskLocationPicker` (Leaflet) for the design's custom SVG map — would lose H3 cell computation + real geolocation; (b) building a dedicated `/searching/{taskId}` route — radar belongs on `TaskDetailPage` because we already have the live subscription + reassignment notice + offers list there.
+- **Verified:** typecheck + lint + vite build all clean. Runtime not yet verified in the browser.
