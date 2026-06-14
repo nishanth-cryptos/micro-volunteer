@@ -22,12 +22,14 @@ export const reportUser = onCall(
       taskId?: unknown;
       reason?: unknown;
       details?: unknown;
+      messageRef?: unknown;
     };
 
     const reportedUserId = data.reportedUserId;
     const taskId = data.taskId;
     const reason = data.reason;
     const details = data.details ?? '';
+    const messageRef = data.messageRef;
 
     if (typeof reportedUserId !== 'string' || reportedUserId.length === 0) {
       throw new HttpsError('invalid-argument', 'reportedUserId is required.');
@@ -42,6 +44,21 @@ export const reportUser = onCall(
       throw new HttpsError(
         'invalid-argument',
         'details must be a string up to 500 characters.',
+      );
+    }
+    // Optional message-level report (M7). When present it must point at a
+    // message inside this task's chat: chats/{taskId}/messages/{msgId}.
+    const expectedMessagePrefix = `chats/${String(taskId)}/messages/`;
+    if (
+      messageRef !== undefined &&
+      (typeof messageRef !== 'string' ||
+        messageRef.length === 0 ||
+        messageRef.length > 300 ||
+        !messageRef.startsWith(expectedMessagePrefix))
+    ) {
+      throw new HttpsError(
+        'invalid-argument',
+        'messageRef must reference a message in this task chat.',
       );
     }
 
@@ -158,6 +175,7 @@ export const reportUser = onCall(
         taskId,
         reason,
         details,
+        ...(typeof messageRef === 'string' ? { messageRef } : {}),
         status: 'pending',
         uniqueReporterCount,
         createdAt: FieldValue.serverTimestamp(),
@@ -188,6 +206,18 @@ export const reportUser = onCall(
       userId: reporterId,
       taskId,
     });
+
+    // Mark the reported chat message (M7) so the reporter's UI can show it
+    // as reported. Admin SDK bypasses message immutability rules. Best-effort.
+    if (typeof messageRef === 'string') {
+      try {
+        await db.doc(messageRef).update({
+          reportedBy: FieldValue.arrayUnion(reporterId),
+        });
+      } catch {
+        /* message may have been removed; report itself already recorded */
+      }
+    }
 
     return { reportId };
   },

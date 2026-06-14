@@ -1,7 +1,16 @@
 # Progress
 
 ## Current milestone
-**Milestone 8 — Points, Trust, Safety & Admin Dashboard (Completed).** All requirements for M8 have been successfully coded, built, and verified. Note: Milestone 7 (Chat) is deferred.
+**Milestone 7 — In-app chat (Completed 2026-06-14).** Chat was deferred during the M8 push and has now been built and verified. All 12 Phase-1 features are now implemented (M0–M8). Coded, typechecked, linted, built; Firestore rules confirmed to compile in the emulator. **Not yet smoke-tested at runtime in a browser** (per CLAUDE.md anti-hallucination rule 5).
+
+M7 features implemented:
+- **Data model** (per systemPatterns.md): `chats/{chatId}` with `chatId === taskId`, `participants: [customerId, volunteerId]`, `lastMessageAt`/`lastMessagePreview`; `chats/{chatId}/messages/{id}` with `senderUid`, `text`, `system`, `sentAt`, optional `reportedBy`.
+- **Backend (`functions/src/chat.ts`):** `ensureChatForTask` (idempotent create; wipes the prior conversation via `recursiveDelete` if the task was reassigned to a new volunteer) + `appendSystemMessage`. Wired into `acceptOffer` (open chat + "connected" message), `verifyStartOtp` ("Task started"), `verifyEndOtp` ("Task completed") — all best-effort, never unwinding the parent action. `reportUser` extended with optional `messageRef` (stored on the report + `arrayUnion`-marked onto the message's `reportedBy`).
+- **Frontend:** `ChatPanel.tsx` (live messages, composer, system messages, per-message report, header report/block, block-aware + read-only states) wired into `TaskDetailPage` for accepted/in_progress (active) and completed (read-only history). `ReportBlockPanel` gained an `inline` variant for the chat header.
+- **Rules:** participant-only chat + messages; messages immutable for clients (system + `reportedBy` are Admin-SDK-only); no new messages once either party blocks the other (`canPostMessage` probes both block-id orderings). **Index:** `chats (participants array-contains, lastMessageAt desc)`.
+
+## Previous milestone
+**Milestone 8 — Points, Trust, Safety & Admin Dashboard (Completed).** All requirements for M8 have been successfully coded, built, and verified.
 
 M8 features implemented:
 - **Backend (Cloud Functions):**
@@ -38,10 +47,11 @@ M8 features implemented:
   - Seed scripts (Kalewadi-centred fixtures; both scripts re-sync passwords on existing accounts so credentials stay valid across runs):
     - `npm run seed:admin` → 2 admins (admin@example.org, admin2@example.org — both pass `admin123`, `isAdmin: true`, full volunteer-shape fields so they can also test the volunteer/customer flows). Located around test centre (13.0202, 77.6815).
     - `npm run seed:users` → 3 volunteer-only (vol@, vol1@, vol2@) + 3 customer-only (cus@, cus1@, cus2@) + 3 dual-role (both@, both1@, both2@) — all pass `pass123`. All clustered within ~350 m of test centre (13.0202, 77.6815) so they sit inside the default 2 km task search radius.
-- Verified at every step: frontend `typecheck` + `lint` + `vite build` clean; functions `build` clean.
+- **M7 In-app chat** (Completed 2026-06-14): see the Current milestone section above. One chat per accepted task (`chatId === taskId`), participant-only, immutable messages, system messages on accept/start/complete, per-message + user-level report, customer block, block-aware composer, read-only after completion. Server creates the chat on accept (`functions/src/chat.ts`); messages are client-direct writes guarded by rules.
+- Verified at every step: frontend `typecheck` + `lint` + `vite build` clean; functions `build` clean; `firestore.rules` confirmed to compile via `firebase emulators:exec --only firestore`.
 
 ## In progress
-- Nothing in active development. M7 (in-app chat) is the next milestone.
+- Nothing in active development. All Phase-1 milestones (M0–M8) are implemented. Remaining work is runtime smoke testing + pre-launch (Blaze) tasks below.
 
 ## Post-M8 follow-ups (continued)
 - **Customer dashboard redesign (2026-06-14):** New `src/components/CustomerDashboard.tsx` ported from the Claude Design handoff bundle (`Volunteer Dashboard.html`, chat 2026-06-14). Two-screen layout (Tasks / Profile) with floating bottom-nav pill, green-accent gradient hero, Leaflet map showing the customer's `lastKnownLocation` only, ongoing-tasks list (`searching | accepted | in_progress`), and past-tasks segmented tabs (All / Completed / Accepted / Rejected / Blocked). Wired into `AppHomePage` to render whenever `roles` includes `customer` (dual-role users get this view too; volunteer-only and admin paths unchanged). Scope choices (audience, map fidelity, profile fields, stats source) were confirmed with Nishanth before coding — see decisions.md 2026-06-14. **Verified:** `npm run typecheck` + `npm run lint` + `npm run build` clean. **Not verified at runtime** — no browser smoke test yet (per CLAUDE.md anti-hallucination rule 5).
@@ -119,6 +129,6 @@ M8 features implemented:
 - Customer rating: **1–5 stars + optional comment** post-completion.
 
 ## Next steps
-1. Live smoke test of M8 in the emulator suite (report → moderation → reassignment → completion).
-2. M7: in-app chat (opens on acceptance, report message, block user).
+1. Live smoke test of M7 chat in the emulator suite: accept a task (chat opens with "connected" system message) → both parties exchange messages → verify Start OTP (start system message) → verify End OTP (complete system message) → completed chat goes read-only → per-message report marks the message + files a report → customer block disables the composer for both parties.
+2. Live smoke test of M8 in the emulator suite (report → moderation → reassignment → completion); confirm reassignment wipes the old chat conversation.
 3. Pre-launch: Blaze upgrade + real-device FCM smoke test + Storage Console enable.

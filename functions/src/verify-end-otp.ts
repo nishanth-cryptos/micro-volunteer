@@ -12,6 +12,8 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { constantTimeEquals, hashOtp } from './otp';
 import { appendActivityLog, safeDisplayName } from './activity-log';
+import { appendSystemMessage } from './chat';
+import { logger } from 'firebase-functions/v2';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -113,6 +115,16 @@ export const verifyEndOtp = onCall(
       userId: callerUid,
       taskId,
     });
+
+    // Chat system message (M7) — best-effort, never blocks the response.
+    try {
+      await appendSystemMessage(db, taskId, 'Task completed — thanks for helping out!');
+    } catch (err) {
+      logger.warn('Failed to append completion system message (non-fatal)', {
+        taskId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return { taskId, status: 'completed' };
   },

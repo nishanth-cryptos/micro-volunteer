@@ -12,6 +12,8 @@ import { checkActiveStatus } from './moderation-helper';
 import { writeAuditEvent } from './audit';
 import { constantTimeEquals, hashOtp } from './otp';
 import { appendActivityLog, safeDisplayName } from './activity-log';
+import { appendSystemMessage } from './chat';
+import { logger } from 'firebase-functions/v2';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -116,6 +118,16 @@ export const verifyStartOtp = onCall(
       userId: callerUid,
       taskId,
     });
+
+    // Chat system message (M7) — best-effort, never blocks the response.
+    try {
+      await appendSystemMessage(db, taskId, 'Task started — the start code was verified.');
+    } catch (err) {
+      logger.warn('Failed to append start system message (non-fatal)', {
+        taskId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     return { taskId, status: 'in_progress' };
   },
