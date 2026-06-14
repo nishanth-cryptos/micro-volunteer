@@ -22,6 +22,7 @@ import { MyTasksList } from '../components/MyTasksList';
 import { OfferInbox } from '../components/OfferInbox';
 import { AcceptedTasksList } from '../components/AcceptedTasksList';
 import { BlockedUsersList } from '../components/BlockedUsersList';
+import { CustomerDashboard } from '../components/CustomerDashboard';
 import { getSkillLabel } from '../lib/catalog';
 import { KarmaBadge } from '../components/KarmaBadge';
 import { KarmaToast } from '../components/KarmaToast';
@@ -60,6 +61,23 @@ export default function AppHomePage() {
   // Dashboard link and a pending-reports alert.
   if (userDoc.isAdmin === true) {
     return <AdminHomeScreen name={name} />;
+  }
+
+  // Customer-facing redesign (design handoff 2026-06-14). Applies to any
+  // user whose roles include 'customer' (pure customer or dual-role).
+  // Volunteer-only users keep the existing layout below.
+  if (isCustomer) {
+    return (
+      <>
+        <CustomerDashboard uid={user.uid} userDoc={userDoc} />
+        {toastMessage && (
+          <KarmaToast
+            message={toastMessage}
+            onClose={() => setToastMessage(null)}
+          />
+        )}
+      </>
+    );
   }
 
   async function handleSignOut() {

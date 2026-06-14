@@ -81,3 +81,15 @@
 - **Why:** Nishanth chose this scope explicitly when asked (2026-06-08). Preserves the "immutable audit trail" invariant in systemPatterns.md while still removing the user-identifiable PII (auth, photo, ID image, profile doc) after the cool-down window. Dangling UID refs on past tasks/reports/blocks are tolerated by UI fallbacks.
 - **Rejected:** (a) Hard-deleting tasks + events along with the user — breaks audit and harms innocent counterparties on shared tasks. (b) Pure soft-delete flag — doesn't satisfy "delete from db and everywhere".
 - **Effect:** Adds `bannedAt: Timestamp` on `users/{uid}` (set on ban, cleared on dismiss). Adds new scheduled function `scheduledPurgeBannedUsers` (daily, region asia-south1). `recursiveDelete` from firebase-admin walks the user's subcollections (moderationLog, deviceTokens, notifications) and any in-flight task's offers + events.
+
+
+## 2026-06-14 — Customer dashboard redesign from Claude Design handoff bundle
+- **Decision:** Ported the design from `claude.ai/design` handoff (`Volunteer Dashboard.html`, chat 2026-06-14) into a new `CustomerDashboard` component rendered from `AppHomePage` for any user whose `roles` include `customer` (pure customer and dual-role). Volunteer-only and admin paths unchanged. Design preserves the green-accent palette, gradient hero, floating bottom-nav pill, and two-screen Tasks/Profile layout from the source HTML.
+- **Scope choices locked with Nishanth before coding** (anti-hallucination rule 3):
+  1. **Audience:** customer-only redesign — applies whenever `roles` includes `customer` (dual-role users also see this view; a switch-to-volunteer affordance is TBD).
+  2. **Map fidelity:** real Leaflet/OSM map showing only the customer's `lastKnownLocation` pin. The design's R/M/K/P nearby-volunteer markers were not implemented — exposing volunteer locations to customers is a privacy concern not covered by current rules/spec.
+  3. **Profile fields:** Phone + Email only. `homeAddress` and `emergencyContact` from the design were dropped — they're not in the user schema today and adding them would have been an out-of-scope data-model change with PII implications.
+  4. **Stats:** Tasks posted (real count) + Completion % (derived from `completed / total` of this customer's tasks). The design's "Avg rating" was dropped — there's no customer-rating server-side. "On-time" was dropped — no source data.
+- **Past-tasks tabs mapping:** All / Completed (`status == completed`) / Accepted (currently `accepted | in_progress`) / Rejected (`cancelled | expired` with no `acceptedVolunteerId`) / Blocked (count of `blocks` where `blockedBy == uid`).
+- **Rejected:** (a) Rebuilding the volunteer view to the same shell — out of scope per Q&A; (b) faking the nearby-volunteer pins with anonymised dots — would need a server-side callable for jittered counts, non-trivial; (c) adding `homeAddress` + `emergencyContact` to the schema in this change — scope discipline (CLAUDE.md rule 7).
+- **Verified:** typecheck + lint + vite build all clean. Runtime not yet verified in the browser.
