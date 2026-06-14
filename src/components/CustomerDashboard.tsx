@@ -184,26 +184,28 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
     <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
       <TopBar initial={initialOf(userDoc.displayName)} />
       <div className="mx-auto max-w-7xl px-8 pt-10 pb-[124px]">
-        {screen === 'tasks' && (
-          <TasksScreen
-            userDoc={userDoc}
-            ongoing={ongoing}
-            ongoingCount={ongoing.length}
-          />
-        )}
-        {screen === 'profile' && (
-          <ProfileScreen
-            userDoc={userDoc}
-            tasksPosted={rows.length}
-            completionPct={completionPct}
-            buckets={historyBuckets}
-            blockedCount={blockedCount}
-            counts={counts}
-            filter={filter}
-            onFilter={setFilter}
-            onSignOut={() => void handleSignOut()}
-          />
-        )}
+        <div key={screen} className="vc-screen-enter">
+          {screen === 'tasks' && (
+            <TasksScreen
+              userDoc={userDoc}
+              ongoing={ongoing}
+              ongoingCount={ongoing.length}
+            />
+          )}
+          {screen === 'profile' && (
+            <ProfileScreen
+              userDoc={userDoc}
+              tasksPosted={rows.length}
+              completionPct={completionPct}
+              buckets={historyBuckets}
+              blockedCount={blockedCount}
+              counts={counts}
+              filter={filter}
+              onFilter={setFilter}
+              onSignOut={() => void handleSignOut()}
+            />
+          )}
+        </div>
       </div>
       <BottomNav
         screen={screen}
@@ -434,7 +436,7 @@ function OngoingTaskCard({ task }: { task: TaskRow }) {
   return (
     <Link
       to={`/tasks/${task.id}`}
-      className="mb-2.5 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition hover:border-[#d8d4cc] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#131312] focus-visible:ring-offset-2"
+      className="vc-fade-up mb-2.5 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d8d4cc] hover:shadow-[0_8px_20px_-12px_rgba(20,18,15,0.18)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#131312] focus-visible:ring-offset-2"
     >
       <span className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-full ${ringBg}`}>
         {isSearching ? (
@@ -572,18 +574,20 @@ function ProfileScreen({
               </div>
               {verified && (
                 <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-3 w-3"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
+                  <span className="vc-check-pop inline-flex">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-3 w-3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  </span>
                   Verified contact
                 </span>
               )}
@@ -819,7 +823,7 @@ function HistoryList({
       {items.map((row) => (
         <div
           key={row.key}
-          className="mb-2.5 flex items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4"
+          className="vc-fade-up mb-2.5 flex items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition hover:border-[#d8d4cc]"
         >
           <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full bg-[#e3efe9]">
             <svg
@@ -935,10 +939,10 @@ function NavButton({
       type="button"
       onClick={onClick}
       className={
-        'inline-flex items-center gap-2 rounded-full px-[22px] py-2.5 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+        'inline-flex items-center gap-2 rounded-full px-[22px] py-2.5 text-[13px] font-semibold transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
         (active
-          ? 'bg-[#131312] text-white focus-visible:ring-white'
-          : 'bg-transparent text-[#8a847d] hover:text-[#131312] focus-visible:ring-[#131312]')
+          ? 'scale-[1.02] bg-[#131312] text-white focus-visible:ring-white'
+          : 'bg-transparent text-[#8a847d] hover:scale-[1.02] hover:text-[#131312] focus-visible:ring-[#131312]')
       }
       aria-pressed={active}
     >

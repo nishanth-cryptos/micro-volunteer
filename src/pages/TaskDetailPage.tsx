@@ -411,16 +411,11 @@ function OffersSection({
       ? (task.customerName || 'Customer')
       : (accepted?.displayName || 'Volunteer');
 
-    const subtitle = viewerIsAcceptedVolunteer ? (
-      <p className="mt-1 text-sm text-neutral-600">Customer</p>
-    ) : (
-      accepted && (
-        <p className="mt-1 text-sm text-neutral-600">
-          {formatDistance(accepted.distanceM)} away · score{' '}
-          {accepted.score.toFixed(2)}
-        </p>
-      )
-    );
+    const subtitle: string | null = viewerIsAcceptedVolunteer
+      ? 'Customer'
+      : accepted
+        ? `${formatDistance(accepted.distanceM)} away · score ${accepted.score.toFixed(2)}`
+        : null;
 
     const headline =
       task.status === 'in_progress'
@@ -441,19 +436,61 @@ function OffersSection({
 
     return (
       <>
-        <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-          <p className="text-sm font-medium text-emerald-700">{headline}</p>
-          <div className="mt-4 flex items-center gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-emerald-200 text-base font-medium text-emerald-800">
+        <section className="vc-fade-up relative mt-10 overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f6f5c] to-[#15493b] p-7 text-white shadow-[0_18px_40px_-20px_rgba(31,111,92,0.45)]">
+          <span
+            className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-white/5"
+            aria-hidden="true"
+          />
+          <span
+            className="pointer-events-none absolute -bottom-20 right-20 h-40 w-40 rounded-full bg-white/[0.04]"
+            aria-hidden="true"
+          />
+          <div className="relative flex items-center gap-3">
+            <span className="vc-check-pop grid h-9 w-9 place-items-center rounded-full bg-white text-[#1f6f5c]">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <span className="text-[15px] font-semibold tracking-tight">
+              {headline}
+            </span>
+          </div>
+          <div className="relative mt-5 flex items-center gap-4">
+            <div className="relative flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full border-2 border-white/30 bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-lg font-bold text-[#5a2900]">
               {targetName.charAt(0).toUpperCase()}
+              <span
+                className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#1f6f5c] bg-[#4ade80]"
+                aria-hidden="true"
+              />
             </div>
-            <div>
-              <p className="text-base font-medium text-neutral-900">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold tracking-tight">
                 {targetName}
               </p>
-              {subtitle}
+              {subtitle && (
+                <p className="mt-0.5 truncate text-[13px] text-white/80">
+                  {subtitle}
+                </p>
+              )}
             </div>
           </div>
+          <p className="relative mt-5 inline-flex items-center gap-1.5 text-[12px] text-white/85">
+            {chatInstruction}
+            <span className="vc-dot-bounce inline-flex" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </p>
         </section>
         {task.taskId && otherPartyUid && (
           <ChatPanel
@@ -584,7 +621,7 @@ function OffersSection({
   }
   const pending = offers.filter((o) => o.state === 'offered');
   return (
-    <section className="mt-12">
+    <section className="mt-10">
       {hasReassignedEvent && (
         <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm flex gap-3">
           <svg
@@ -610,52 +647,213 @@ function OffersSection({
           </div>
         </div>
       )}
-      <h2 className="text-lg font-semibold text-neutral-900">
-        Pending offers
-      </h2>
-      <p className="mt-1 text-sm text-neutral-600">
-        {pending.length === 0
-          ? 'Nobody nearby has been offered yet. Volunteers will be matched as they come online.'
-          : `${String(pending.length)} ${pending.length === 1 ? 'volunteer has' : 'volunteers have'} been offered. The first to accept gets the task.`}
-      </p>
+
+      <RadarSearching
+        reachedCount={pending.length}
+        radiusM={task.searchRadiusM ?? 2000}
+        startedAt={task.createdAt}
+        customerInitial={(task.customerName ?? 'You').charAt(0).toUpperCase()}
+        recentBlips={pending.slice(0, 6)}
+      />
+
       {pending.length > 0 && (
-        <ul className="mt-6 space-y-3">
+        <ul className="vc-fade-up mt-8 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+            Pending offers ({pending.length})
+          </p>
           {pending.map((o) => {
             const name = o.displayName || 'Volunteer';
             return (
-            <li
-              key={o.id}
-              className="rounded-2xl border border-neutral-200 bg-white p-5"
-            >
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-200 text-base font-medium text-neutral-700">
-                  {name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-neutral-900">
-                    {name}
-                  </p>
-                  <p className="mt-0.5 text-sm text-neutral-600">
-                    {formatDistance(o.distanceM)} away · score{' '}
-                    {o.score.toFixed(2)}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <ScoreChip label="Dist" value={o.scoreBreakdown.distance} />
-                    <ScoreChip label="Skill" value={o.scoreBreakdown.skill} />
-                    <ScoreChip label="Trust" value={o.scoreBreakdown.trust} />
-                    <ScoreChip
-                      label="Past"
-                      value={o.scoreBreakdown.pastCompletion}
-                    />
+              <li
+                key={o.id}
+                className="vc-fade-up rounded-2xl border border-[#ececea] bg-white p-5 transition hover:border-[#d8d4cc]"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-semibold text-[#5a2900]">
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-neutral-900">{name}</p>
+                    <p className="mt-0.5 text-sm text-neutral-600">
+                      {formatDistance(o.distanceM)} away · score{' '}
+                      {o.score.toFixed(2)}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <ScoreChip label="Dist" value={o.scoreBreakdown.distance} />
+                      <ScoreChip label="Skill" value={o.scoreBreakdown.skill} />
+                      <ScoreChip label="Trust" value={o.scoreBreakdown.trust} />
+                      <ScoreChip
+                        label="Past"
+                        value={o.scoreBreakdown.pastCompletion}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </li>
+              </li>
             );
           })}
         </ul>
       )}
     </section>
+  );
+}
+
+// Radar searching visual. Pulsing rings + fade-in volunteer blips driven
+// by the real `offers` count. No rotating sweep — explicitly removed
+// per design chat 2026-06-14. Headline progresses through three states
+// based on reached count + elapsed time.
+function RadarSearching({
+  reachedCount,
+  radiusM,
+  startedAt,
+  customerInitial,
+  recentBlips,
+}: {
+  reachedCount: number;
+  radiusM: number;
+  startedAt: Timestamp | null;
+  customerInitial: string;
+  recentBlips: OfferDoc[];
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const elapsedMs = startedAt ? Math.max(0, now - startedAt.toMillis()) : 0;
+  const elapsedTotal = Math.floor(elapsedMs / 1000);
+  const elapsedMins = Math.floor(elapsedTotal / 60);
+  const elapsedSecs = elapsedTotal % 60;
+  const timerLabel = `${String(elapsedMins)}:${elapsedSecs.toString().padStart(2, '0')}`;
+
+  const headline =
+    reachedCount === 0
+      ? 'Searching for volunteers nearby…'
+      : reachedCount === 1
+        ? `Found ${String(reachedCount)} nearby volunteer`
+        : `Found ${String(reachedCount)} nearby volunteers`;
+
+  // Deterministic blip placement around the circle (no random reshuffle
+  // on every render). Up to 6 blips, evenly distributed at 2 radii.
+  const blipPositions: Array<{ x: number; y: number; label: string }> =
+    recentBlips.map((o, i) => {
+      const total = recentBlips.length;
+      const angle = (i / total) * Math.PI * 2 + (Math.PI / 5);
+      const r = i % 2 === 0 ? 32 : 42;
+      const x = 50 + Math.cos(angle) * r;
+      const y = 50 + Math.sin(angle) * r;
+      return {
+        x,
+        y,
+        label: (o.displayName ?? 'V').charAt(0).toUpperCase(),
+      };
+    });
+
+  return (
+    <div className="vc-fade-up relative overflow-hidden rounded-3xl border border-[#ececea] bg-white px-7 py-9 text-center">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(circle at 50% 38%, rgba(31,111,92,0.06) 0%, transparent 60%)',
+        }}
+        aria-hidden="true"
+      />
+      <div className="relative mx-auto h-[320px] w-[320px] max-w-full">
+        {/* concentric radar grid */}
+        <div
+          className="absolute inset-0 rounded-full border border-[#1f6f5c]/15"
+          aria-hidden="true"
+        >
+          <div className="absolute inset-[22%] rounded-full border border-dashed border-[#1f6f5c]/20" />
+          <div className="absolute inset-[44%] rounded-full border border-dashed border-[#1f6f5c]/20" />
+        </div>
+        {/* axes */}
+        <div className="absolute inset-0" aria-hidden="true">
+          <div className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-[#1f6f5c]/10" />
+          <div className="absolute top-1/2 left-0 right-0 h-px -translate-y-1/2 bg-[#1f6f5c]/10" />
+        </div>
+        {/* pulsing rings */}
+        <div
+          className="vc-radar-ping absolute left-1/2 top-1/2 -ml-[10px] -mt-[10px] h-5 w-5 rounded-full border-2 border-[#1f6f5c]"
+          aria-hidden="true"
+        />
+        <div
+          className="vc-radar-ping absolute left-1/2 top-1/2 -ml-[10px] -mt-[10px] h-5 w-5 rounded-full border-2 border-[#1f6f5c]"
+          style={{ animationDelay: '0.85s' }}
+          aria-hidden="true"
+        />
+        <div
+          className="vc-radar-ping absolute left-1/2 top-1/2 -ml-[10px] -mt-[10px] h-5 w-5 rounded-full border-2 border-[#1f6f5c]"
+          style={{ animationDelay: '1.7s' }}
+          aria-hidden="true"
+        />
+        {/* volunteer blips */}
+        {blipPositions.map((b, i) => (
+          <span
+            key={i}
+            className="vc-blip-in absolute grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-[#1f6f5c] text-[11px] font-semibold text-white shadow-md"
+            style={{
+              left: `${b.x.toFixed(2)}%`,
+              top: `${b.y.toFixed(2)}%`,
+              animationDelay: `${(i * 0.18).toFixed(2)}s`,
+            }}
+            aria-hidden="true"
+          >
+            {b.label}
+          </span>
+        ))}
+        {/* customer pin */}
+        <span
+          className="vc-radar-me absolute left-1/2 top-1/2 z-10 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900] shadow-lg"
+          aria-hidden="true"
+        >
+          {customerInitial}
+        </span>
+      </div>
+
+      <h2 className="mt-5 text-xl font-bold tracking-tight text-[#131312]">
+        {headline}
+      </h2>
+      <p className="mt-1.5 text-sm text-[#4f4b46]">
+        Pinging volunteers within{' '}
+        <span className="font-semibold">{(radiusM / 1000).toFixed(1)} km</span>.
+      </p>
+
+      <div className="relative mt-6 inline-flex flex-wrap items-center justify-center gap-6 rounded-full border border-[#ececea] bg-white px-6 py-3 text-[12px] font-medium text-[#4f4b46]">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="font-mono text-base font-semibold text-[#131312]">
+            {reachedCount}
+          </span>{' '}
+          reached
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="font-mono text-base font-semibold text-[#131312]">
+            {(radiusM / 1000).toFixed(1)}
+          </span>{' '}
+          km radius
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v6l4 2" />
+          </svg>
+          <span className="font-mono text-base font-semibold text-[#131312]">
+            {timerLabel}
+          </span>
+        </span>
+      </div>
+    </div>
   );
 }
 

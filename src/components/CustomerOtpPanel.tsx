@@ -1,12 +1,14 @@
 // Customer-side OTP panel. Renders inside TaskDetailPage based on the
 // current task status:
 //   accepted    → "Get start code" button; once fetched, shows the
-//                 plaintext code with a 10-minute countdown.
+//                 plaintext code in flip-reveal cells with a countdown.
 //   in_progress → "Get end code" button; same code/countdown UX.
 //
 // Plaintext is only ever in local state — the callable returns it once,
 // the task doc only carries the hash. Page refresh loses the code; the
 // customer can generate a fresh one.
+//
+// Visual theme ported from Claude Design handoff bundle (2026-06-14).
 
 import { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
@@ -66,34 +68,50 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
       : 'The volunteer says they’re done? Show them this code to finish the task. They’ll enter it on their phone.';
 
   return (
-    <section className="mt-8 rounded-2xl border border-neutral-200 bg-white p-6">
-      <h2 className="text-lg font-semibold text-neutral-900">
-        {phaseLabel} code
-      </h2>
-      <p className="mt-1 text-sm text-neutral-600">{helpText}</p>
+    <section className="vc-fade-up mt-6 rounded-3xl border border-[#ececea] bg-white p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[15px] font-semibold tracking-tight text-[#131312]">
+          {phaseLabel} code
+        </h2>
+        {code && !expired && (
+          <span className="font-mono text-[12px] text-[#8a847d]">
+            Refreshes in {formatRemaining(remainingMs)}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-[13px] text-[#4f4b46]">{helpText}</p>
 
       {code && !expired && (
-        <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl bg-neutral-900 px-6 py-5 text-white">
-          <span
-            className="font-mono text-3xl tracking-[0.4em]"
-            aria-label={`Your code is ${code.split('').join(' ')}`}
-          >
-            {code}
-          </span>
-          <span className="text-sm text-neutral-300">
-            Expires in {formatRemaining(remainingMs)}
-          </span>
+        <div
+          // Re-key so the flip animation re-runs on every fresh code.
+          key={code}
+          className="mt-5 flex justify-center gap-2.5"
+          aria-label={`Your code is ${code.split('').join(' ')}`}
+        >
+          {code.split('').map((digit, i) => (
+            <span
+              key={i}
+              className="vc-cell grid h-14 w-12 place-items-center rounded-xl border border-[#ececea] bg-gradient-to-b from-white to-[#fafaf8] font-mono text-2xl font-bold text-[#131312] shadow-[0_4px_10px_-6px_rgba(20,18,15,0.15)]"
+              style={{ animationDelay: `${(i * 0.08).toFixed(2)}s` }}
+              aria-hidden="true"
+            >
+              {digit}
+            </span>
+          ))}
         </div>
       )}
 
       {expired && (
-        <p className="mt-4 text-sm text-amber-700">
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           That code has expired. Generate a new one.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
           {error}
         </p>
       )}
@@ -102,7 +120,12 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
         type="button"
         onClick={() => void handleGenerate()}
         disabled={busy}
-        className="mt-6 rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-50"
+        className={
+          'mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50 ' +
+          (code && !expired
+            ? 'border border-[#ececea] bg-white text-[#4f4b46] hover:border-[#1f6f5c] hover:text-[#131312]'
+            : 'bg-gradient-to-r from-[#1f6f5c] to-[#185845] text-white shadow-[0_8px_18px_-8px_rgba(31,111,92,0.55)] hover:from-[#1d6655] hover:to-[#14503e]')
+        }
       >
         {busy
           ? 'Getting…'
