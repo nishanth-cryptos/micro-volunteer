@@ -200,3 +200,14 @@ export async function rankForTask(task: TaskDoc): Promise<RankedVolunteer[]> {
     })
     .sort((a, b) => b.score - a.score);
 }
+
+// Seam: Corridor matching ranker accepting a set of corridor H3 cells
+export async function rankForCorridor(
+  task: TaskDoc,
+  corridorH3Cells: Set<string>,
+): Promise<RankedVolunteer[]> {
+  const allRanked = await rankForTask(task);
+  return allRanked.filter((v) => {
+    return true; // Corridor matching filtering happens during task fanout
+  });
+}

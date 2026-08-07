@@ -61,6 +61,7 @@ export interface UserDoc {
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signed-out' }
+  | { status: 'error'; user: FirebaseUser; error: Error }
   | { status: 'no-doc'; user: FirebaseUser }
   | { status: 'incomplete'; user: FirebaseUser; userDoc: UserDoc }
   | { status: 'ready'; user: FirebaseUser; userDoc: UserDoc };
@@ -107,8 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const data = snap.exists() ? (snap.data() as UserDoc) : null;
           setState(classify(user, data));
         },
-        () => {
-          setState({ status: 'no-doc', user });
+        (error) => {
+          setState({ status: 'error', user, error });
         },
       );
     });

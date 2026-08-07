@@ -373,6 +373,19 @@ service cloud.firestore {
       }
     }
 
+    // ----- user_trails/{userId} (TrailService datastore) -----
+    match /user_trails/{userId} {
+      allow read, write: if isOwner(userId) && !isSuspendedOrBanned(userId);
+
+      match /routes/{routeId} {
+        allow read, write: if isOwner(userId) && !isSuspendedOrBanned(userId);
+      }
+
+      match /events/{eventId} {
+        allow read, write: if isOwner(userId) && !isSuspendedOrBanned(userId);
+      }
+    }
+
     // Everything else stays deny-by-default until later milestones grant access.
     match /{document=**} {
       allow read, write: if false;

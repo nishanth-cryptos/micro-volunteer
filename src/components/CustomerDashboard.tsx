@@ -19,16 +19,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import {
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
+  updateDoc,
   where,
   type QuerySnapshot,
   type Timestamp,
 } from 'firebase/firestore';
 import { getDownloadURL, ref as storageRef } from 'firebase/storage';
+import { latLngToCell } from 'h3-js';
 import { Link, useNavigate } from 'react-router-dom';
-import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -338,7 +342,7 @@ function TopBar({
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
         </span>
-        Volunteer Connector
+        Hey Padosi
       </div>
       <div className="relative flex items-center gap-3.5 text-[13px] text-[#4f4b46]">
         <button
@@ -494,22 +498,146 @@ function LiveDot() {
 
 function MapCard({ userDoc }: { userDoc: UserDoc }) {
   const loc = userDoc.lastKnownLocation;
+  const [detecting, setDetecting] = useState(false);
+  const [isChoosing, setIsChoosing] = useState(false);
+  const [placeName, setPlaceName] = useState<string | null>(null);
   const center = loc ? { lat: loc.lat, lng: loc.lng } : FALLBACK_CENTER;
   const hasPin = Boolean(loc);
+
+interface NominatimAddress {
+  suburb?: string;
+  neighbourhood?: string;
+  residential?: string;
+  city_district?: string;
+  town?: string;
+  city?: string;
+}
+
+interface NominatimResponse {
+  name?: string;
+  display_name?: string;
+  address?: NominatimAddress;
+}
+
+  useEffect(() => {
+    if (!hasPin) return;
+    let cancelled = false;
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${center.lat}&lon=${center.lng}`,
+    )
+      .then((res) => res.json() as Promise<NominatimResponse>)
+      .then((data) => {
+        if (cancelled) return;
+        const addr = data.address;
+        const name =
+          addr?.suburb ||
+          addr?.neighbourhood ||
+          addr?.residential ||
+          addr?.city_district ||
+          addr?.town ||
+          addr?.city ||
+          data.name ||
+          (data.display_name ? data.display_name.split(',')[0] : null);
+        if (name) {
+          setPlaceName(name);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [center.lat, center.lng, hasPin]);
+
   const addressText = hasPin
-    ? `${loc!.lat.toFixed(4)}, ${loc!.lng.toFixed(4)}`
+    ? placeName
+      ? `${placeName} (${loc!.lat.toFixed(4)}, ${loc!.lng.toFixed(4)})`
+      : `${loc!.lat.toFixed(4)}, ${loc!.lng.toFixed(4)}`
     : 'No location set yet';
+
+  const handleMapClick = (lat: number, lng: number) => {
+    if (!isChoosing) return;
+    const h3Cell = latLngToCell(lat, lng, 9);
+    const currentUser = auth().currentUser;
+    if (currentUser) {
+      void updateDoc(doc(db(), 'users', currentUser.uid), {
+        lastKnownLocation: {
+          lat,
+          lng,
+          h3Cell,
+          updatedAt: serverTimestamp(),
+        },
+      });
+    }
+    setIsChoosing(false);
+  };
+
+  const detectLocation = () => {
+    if (!('geolocation' in navigator)) return;
+    setDetecting(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const h3Cell = latLngToCell(lat, lng, 9);
+        const currentUser = auth().currentUser;
+        if (currentUser) {
+          void updateDoc(doc(db(), 'users', currentUser.uid), {
+            lastKnownLocation: {
+              lat,
+              lng,
+              h3Cell,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+        setDetecting(false);
+      },
+      () => {
+        setDetecting(false);
+      },
+      { timeout: 10000, maximumAge: 60_000 },
+    );
+  };
+
+  useEffect(() => {
+    if (hasPin || !('geolocation' in navigator)) return;
+    let isMounted = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!isMounted) return;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const h3Cell = latLngToCell(lat, lng, 9);
+        const currentUser = auth().currentUser;
+        if (currentUser) {
+          void updateDoc(doc(db(), 'users', currentUser.uid), {
+            lastKnownLocation: {
+              lat,
+              lng,
+              h3Cell,
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+      },
+      () => {},
+      { timeout: 10000, maximumAge: 60_000 },
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [hasPin]);
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-[#ececea] bg-white">
       <div className="relative h-[clamp(360px,55vh,640px)]">
         <MapContainer
           center={[center.lat, center.lng]}
-          zoom={hasPin ? 14 : 11}
-          className="h-full w-full"
-          scrollWheelZoom={false}
-          dragging={false}
-          doubleClickZoom={false}
+          zoom={hasPin ? 13 : 11}
+          className="h-full w-full cursor-pointer"
+          scrollWheelZoom={true}
+          dragging={true}
+          doubleClickZoom={true}
           zoomControl={false}
           attributionControl={false}
         >
@@ -518,17 +646,55 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
           <MapCenterer center={center} />
-          {hasPin && <Marker position={[center.lat, center.lng]} />}
+          <MapZoomControls center={center} />
+          <MapClickHandler enabled={isChoosing} onPick={handleMapClick} />
+          {hasPin && (
+            <>
+              <Marker
+                position={[center.lat, center.lng]}
+                draggable={isChoosing}
+                eventHandlers={{
+                  dragend: (e: L.LeafletEvent) => {
+                    const m = e.target as L.Marker;
+                    const ll = m.getLatLng();
+                    handleMapClick(ll.lat, ll.lng);
+                  },
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -20]} opacity={1} permanent>
+                  <span className="font-sans text-xs font-semibold text-[#131312]">
+                    📍 {placeName ? placeName : `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`}
+                  </span>
+                </Tooltip>
+              </Marker>
+              <Circle
+                center={[center.lat, center.lng]}
+                radius={2500}
+                pathOptions={{
+                  fillColor: '#1f6f5c',
+                  fillOpacity: 0.12,
+                  color: '#1f6f5c',
+                  weight: 1.5,
+                  dashArray: '6, 6',
+                }}
+              />
+            </>
+          )}
         </MapContainer>
+        {isChoosing && (
+          <div className="pointer-events-none absolute top-3 left-1/2 z-[1000] -translate-x-1/2 rounded-full bg-[#1f6f5c] px-4 py-1.5 text-xs font-semibold text-white shadow-md">
+            Click anywhere on the map or drag the pin to set location
+          </div>
+        )}
         {!hasPin && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center bg-white/55">
             <span className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-[#4f4b46] shadow">
-              Set your location to see nearby
+              {detecting ? 'Detecting your location…' : 'Set your location to see nearby'}
             </span>
           </div>
         )}
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-[#ececea] bg-white px-[18px] py-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#ececea] bg-white px-[18px] py-3.5">
         <div className="flex min-w-0 items-center gap-2.5">
           <span
             className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[#1f6f5c] ring-[3px] ring-[#1f6f5c]/20"
@@ -537,6 +703,60 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
           <span className="truncate text-[13px] font-medium text-[#131312]">
             {addressText}
           </span>
+          {hasPin && (
+            <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-[11px] font-semibold text-[#1f6f5c]">
+              2.5 km coverage preview
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsChoosing((prev) => !prev)}
+            className={
+              'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition focus:outline-none ' +
+              (isChoosing
+                ? 'bg-[#1f6f5c] text-white shadow-sm hover:bg-[#185845]'
+                : 'border border-[#ececea] bg-white text-[#4f4b46] hover:bg-[#f3f1ec] hover:border-[#d8d4cc]')
+            }
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            {isChoosing ? 'Lock location' : 'Choose on map'}
+          </button>
+
+          <button
+            type="button"
+            onClick={detectLocation}
+            disabled={detecting}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#1f6f5c] transition hover:bg-[#f3f1ec] hover:border-[#d8d4cc] focus:outline-none disabled:opacity-50"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            {detecting ? 'Detecting…' : 'Detect my location'}
+          </button>
         </div>
       </div>
     </div>
@@ -549,6 +769,87 @@ function MapCenterer({ center }: { center: { lat: number; lng: number } }) {
     map.setView([center.lat, center.lng], map.getZoom(), { animate: true });
   }, [center.lat, center.lng, map]);
   return null;
+}
+
+function MapClickHandler({
+  enabled,
+  onPick,
+}: {
+  enabled: boolean;
+  onPick: (lat: number, lng: number) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      if (enabled) {
+        onPick(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+  return null;
+}
+
+function MapZoomControls({ center }: { center: { lat: number; lng: number } }) {
+  const map = useMap();
+
+  const handleZoomIn = () => {
+    const nextZoom = Math.min(map.getZoom() + 1, 18);
+    map.setView([center.lat, center.lng], nextZoom, { animate: true });
+  };
+
+  const handleZoomOut = () => {
+    const nextZoom = Math.max(map.getZoom() - 1, 3);
+    map.setView([center.lat, center.lng], nextZoom, { animate: true });
+  };
+
+  return (
+    <div className="absolute right-3 top-3 z-[1000] flex flex-col overflow-hidden rounded-xl border border-[#ececea] bg-white/95 shadow-md backdrop-blur-sm">
+      <button
+        type="button"
+        onClick={handleZoomIn}
+        title="Zoom in (Magnify)"
+        aria-label="Zoom in"
+        className="flex h-9 w-9 items-center justify-center text-[#131312] transition hover:bg-[#f3f1ec] active:bg-[#e3efe9]"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+          <path d="M11 8v6M8 11h6" />
+        </svg>
+      </button>
+      <div className="h-px bg-[#ececea]" />
+      <button
+        type="button"
+        onClick={handleZoomOut}
+        title="Zoom out (Minify)"
+        aria-label="Zoom out"
+        className="flex h-9 w-9 items-center justify-center text-[#131312] transition hover:bg-[#f3f1ec] active:bg-[#e3efe9]"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+          <path d="M8 11h6" />
+        </svg>
+      </button>
+    </div>
+  );
 }
 
 function PostCta() {
@@ -739,7 +1040,7 @@ function ProfileScreen({
                 {userDoc.displayName ?? 'You'}
               </div>
               <div className="mt-1 truncate text-[13px] opacity-80">
-                Member · Volunteer Connector
+                Member · Hey Padosi
               </div>
               {verified && (
                 <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium">

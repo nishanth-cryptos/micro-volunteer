@@ -29,7 +29,7 @@ export function AuthMethodTabs({
       <div
         role="tablist"
         aria-label="Choose how to continue"
-        className="inline-flex rounded-full bg-neutral-100 p-1"
+        className="inline-flex rounded-full border border-[#ececea] bg-[#f3f1ec] p-1 shadow-inner"
       >
         <Tab
           id={phoneId}
@@ -92,10 +92,10 @@ function Tab({
       aria-controls={controls}
       onClick={onClick}
       className={
-        'rounded-full px-5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 ' +
+        'rounded-full px-5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 ' +
         (selected
-          ? 'bg-white text-neutral-900 shadow-sm'
-          : 'text-neutral-600 hover:text-neutral-900')
+          ? 'bg-white text-[#131312] shadow-sm font-semibold'
+          : 'text-[#4f4b46] hover:text-[#131312]')
       }
     >
       {children}

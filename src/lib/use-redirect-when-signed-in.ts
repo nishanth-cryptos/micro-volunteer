@@ -12,7 +12,12 @@ export function useRedirectWhenSignedIn() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (state.status === 'loading' || state.status === 'signed-out') return;
+    if (
+      state.status === 'loading' ||
+      state.status === 'signed-out' ||
+      state.status === 'error'
+    )
+      return;
 
     let path = '/app';
     if (state.status === 'no-doc') {

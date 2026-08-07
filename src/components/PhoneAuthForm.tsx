@@ -104,7 +104,7 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
           <div>
             <label
               htmlFor={phoneId}
-              className="block text-sm font-medium text-neutral-900"
+              className="block text-sm font-medium text-[#131312]"
             >
               Phone number
             </label>
@@ -120,9 +120,9 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
               aria-invalid={error !== null}
               aria-describedby={error ? `${phoneId}-error` : undefined}
               placeholder="+91 99999 99999"
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+              className="mt-2 w-full rounded-xl border border-[#ececea] bg-white px-4 py-3 text-base text-[#131312] placeholder-[#8a847d] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-1 focus:ring-[#1f6f5c]"
             />
-            <p className="mt-2 text-xs text-neutral-500">
+            <p className="mt-2 text-xs text-[#8a847d]">
               Include the country code. We&apos;ll send a one-time code.
             </p>
           </div>
@@ -130,7 +130,7 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
             <p
               id={`${phoneId}-error`}
               role="alert"
-              className="text-sm text-red-700"
+              className="text-sm text-[#a32a22]"
             >
               {error}
             </p>
@@ -138,7 +138,7 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="w-full rounded-full bg-[#1f6f5c] px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {busy ? 'Sending…' : 'Send code'}
           </button>
@@ -152,7 +152,7 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
           <div>
             <label
               htmlFor={codeId}
-              className="block text-sm font-medium text-neutral-900"
+              className="block text-sm font-medium text-[#131312]"
             >
               Enter the code we sent to {phone.trim()}
             </label>
@@ -168,14 +168,14 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
               onChange={(e) => setCode(e.target.value)}
               aria-invalid={error !== null}
               aria-describedby={error ? `${codeId}-error` : undefined}
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-center text-2xl tracking-[0.5em] text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+              className="mt-2 w-full rounded-xl border border-[#ececea] bg-white px-4 py-3 text-center text-2xl tracking-[0.5em] text-[#131312] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-1 focus:ring-[#1f6f5c]"
             />
           </div>
           {error && (
             <p
               id={`${codeId}-error`}
               role="alert"
-              className="text-sm text-red-700"
+              className="text-sm text-[#a32a22]"
             >
               {error}
             </p>
@@ -183,7 +183,7 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-50"
+            className="w-full rounded-full bg-[#1f6f5c] px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50"
           >
             {busy ? 'Verifying…' : 'Verify and continue'}
           </button>
@@ -194,7 +194,7 @@ export function PhoneAuthForm({ mode: _mode }: Props) {
               setCode('');
               setError(null);
             }}
-            className="block w-full text-sm text-neutral-600 hover:text-neutral-900"
+            className="block w-full text-sm font-medium text-[#4f4b46] transition hover:text-[#131312]"
           >
             Use a different number
           </button>

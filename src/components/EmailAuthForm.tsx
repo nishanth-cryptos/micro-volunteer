@@ -64,7 +64,7 @@ export function EmailAuthForm({ mode }: Props) {
       <div>
         <label
           htmlFor={emailId}
-          className="block text-sm font-medium text-neutral-900"
+          className="block text-sm font-medium text-[#131312]"
         >
           Email
         </label>
@@ -78,13 +78,13 @@ export function EmailAuthForm({ mode }: Props) {
           onChange={(e) => setEmail(e.target.value)}
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
-          className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+          className="mt-2 w-full rounded-xl border border-[#ececea] bg-white px-4 py-3 text-base text-[#131312] placeholder-[#8a847d] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-1 focus:ring-[#1f6f5c]"
         />
       </div>
       <div>
         <label
           htmlFor={passwordId}
-          className="block text-sm font-medium text-neutral-900"
+          className="block text-sm font-medium text-[#131312]"
         >
           Password
         </label>
@@ -99,10 +99,10 @@ export function EmailAuthForm({ mode }: Props) {
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
-          className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+          className="mt-2 w-full rounded-xl border border-[#ececea] bg-white px-4 py-3 text-base text-[#131312] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-1 focus:ring-[#1f6f5c]"
         />
         {mode === 'signup' && (
-          <p className="mt-2 text-xs text-neutral-500">
+          <p className="mt-2 text-xs text-[#8a847d]">
             At least 8 characters.
           </p>
         )}
@@ -111,7 +111,7 @@ export function EmailAuthForm({ mode }: Props) {
         <div>
           <label
             htmlFor={confirmId}
-            className="block text-sm font-medium text-neutral-900"
+            className="block text-sm font-medium text-[#131312]"
           >
             Confirm password
           </label>
@@ -125,19 +125,19 @@ export function EmailAuthForm({ mode }: Props) {
             onChange={(e) => setConfirm(e.target.value)}
             aria-invalid={error !== null}
             aria-describedby={error ? errorId : undefined}
-            className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-3 text-base text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+            className="mt-2 w-full rounded-xl border border-[#ececea] bg-white px-4 py-3 text-base text-[#131312] transition focus:border-[#1f6f5c] focus:outline-none focus:ring-1 focus:ring-[#1f6f5c]"
           />
         </div>
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-sm text-red-700">
+        <p id={errorId} role="alert" className="text-sm text-[#a32a22]">
           {error}
         </p>
       )}
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-50"
+        className="w-full rounded-full bg-[#1f6f5c] px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50"
       >
         {busy
           ? mode === 'signup'

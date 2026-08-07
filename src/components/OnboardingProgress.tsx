@@ -41,8 +41,8 @@ export function OnboardingProgress({ current, includeSkills }: Props) {
                   className={
                     'flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium transition ' +
                     (completed || isCurrent
-                      ? 'bg-neutral-900 text-white'
-                      : 'border border-neutral-300 bg-white text-neutral-500')
+                      ? 'bg-[#1f6f5c] text-white shadow-sm'
+                      : 'border border-[#ececea] bg-white text-[#8a847d]')
                   }
                 >
                   {completed ? '✓' : step.num}
@@ -51,8 +51,8 @@ export function OnboardingProgress({ current, includeSkills }: Props) {
                   className={
                     'mt-2 text-xs ' +
                     (isCurrent
-                      ? 'font-medium text-neutral-900'
-                      : 'text-neutral-500')
+                      ? 'font-semibold text-[#131312]'
+                      : 'text-[#8a847d]')
                   }
                 >
                   {step.label}
@@ -63,7 +63,7 @@ export function OnboardingProgress({ current, includeSkills }: Props) {
                   aria-hidden="true"
                   className={
                     'mt-4 h-px w-10 sm:w-16 ' +
-                    (completed ? 'bg-neutral-900' : 'bg-neutral-300')
+                    (completed ? 'bg-[#1f6f5c]' : 'bg-[#ececea]')
                   }
                 />
               )}

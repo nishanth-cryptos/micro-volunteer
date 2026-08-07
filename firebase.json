@@ -20,12 +20,12 @@
     }
   ],
   "emulators": {
-    "auth": { "port": 9099 },
-    "firestore": { "port": 8080 },
-    "functions": { "port": 5001 },
-    "storage": { "port": 9199 },
-    "hosting": { "port": 5002 },
-    "ui": { "enabled": true, "port": 4000 },
+    "auth": { "host": "127.0.0.1", "port": 9099 },
+    "firestore": { "host": "127.0.0.1", "port": 8080 },
+    "functions": { "host": "127.0.0.1", "port": 5001 },
+    "storage": { "host": "127.0.0.1", "port": 9199 },
+    "hosting": { "host": "127.0.0.1", "port": 5002 },
+    "ui": { "enabled": true, "host": "127.0.0.1", "port": 4000 },
     "singleProjectMode": true
   }
 }

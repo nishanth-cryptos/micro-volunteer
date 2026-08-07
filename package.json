@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Hyperlocal micro-volunteering web app — Phase 1 MVP",
+  "description": "Hey Padosi — Hyperlocal micro-volunteering web app",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "emulators": "firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data",
+    "emulators": "node scripts/start-emulators.js",
     "seed:admin": "node scripts/seed-admin.js",
     "seed:users": "node scripts/seed-users.js"
   },

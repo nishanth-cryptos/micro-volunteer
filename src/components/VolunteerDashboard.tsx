@@ -1,0 +1,1959 @@
+// VolunteerDashboard — Reimaged volunteer dashboard adhering strictly to
+// the customer design system (#fafaf8 background, green gradient hero,
+// #ececea rounded cards, floating bottom nav pill).
+//
+// Responsibilities:
+//   - Top bar with Hey Padosi logo + account menu
+//   - Green gradient Hero Card with Karma Points, Trust Score, and Completions
+//   - Skill points pills
+//   - "Available right now" toggle switch with geolocation & status text
+//   - "Offers for you" section with Accept/Reject actions & empty state
+//   - "Nearby requests near you" section for open tasks with empty state
+//   - "Tasks you've accepted" section
+//   - Profile screen with details & sign out button
+//   - Floating bottom nav pill (Dashboard / Profile)
+
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { signOut } from 'firebase/auth';
+import {
+  collection,
+  collectionGroup,
+  doc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  type Timestamp,
+} from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { getDownloadURL, ref as storageRef } from 'firebase/storage';
+import { latLngToCell } from 'h3-js';
+import { Link, useNavigate } from 'react-router-dom';
+import { auth, db, functions, storage } from '../lib/firebase';
+import type { UserDoc } from '../lib/auth-context';
+import { getCategory, getSkillLabel } from '../lib/catalog';
+import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
+import { KarmaBadge } from './KarmaBadge';
+import { DeparturePromptModal } from './DeparturePromptModal';
+import {
+  calculateRouteSlack,
+  createDepartureEvent,
+  shouldTriggerDeparturePrompt,
+} from '../lib/trail-service/departure-detector';
+import { matchTasksInCorridor } from '../lib/trail-service/corridor-matcher';
+import {
+  getCanonicalRoutes,
+  getLocalTrailConsent,
+  recordDepartureEvent,
+  setTrailConsent,
+  wipeAllTrailData,
+} from '../lib/trail-service/trail-store';
+import type { CanonicalRoute, TaskSuggestion } from '../lib/trail-service/types';
+
+const H3_RESOLUTION = 9;
+
+type TaskStatus =
+  | 'searching'
+  | 'accepted'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'expired';
+
+interface OfferRow {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  taskCategory: string;
+  taskRiskLevel: 'low' | 'medium';
+  distanceM: number;
+  score: number;
+  offeredAt: Timestamp | null;
+}
+
+interface NearbyTaskRow {
+  id: string;
+  title: string;
+  category: string;
+  riskLevel: 'low' | 'medium';
+  createdAt: Timestamp | null;
+}
+
+interface AcceptedTaskRow {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  acceptedAt: Timestamp | null;
+  riskLevel: 'low' | 'medium';
+}
+
+type ScreenKey = 'dashboard' | 'profile';
+
+interface Props {
+  uid: string;
+  userDoc: UserDoc;
+}
+
+export function VolunteerDashboard({ uid, userDoc }: Props) {
+  const navigate = useNavigate();
+  const [screen, setScreen] = useState<ScreenKey>('dashboard');
+  const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [nearbyTasks, setNearbyTasks] = useState<NearbyTaskRow[]>([]);
+  const [acceptedTasks, setAcceptedTasks] = useState<AcceptedTaskRow[]>([]);
+  const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
+  const [toggleBusy, setToggleBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [activeRoutePrompt, setActiveRoutePrompt] = useState<CanonicalRoute | null>(null);
+  const [promptSuggestions, setPromptSuggestions] = useState<TaskSuggestion[]>([]);
+  const [promptSlackMinutes, setPromptSlackMinutes] = useState(15);
+
+  const available = userDoc.availableNow ?? false;
+
+  // TrailService Departure Detector check
+  useEffect(() => {
+    if (!available || !getLocalTrailConsent(uid)) return;
+
+    void getCanonicalRoutes(uid).then((routes) => {
+      for (const route of routes) {
+        if (shouldTriggerDeparturePrompt(route)) {
+          const { slackMinutes } = calculateRouteSlack(route);
+          if (slackMinutes >= 5) {
+            const openCandidates = nearbyTasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              category: t.category,
+              requiredSkills: [],
+              riskLevel: t.riskLevel,
+              location: {
+                lat: userDoc.lastKnownLocation?.lat ?? 19.076,
+                lng: userDoc.lastKnownLocation?.lng ?? 72.8777,
+                h3Cell: userDoc.lastKnownLocation?.h3Cell ?? '',
+              },
+            }));
+            const suggestions = matchTasksInCorridor(
+              route,
+              openCandidates,
+              slackMinutes,
+              userDoc.skills ?? [],
+            );
+            setActiveRoutePrompt(route);
+            setPromptSuggestions(suggestions);
+            setPromptSlackMinutes(slackMinutes);
+            break;
+          }
+        }
+      }
+    });
+  }, [uid, userDoc, available, nearbyTasks]);
+
+  // 1. Subscribe to offers for this volunteer
+  useEffect(() => {
+    const q = query(
+      collectionGroup(db(), 'offers'),
+      where('volunteerId', '==', uid),
+      where('state', '==', 'offered'),
+      orderBy('offeredAt', 'desc'),
+      limit(20),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setOffers(
+          snap.docs.map((d) => {
+            const data = d.data() as {
+              taskId: string;
+              taskTitle: string;
+              taskCategory: string;
+              taskRiskLevel: 'low' | 'medium';
+              distanceM: number;
+              score: number;
+              offeredAt: Timestamp | null;
+            };
+            return {
+              id: d.id,
+              taskId: data.taskId,
+              taskTitle: data.taskTitle,
+              taskCategory: data.taskCategory,
+              taskRiskLevel: data.taskRiskLevel,
+              distanceM: data.distanceM,
+              score: data.score,
+              offeredAt: data.offeredAt,
+            };
+          }),
+        );
+      },
+      () => setOffers([]),
+    );
+    return unsub;
+  }, [uid]);
+
+  // 2. Subscribe to open tasks in the neighborhood ('searching' status)
+  useEffect(() => {
+    const q = query(
+      collection(db(), 'tasks'),
+      where('status', '==', 'searching'),
+      orderBy('createdAt', 'desc'),
+      limit(10),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setNearbyTasks(
+          snap.docs.map((d) => {
+            const data = d.data() as {
+              title: string;
+              category: string;
+              riskLevel: 'low' | 'medium';
+              createdAt: Timestamp | null;
+            };
+            return {
+              id: d.id,
+              title: data.title,
+              category: data.category,
+              riskLevel: data.riskLevel,
+              createdAt: data.createdAt,
+            };
+          }),
+        );
+      },
+      () => setNearbyTasks([]),
+    );
+    return unsub;
+  }, []);
+
+  // 3. Subscribe to accepted tasks for this volunteer
+  useEffect(() => {
+    const q = query(
+      collection(db(), 'tasks'),
+      where('acceptedVolunteerId', '==', uid),
+      orderBy('acceptedAt', 'desc'),
+      limit(10),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setAcceptedTasks(
+          snap.docs.map((d) => {
+            const data = d.data() as {
+              title: string;
+              status: TaskStatus;
+              acceptedAt: Timestamp | null;
+              riskLevel: 'low' | 'medium';
+            };
+            return {
+              id: d.id,
+              title: data.title,
+              status: data.status,
+              acceptedAt: data.acceptedAt,
+              riskLevel: data.riskLevel,
+            };
+          }),
+        );
+      },
+      () => setAcceptedTasks([]),
+    );
+    return unsub;
+  }, [uid]);
+
+  async function handleSignOut() {
+    await signOut(auth());
+    void navigate('/', { replace: true });
+  }
+
+  async function toggleAvailability() {
+    setError(null);
+    const ref = doc(db(), 'users', uid);
+    if (available) {
+      setToggleBusy(true);
+      try {
+        await updateDoc(ref, {
+          availableNow: false,
+          availabilityUpdatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Could not update status.',
+        );
+      } finally {
+        setToggleBusy(false);
+      }
+      return;
+    }
+
+    setToggleBusy(true);
+    try {
+      const loc = await getCurrentLocation();
+      const h3Cell = latLngToCell(loc.lat, loc.lng, H3_RESOLUTION);
+      await updateDoc(ref, {
+        availableNow: true,
+        availabilityUpdatedAt: serverTimestamp(),
+        lastKnownLocation: {
+          lat: loc.lat,
+          lng: loc.lng,
+          h3Cell,
+          updatedAt: serverTimestamp(),
+        },
+      });
+    } catch (err) {
+      if (err instanceof GeolocationError) {
+        setError(err.userMessage);
+      } else {
+        setError(
+          err instanceof Error ? err.message : 'Could not update status.',
+        );
+      }
+    } finally {
+      setToggleBusy(false);
+    }
+  }
+
+  function markBusy(taskId: string, on: boolean) {
+    setBusyTaskIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(taskId);
+      else next.delete(taskId);
+      return next;
+    });
+  }
+
+  async function handleAcceptOffer(taskId: string) {
+    setError(null);
+    markBusy(taskId, true);
+    try {
+      const fn = httpsCallable<{ taskId: string }, { taskId: string }>(
+        functions(),
+        'acceptOffer',
+      );
+      await fn({ taskId });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not accept offer.',
+      );
+    } finally {
+      markBusy(taskId, false);
+    }
+  }
+
+  async function handleRejectOffer(taskId: string) {
+    setError(null);
+    markBusy(taskId, true);
+    try {
+      const fn = httpsCallable<{ taskId: string }, { taskId: string }>(
+        functions(),
+        'rejectOffer',
+      );
+      await fn({ taskId });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not reject offer.',
+      );
+    } finally {
+      markBusy(taskId, false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
+      <TopBar
+        displayName={userDoc.displayName ?? 'Volunteer'}
+        email={userDoc.email}
+        photoPath={userDoc.photoURL ?? null}
+        onSignOut={() => void handleSignOut()}
+      />
+      <div className="mx-auto max-w-7xl px-8 pt-10 pb-[124px]">
+        {activeRoutePrompt && (
+          <DeparturePromptModal
+            isOpen={Boolean(activeRoutePrompt)}
+            route={activeRoutePrompt}
+            suggestions={promptSuggestions}
+            slackMinutes={promptSlackMinutes}
+            onConfirm={(selectedTaskId) => {
+              void (async () => {
+                if (activeRoutePrompt) {
+                  await recordDepartureEvent(uid, createDepartureEvent(activeRoutePrompt.id, true));
+                }
+                setActiveRoutePrompt(null);
+                if (selectedTaskId) {
+                  void navigate(`/tasks/${selectedTaskId}`);
+                }
+              })();
+            }}
+            onDecline={() => {
+              void (async () => {
+                if (activeRoutePrompt) {
+                  await recordDepartureEvent(uid, createDepartureEvent(activeRoutePrompt.id, false));
+                }
+                setActiveRoutePrompt(null);
+              })();
+            }}
+          />
+        )}
+        <div key={screen} className="vc-screen-enter">
+          {screen === 'dashboard' && (
+            <DashboardScreen
+              userDoc={userDoc}
+              available={available}
+              toggleBusy={toggleBusy}
+              onToggleAvailability={() => void toggleAvailability()}
+              offers={offers}
+              busyTaskIds={busyTaskIds}
+              onAcceptOffer={(id) => void handleAcceptOffer(id)}
+              onRejectOffer={(id) => void handleRejectOffer(id)}
+              nearbyTasks={nearbyTasks}
+              acceptedTasks={acceptedTasks}
+              error={error}
+            />
+          )}
+          {screen === 'profile' && (
+            <VolunteerProfileScreen
+              uid={uid}
+              userDoc={userDoc}
+              acceptedTasksCount={acceptedTasks.length}
+              onSignOut={() => void handleSignOut()}
+            />
+          )}
+        </div>
+      </div>
+      <BottomNav
+        screen={screen}
+        offersCount={offers.length}
+        onChange={(next) => {
+          setScreen(next);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+    </main>
+  );
+}
+
+// ----- Top Bar ---------------------------------------------------------
+
+function TopBar({
+  displayName,
+  email,
+  photoPath,
+  onSignOut,
+}: {
+  displayName: string;
+  email: string | undefined;
+  photoPath: string | null;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const initial = initialOf(displayName);
+  const photoUrl = usePhotoUrl(photoPath);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(e: MouseEvent) {
+      const t = e.target as Node;
+      if (
+        popoverRef.current?.contains(t) ||
+        triggerRef.current?.contains(t)
+      ) {
+        return;
+      }
+      setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#ececea] bg-white px-7">
+      <div className="flex items-center gap-2.5 text-[15px] font-bold tracking-tight">
+        <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-gradient-to-br from-[#1f6f5c] to-[#185845] text-white">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </span>
+        Hey Padosi
+      </div>
+      <div className="relative flex items-center gap-3.5 text-[13px] text-[#4f4b46]">
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label="Account menu"
+          onClick={() => setOpen((o) => !o)}
+          className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900] ring-2 ring-transparent transition hover:ring-[#1f6f5c]/30 focus:outline-none focus-visible:ring-[#1f6f5c]/40"
+        >
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span aria-hidden="true">{initial}</span>
+          )}
+        </button>
+        {open && (
+          <div
+            ref={popoverRef}
+            role="dialog"
+            aria-label="Account"
+            className="vc-fade-up absolute right-0 top-[44px] z-50 w-64 overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-[0_20px_40px_-16px_rgba(20,18,15,0.18)]"
+          >
+            <div className="flex items-center gap-3 border-b border-[#f3f1ec] px-4 py-4">
+              <span className="grid h-12 w-12 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900]">
+                {photoUrl ? (
+                  <img
+                    src={photoUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initial
+                )}
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-[14px] font-semibold text-[#131312]">
+                  {displayName}
+                </div>
+                {email && (
+                  <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
+                    {email}
+                  </div>
+                )}
+              </div>
+            </div>
+            <Link
+              to="/your-routes"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#1f6f5c] transition hover:bg-[#e3efe9]/50 border-b border-[#f3f1ec]"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              Commute Routes
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onSignOut();
+              }}
+              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#a32a22] transition hover:bg-[#fdf0ef]"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="m16 17 5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
+
+// ----- Main Dashboard Screen --------------------------------------------
+
+function DashboardScreen({
+  userDoc,
+  available,
+  toggleBusy,
+  onToggleAvailability,
+  offers,
+  busyTaskIds,
+  onAcceptOffer,
+  onRejectOffer,
+  nearbyTasks,
+  acceptedTasks,
+  error,
+}: {
+  userDoc: UserDoc;
+  available: boolean;
+  toggleBusy: boolean;
+  onToggleAvailability: () => void;
+  offers: OfferRow[];
+  busyTaskIds: Set<string>;
+  onAcceptOffer: (id: string) => void;
+  onRejectOffer: (id: string) => void;
+  nearbyTasks: NearbyTaskRow[];
+  acceptedTasks: AcceptedTaskRow[];
+  error: string | null;
+}) {
+  const name = userDoc.displayName ?? 'Volunteer';
+  const trustScore = userDoc.trustScore ?? 30;
+  const verifiedCount = userDoc.verifiedTaskCount ?? 0;
+  const verifiedHours = userDoc.verifiedHours ?? 0;
+
+  return (
+    <section className="space-y-8">
+      {/* Top Greeting */}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="m-0 text-[32px] font-bold tracking-tight">
+            Welcome, {name}.
+          </h1>
+          <p className="mt-1.5 text-sm text-[#4f4b46]">
+            Ready to help neighbours nearby today?
+          </p>
+        </div>
+        {available && (
+          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.06em] text-[#8a847d]">
+            <LiveDot />
+            Live
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-sm text-[#a32a22]">
+          {error}
+        </div>
+      )}
+
+      {/* Hero Card with Stats */}
+      <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1f6f5c] to-[#15493b] px-7 py-7 text-white shadow-sm">
+        <span
+          className="pointer-events-none absolute -right-16 -top-16 h-[220px] w-[220px] rounded-full bg-white/5"
+          aria-hidden="true"
+        />
+        <span
+          className="pointer-events-none absolute -bottom-20 right-10 h-40 w-40 rounded-full bg-white/[0.04]"
+          aria-hidden="true"
+        />
+
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-[18px]">
+            <HeroAvatar
+              displayName={userDoc.displayName}
+              photoPath={userDoc.photoURL ?? null}
+            />
+            <div>
+              <div className="text-2xl font-bold tracking-tight">
+                {name}
+              </div>
+              <div className="mt-0.5 text-[13px] opacity-80">
+                Volunteer · Hey Padosi
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <TrustBadge score={trustScore} />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[11px] uppercase tracking-[0.08em] opacity-80">Karma Points</span>
+            <KarmaBadge points={userDoc.points ?? 0} />
+          </div>
+        </div>
+
+        <div className="relative mt-7 grid grid-cols-2 gap-4 border-t border-white/15 pt-5 sm:grid-cols-3">
+          <div>
+            <div className="font-mono text-[24px] font-bold tracking-tight">
+              {trustScore}/100
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Trust Score
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-[24px] font-bold tracking-tight">
+              {verifiedCount} tasks
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              {verifiedHours.toFixed(1)} hrs completed
+            </div>
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <div className="font-mono text-[24px] font-bold tracking-tight">
+              {userDoc.skills?.length ?? 0}
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Active skills
+            </div>
+          </div>
+        </div>
+
+        {/* Skill Points Pills */}
+        {Object.keys(userDoc.skillPoints ?? {}).length > 0 && (
+          <div className="relative mt-5 border-t border-white/15 pt-4">
+            <div className="mb-2 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Skill Points
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(userDoc.skillPoints ?? {}).map(([key, val]) => (
+                <span
+                  key={key}
+                  className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+                >
+                  {getSkillLabel(key)}: {val}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Available Right Now Switch Card */}
+      <div className="rounded-[20px] border border-[#ececea] bg-white p-6 shadow-sm">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <h2 className="text-lg font-semibold text-[#131312]">
+              Available right now
+            </h2>
+            <p className="mt-1 text-sm text-[#4f4b46]">
+              When turned on, nearby neighbours can offer you tasks that match your skills.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={available}
+            aria-label="Availability"
+            onClick={onToggleAvailability}
+            disabled={toggleBusy}
+            className={
+              'relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#131312] focus-visible:ring-offset-2 disabled:opacity-50 ' +
+              (available ? 'bg-[#1f6f5c]' : 'bg-[#ececea]')
+            }
+          >
+            <span
+              aria-hidden="true"
+              className={
+                'pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ' +
+                (available ? 'translate-x-6' : 'translate-x-0')
+              }
+            />
+          </button>
+        </div>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.06em]" aria-live="polite">
+          <span className={available ? 'text-[#1f6f5c]' : 'text-[#8a847d]'}>
+            {available
+              ? '● You are visible to nearby task posters.'
+              : '○ You are not currently visible.'}
+          </span>
+        </p>
+      </div>
+
+      {/* Offers For You Section */}
+      <div>
+        <div className="mb-3.5 flex items-baseline justify-between">
+          <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+            Offers for you
+          </h2>
+          <span className="font-mono text-xs text-[#8a847d]">
+            {offers.length} pending
+          </span>
+        </div>
+
+        {offers.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-8 text-center text-[13px] text-[#8a847d]">
+            No task offers right now. When a nearby task matches your skills you&apos;ll see it here.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {offers.map((row) => {
+              const category = getCategory(row.taskCategory);
+              const busy = busyTaskIds.has(row.taskId);
+              return (
+                <div
+                  key={`${row.taskId}-${row.id}`}
+                  className="vc-fade-up flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#ececea] bg-white p-5 transition hover:border-[#d8d4cc]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-[#131312]">
+                      {row.taskTitle || 'Untitled task'}
+                    </p>
+                    <p className="mt-1 text-xs text-[#8a847d]">
+                      {category?.label ?? row.taskCategory} ·{' '}
+                      <span
+                        className={
+                          row.taskRiskLevel === 'medium'
+                            ? 'font-medium text-amber-700'
+                            : 'font-medium text-[#1f6f5c]'
+                        }
+                      >
+                        {row.taskRiskLevel === 'medium' ? 'Medium' : 'Low'} priority
+                      </span>{' '}
+                      · {formatDistance(row.distanceM)} away
+                    </p>
+                    <p className="mt-1 font-mono text-[11px] text-[#8a847d]">
+                      Match score: {row.score.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex flex-shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onRejectOffer(row.taskId)}
+                      disabled={busy}
+                      className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-[13px] font-medium text-[#4f4b46] transition hover:bg-[#fdf0ef] hover:text-[#a32a22] focus:outline-none disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAcceptOffer(row.taskId)}
+                      disabled={busy}
+                      className="rounded-full bg-[#1f6f5c] px-5 py-2 text-[13px] font-semibold text-white transition hover:bg-[#185845] focus:outline-none disabled:opacity-50"
+                    >
+                      {busy ? 'Working…' : 'Accept'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Nearby Requests Section */}
+      <div>
+        <div className="mb-3.5 flex items-baseline justify-between">
+          <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+            Nearby requests near you
+          </h2>
+          <span className="font-mono text-xs text-[#8a847d]">
+            {nearbyTasks.length} open
+          </span>
+        </div>
+
+        {nearbyTasks.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-8 text-center text-[13px] text-[#8a847d]">
+            No nearby requests right now.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {nearbyTasks.map((t) => (
+              <Link
+                key={t.id}
+                to={`/tasks/${t.id}`}
+                className="vc-fade-up block rounded-2xl border border-[#ececea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#d8d4cc] hover:shadow-[0_8px_20px_-12px_rgba(20,18,15,0.18)]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[15px] font-semibold text-[#131312]">
+                    {t.title || 'Untitled task'}
+                  </span>
+                  <span
+                    className={
+                      'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' +
+                      (t.riskLevel === 'medium'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-[#e3efe9] text-[#1f6f5c]')
+                    }
+                  >
+                    {t.riskLevel === 'medium' ? 'Medium' : 'Low'}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-[#8a847d]">
+                  Category: {getCategory(t.category)?.label ?? t.category}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Tasks You've Accepted Section */}
+      {acceptedTasks.length > 0 && (
+        <div>
+          <div className="mb-3.5 flex items-baseline justify-between">
+            <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+              Tasks you&apos;ve accepted
+            </h2>
+            <span className="font-mono text-xs text-[#8a847d]">
+              {acceptedTasks.length} total
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {acceptedTasks.map((t) => (
+              <Link
+                key={t.id}
+                to={`/tasks/${t.id}`}
+                className="vc-fade-up flex items-center justify-between gap-4 rounded-2xl border border-[#ececea] bg-white px-5 py-4 transition hover:border-[#d8d4cc]"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-semibold text-[#131312]">
+                    {t.title || 'Untitled task'}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[#8a847d]">
+                    Accepted {formatWhen(t.acceptedAt)} ·{' '}
+                    <span
+                      className={
+                        t.riskLevel === 'medium'
+                          ? 'text-amber-700'
+                          : 'text-[#1f6f5c]'
+                      }
+                    >
+                      {t.riskLevel === 'medium' ? 'Medium' : 'Low'}
+                    </span>
+                  </p>
+                </div>
+                <StatusBadge status={t.status} />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ----- Volunteer Profile Screen -----------------------------------------
+
+function VolunteerProfileScreen({
+  uid,
+  userDoc,
+  acceptedTasksCount,
+  onSignOut,
+}: {
+  uid: string;
+  userDoc: UserDoc;
+  acceptedTasksCount: number;
+  onSignOut: () => void;
+}) {
+  const verified =
+    userDoc.phoneNumber !== undefined ||
+    (userDoc.email !== undefined && userDoc.email !== '');
+
+  const [trailConsent, setTrailConsentState] = useState(() =>
+    getLocalTrailConsent(uid),
+  );
+  const [activeModal, setActiveModal] = useState<
+    'privacy' | 'terms' | 'security' | null
+  >(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // Phone OTP Modal state
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
+  const [phoneStep, setPhoneStep] = useState<'input' | 'otp'>('input');
+  const [phoneInput, setPhoneInput] = useState(userDoc.phoneNumber ?? '');
+  const [otpInput, setOtpInput] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneSubmitting, setPhoneSubmitting] = useState(false);
+
+  // Email Modal state
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState(userDoc.email ?? '');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSubmitting, setEmailSubmitting] = useState(false);
+
+  function handleSendPhoneOtp() {
+    setPhoneError(null);
+    const cleaned = phoneInput.trim();
+    if (!cleaned || cleaned.length < 10) {
+      setPhoneError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setPhoneStep('otp');
+  }
+
+  async function handleVerifyPhoneOtp() {
+    setPhoneError(null);
+    if (otpInput.trim() !== generatedOtp) {
+      setPhoneError('Invalid verification code. Please check and try again.');
+      return;
+    }
+    setPhoneSubmitting(true);
+    try {
+      await updateDoc(doc(db(), 'users', uid), {
+        phoneNumber: phoneInput.trim(),
+      });
+      setPhoneModalOpen(false);
+      setPhoneStep('input');
+      setOtpInput('');
+      setStatusMsg('Phone number successfully updated & verified.');
+    } catch (err) {
+      setPhoneError(
+        err instanceof Error ? err.message : 'Could not update phone number.',
+      );
+    } finally {
+      setPhoneSubmitting(false);
+    }
+  }
+
+  async function handleUpdateEmail() {
+    setEmailError(null);
+    const cleaned = emailInput.trim();
+    if (!cleaned || !cleaned.includes('@')) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+    setEmailSubmitting(true);
+    try {
+      await updateDoc(doc(db(), 'users', uid), {
+        email: cleaned,
+      });
+      setEmailModalOpen(false);
+      setStatusMsg('Email address successfully updated.');
+    } catch (err) {
+      setEmailError(
+        err instanceof Error ? err.message : 'Could not update email address.',
+      );
+    } finally {
+      setEmailSubmitting(false);
+    }
+  }
+
+  async function handleConsentToggle(enabled: boolean) {
+    setStatusMsg(null);
+    try {
+      await setTrailConsent(uid, enabled);
+      setTrailConsentState(enabled);
+      if (enabled) {
+        setStatusMsg('Commute trail matching enabled.');
+      } else {
+        setStatusMsg('Trail consent revoked and stored trails wiped.');
+      }
+    } catch (err) {
+      setStatusMsg(
+        err instanceof Error ? err.message : 'Could not update consent.',
+      );
+    }
+  }
+
+  async function handleWipeTrailHistory() {
+    if (
+      !confirm(
+        'Are you sure you want to delete all inferred commute routes and trail history?',
+      )
+    ) {
+      return;
+    }
+    try {
+      await wipeAllTrailData(uid);
+      setTrailConsentState(false);
+      setStatusMsg('Trail history successfully deleted.');
+    } catch {
+      setStatusMsg('Failed to delete trail history.');
+    }
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <h1 className="m-0 text-[32px] font-bold tracking-tight">
+            Your profile
+          </h1>
+          <p className="mt-1.5 text-sm text-[#4f4b46]">
+            Your volunteer details, privacy options, and account settings.
+          </p>
+        </div>
+      </div>
+
+      {statusMsg && (
+        <div
+          role="status"
+          className="rounded-2xl border border-[#1f6f5c]/20 bg-[#e3efe9]/50 p-4 text-sm font-medium text-[#1f6f5c]"
+        >
+          {statusMsg}
+        </div>
+      )}
+
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Hero summary */}
+        <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1f6f5c] to-[#15493b] px-7 py-7 text-white lg:col-span-1">
+          <span
+            className="pointer-events-none absolute -right-16 -top-16 h-[220px] w-[220px] rounded-full bg-white/5"
+            aria-hidden="true"
+          />
+          <div className="relative flex items-center gap-[18px]">
+            <HeroAvatar
+              displayName={userDoc.displayName}
+              photoPath={userDoc.photoURL ?? null}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-2xl font-bold tracking-tight">
+                {userDoc.displayName ?? 'Volunteer'}
+              </div>
+              <div className="mt-1 truncate text-[13px] opacity-80">
+                Volunteer · Hey Padosi
+              </div>
+              {verified && (
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium">
+                  ✓ Verified contact
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="relative mt-6 grid grid-cols-2 gap-4 border-t border-white/15 pt-5">
+            <div>
+              <div className="font-mono text-[26px] font-bold tracking-tight">
+                {userDoc.verifiedTaskCount ?? 0}
+              </div>
+              <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+                Completed
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-[26px] font-bold tracking-tight">
+                {acceptedTasksCount}
+              </div>
+              <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+                Active accepted
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Volunteer details & Settings */}
+        <div className="lg:col-span-2 space-y-6">
+          <div>
+            <div className="mb-3.5 flex items-baseline justify-between">
+              <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+                Volunteer details
+              </h2>
+            </div>
+            <div className="overflow-hidden rounded-[18px] border border-[#ececea] bg-white">
+              <DetailRow
+                icon={
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-[#1f6f5c]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92Z" />
+                  </svg>
+                }
+                label="Phone"
+                value={userDoc.phoneNumber ? userDoc.phoneNumber : 'Not set'}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneInput(userDoc.phoneNumber ?? '');
+                      setPhoneStep('input');
+                      setPhoneError(null);
+                      setPhoneModalOpen(true);
+                    }}
+                    className="rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-1.5 text-xs font-bold text-[#1f6f5c] transition hover:bg-[#e3efe9]"
+                  >
+                    {userDoc.phoneNumber ? 'Edit Phone' : 'Add & Verify Phone'}
+                  </button>
+                }
+              />
+              <DetailRow
+                icon={
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-[#1f6f5c]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="m22 7-10 6L2 7" />
+                  </svg>
+                }
+                label="Email"
+                value={userDoc.email ? userDoc.email : 'Not set'}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailInput(userDoc.email ?? '');
+                      setEmailError(null);
+                      setEmailModalOpen(true);
+                    }}
+                    className="rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-1.5 text-xs font-bold text-[#1f6f5c] transition hover:bg-[#e3efe9]"
+                  >
+                    Change email address
+                  </button>
+                }
+              />
+              <DetailRow
+                icon={
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4 text-[#1f6f5c]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                }
+                label="ID Verification"
+                value={
+                  userDoc.idImagePath ? 'ID Uploaded & Verified' : 'Optional'
+                }
+              />
+            </div>
+          </div>
+
+          {/* Commute Trail Matching Settings */}
+          <div>
+            <h2 className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+              Commute Trail & Matching Settings
+            </h2>
+            <div className="overflow-hidden rounded-[18px] border border-[#ececea] bg-white p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-[#131312]">
+                    Enable Commute Trail Matching
+                  </div>
+                  <div className="text-xs text-[#8a847d]">
+                    Allow TrailService to infer recurring routes for corridor task matching.
+                  </div>
+                </div>
+                <label
+                  aria-label="Toggle commute trail matching"
+                  className="relative inline-flex cursor-pointer items-center"
+                >
+                  <input
+                    type="checkbox"
+                    checked={trailConsent}
+                    onChange={(e) => void handleConsentToggle(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <div className="peer h-7 w-12 rounded-full bg-[#ececea] after:absolute after:top-0.5 after:left-0.5 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow after:transition-all peer-checked:bg-[#1f6f5c] peer-checked:after:translate-x-5" />
+                </label>
+              </div>
+
+              {/* Sub-settings visible when enabled */}
+              {trailConsent && (
+                <div className="mt-4 pt-4 border-t border-[#ececea] space-y-3 vc-fade-up">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Link
+                      to="/your-routes"
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-2.5 text-xs font-bold text-[#1f6f5c] transition hover:bg-[#e3efe9]"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      Commute Routes →
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleWipeTrailHistory()}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[#f0c4c0] bg-[#fdf0ef] px-4 py-2.5 text-xs font-bold text-[#a32a22] transition hover:bg-red-100"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      Delete trail history
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Standalone Legal & Security Settings Buttons */}
+          <div>
+            <h2 className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+              Platform & Legal Settings
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveModal('privacy')}
+                className="flex items-center gap-3 rounded-[16px] border border-[#ececea] bg-white p-4 text-left transition hover:border-[#1f6f5c]/50 hover:bg-[#fafaf8] focus:outline-none"
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                </span>
+                <div>
+                  <div className="text-xs font-bold text-[#131312]">
+                    Privacy Policy
+                  </div>
+                  <div className="text-[11px] text-[#8a847d]">
+                    DPDP Act 2025/2027
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveModal('terms')}
+                className="flex items-center gap-3 rounded-[16px] border border-[#ececea] bg-white p-4 text-left transition hover:border-[#1f6f5c]/50 hover:bg-[#fafaf8] focus:outline-none"
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                </span>
+                <div>
+                  <div className="text-xs font-bold text-[#131312]">
+                    Terms & Conditions
+                  </div>
+                  <div className="text-[11px] text-[#8a847d]">
+                    Community code
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveModal('security')}
+                className="flex items-center gap-3 rounded-[16px] border border-[#ececea] bg-white p-4 text-left transition hover:border-[#1f6f5c]/50 hover:bg-[#fafaf8] focus:outline-none"
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+                <div>
+                  <div className="text-xs font-bold text-[#131312]">
+                    Security & Shield
+                  </div>
+                  <div className="text-[11px] text-[#8a847d]">
+                    AES-256 & Isolation
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="rounded-full border border-[#ececea] bg-transparent px-[22px] py-2.5 text-[13px] font-medium text-[#4f4b46] transition hover:border-[#f0c4c0] hover:bg-[#fdf0ef] hover:text-[#a32a22]"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Standalone Setting Modals */}
+      {activeModal &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#131312]/60 p-4 backdrop-blur-xs vc-fade-up">
+            <div className="w-full max-w-lg overflow-hidden rounded-[24px] border border-[#ececea] bg-white p-6 shadow-xl sm:p-7">
+              {activeModal === 'privacy' && (
+                <>
+                  <div className="flex items-center justify-between border-b border-[#ececea] pb-4">
+                    <h3 className="m-0 text-lg font-bold text-[#131312]">
+                      Privacy Policy (DPDP Act 2025/2027)
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="rounded-full p-1 text-[#8a847d] hover:bg-[#fafaf8]"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3 text-xs leading-relaxed text-[#4f4b46]">
+                    <p>
+                      Hey Padosi processes location and commute trail data strictly under purpose limitation for hyperlocal volunteer matching.
+                    </p>
+                    <p>
+                      <strong>On-Device Privacy:</strong> Raw GPS pings are processed locally on your phone. Only derived route summaries are synced to isolated storage.
+                    </p>
+                    <p>
+                      <strong>Data Principal Rights:</strong> You hold complete rights to access, inspect, and delete your inferred commute routes at any time via the self-serve routes screen.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {activeModal === 'terms' && (
+                <>
+                  <div className="flex items-center justify-between border-b border-[#ececea] pb-4">
+                    <h3 className="m-0 text-lg font-bold text-[#131312]">
+                      Terms & Conditions
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="rounded-full p-1 text-[#8a847d] hover:bg-[#fafaf8]"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3 text-xs leading-relaxed text-[#4f4b46]">
+                    <p>
+                      <strong>Community Code:</strong> Hey Padosi is a mutual-aid micro-volunteering platform. All volunteers and customers must interact respectfully.
+                    </p>
+                    <p>
+                      <strong>Task Verification & Risk:</strong> Medium-risk tasks require ID verification. Fraudulent activity or unsafe behavior results in immediate account suspension.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {activeModal === 'security' && (
+                <>
+                  <div className="flex items-center justify-between border-b border-[#ececea] pb-4">
+                    <h3 className="m-0 text-lg font-bold text-[#131312]">
+                      Platform Security & Shield
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="rounded-full p-1 text-[#8a847d] hover:bg-[#fafaf8]"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="mt-4 space-y-3 text-xs leading-relaxed text-[#4f4b46]">
+                    <p>
+                      <strong>AES-256 & Isolation:</strong> Trail data is encrypted in transit and stored in an isolated datastore (`user_trails`) with strict owner-only security rules.
+                    </p>
+                    <p>
+                      <strong>Customer Position Shield:</strong> Task posters only ever see "Volunteer on the way, ETA X min". Your live coordinates and route corridors are never exposed to customers.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="rounded-xl bg-[#1f6f5c] px-5 py-2 text-xs font-bold text-white transition hover:bg-[#185845]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Phone Verification Modal */}
+      {phoneModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#131312]/60 p-4 backdrop-blur-xs vc-fade-up">
+            <div className="w-full max-w-md overflow-hidden rounded-[24px] border border-[#ececea] bg-white p-6 shadow-xl sm:p-7">
+              <div className="flex items-center justify-between border-b border-[#ececea] pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92Z" />
+                    </svg>
+                  </span>
+                  <h3 className="m-0 text-lg font-bold text-[#131312]">
+                    Verify Mobile Number
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPhoneModalOpen(false)}
+                  className="rounded-full p-1 text-[#8a847d] hover:bg-[#fafaf8]"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {phoneError && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-[#fdf0ef] p-3 text-xs font-medium text-[#a32a22]">
+                  {phoneError}
+                </div>
+              )}
+
+              {phoneStep === 'input' ? (
+                <div className="mt-4 space-y-4">
+                  <p className="text-xs leading-relaxed text-[#4f4b46]">
+                    Enter your mobile number below. We will send a 6-digit OTP code to verify ownership.
+                  </p>
+                  <div>
+                    <label htmlFor="phone-number-input" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                      Phone Number
+                    </label>
+                    <input
+                      id="phone-number-input"
+                      type="tel"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-2.5 text-sm font-medium text-[#131312] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPhoneModalOpen(false)}
+                      className="rounded-xl border border-[#ececea] px-4 py-2 text-xs font-semibold text-[#4f4b46] hover:bg-[#fafaf8]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendPhoneOtp}
+                      className="rounded-xl bg-[#1f6f5c] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#185845]"
+                    >
+                      Send Verification OTP
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  <div className="rounded-xl border border-[#1f6f5c]/20 bg-[#e3efe9]/50 p-3.5 text-xs text-[#1f6f5c]">
+                    <div>Verification code sent to <strong>{phoneInput}</strong>.</div>
+                    <div className="mt-1 font-mono text-[11px]">
+                      Test OTP Code: <strong className="text-[#131312]">{generatedOtp}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="phone-otp-input" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                      Enter 6-Digit OTP
+                    </label>
+                    <input
+                      id="phone-otp-input"
+                      type="text"
+                      maxLength={6}
+                      value={otpInput}
+                      onChange={(e) => setOtpInput(e.target.value)}
+                      placeholder="123456"
+                      className="w-full text-center font-mono text-lg font-bold tracking-widest rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-2.5 text-[#131312] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPhoneStep('input')}
+                      className="text-xs font-semibold text-[#1f6f5c] hover:underline"
+                    >
+                      ← Back to Phone Input
+                    </button>
+                    <button
+                      type="button"
+                      disabled={phoneSubmitting}
+                      onClick={() => void handleVerifyPhoneOtp()}
+                      className="rounded-xl bg-[#1f6f5c] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#185845] disabled:opacity-50"
+                    >
+                      {phoneSubmitting ? 'Verifying...' : 'Verify & Confirm'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Change Email Modal */}
+      {emailModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#131312]/60 p-4 backdrop-blur-xs vc-fade-up">
+            <div className="w-full max-w-md overflow-hidden rounded-[24px] border border-[#ececea] bg-white p-6 shadow-xl sm:p-7">
+              <div className="flex items-center justify-between border-b border-[#ececea] pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <path d="m22 7-10 6L2 7" />
+                    </svg>
+                  </span>
+                  <h3 className="m-0 text-lg font-bold text-[#131312]">
+                    Change Email Address
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEmailModalOpen(false)}
+                  className="rounded-full p-1 text-[#8a847d] hover:bg-[#fafaf8]"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {emailError && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-[#fdf0ef] p-3 text-xs font-medium text-[#a32a22]">
+                  {emailError}
+                </div>
+              )}
+
+              <div className="mt-4 space-y-4">
+                <p className="text-xs leading-relaxed text-[#4f4b46]">
+                  Enter your new email address below. This will update your contact information for notifications and login.
+                </p>
+                <div>
+                  <label htmlFor="user-email-input" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                    New Email Address
+                  </label>
+                  <input
+                    id="user-email-input"
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-2.5 text-sm font-medium text-[#131312] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEmailModalOpen(false)}
+                    className="rounded-xl border border-[#ececea] px-4 py-2 text-xs font-semibold text-[#4f4b46] hover:bg-[#fafaf8]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={emailSubmitting}
+                    onClick={() => void handleUpdateEmail()}
+                    className="rounded-xl bg-[#1f6f5c] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#185845] disabled:opacity-50"
+                  >
+                    {emailSubmitting ? 'Updating...' : 'Update Email'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </section>
+  );
+}
+
+// ----- Bottom Navigation -----------------------------------------------
+
+function BottomNav({
+  screen,
+  offersCount,
+  onChange,
+}: {
+  screen: ScreenKey;
+  offersCount: number;
+  onChange: (next: ScreenKey) => void;
+}) {
+  return (
+    <nav
+      className="fixed bottom-[18px] left-1/2 z-30 flex -translate-x-1/2 gap-1 rounded-full border border-[#ececea] bg-white p-1.5 shadow-[0_12px_32px_-10px_rgba(20,18,15,0.18),0_4px_10px_-4px_rgba(20,18,15,0.08)]"
+      aria-label="Primary"
+    >
+      <NavButton
+        active={screen === 'dashboard'}
+        onClick={() => onChange('dashboard')}
+        icon={
+          <svg
+            viewBox="0 0 24 24"
+            className="h-[18px] w-[18px]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+          </svg>
+        }
+        label="Dashboard"
+        badge={offersCount > 0 ? String(offersCount) : null}
+      />
+      <NavButton
+        active={screen === 'profile'}
+        onClick={() => onChange('profile')}
+        icon={
+          <svg
+            viewBox="0 0 24 24"
+            className="h-[18px] w-[18px]"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        }
+        label="Profile"
+        badge={null}
+      />
+    </nav>
+  );
+}
+
+function NavButton({
+  active,
+  onClick,
+  icon,
+  label,
+  badge,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  badge: string | null;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'inline-flex items-center gap-2 rounded-full px-[22px] py-2.5 text-[13px] font-semibold transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+        (active
+          ? 'scale-[1.02] bg-[#131312] text-white focus-visible:ring-white'
+          : 'bg-transparent text-[#8a847d] hover:scale-[1.02] hover:text-[#131312] focus-visible:ring-[#131312]')
+      }
+      aria-pressed={active}
+    >
+      {icon}
+      {label}
+      {badge && (
+        <span className="rounded-full bg-[#1f6f5c] px-1.5 py-[1px] font-mono text-[10px] leading-tight text-white">
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ----- Helpers ---------------------------------------------------------
+
+function LiveDot() {
+  return (
+    <span className="relative inline-block h-2 w-2">
+      <span className="absolute inset-0 rounded-full bg-[#1f6f5c]" />
+      <span
+        className="absolute inset-[-4px] animate-ping rounded-full bg-[#1f6f5c] opacity-25"
+        aria-hidden="true"
+      />
+    </span>
+  );
+}
+
+function TrustBadge({ score }: { score: number }) {
+  if (score >= 85) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-semibold text-emerald-900">
+        Trusted
+      </span>
+    );
+  }
+  if (score >= 60) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100/90 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+        Reliable
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold text-white">
+      Newcomer
+    </span>
+  );
+}
+
+function HeroAvatar({
+  displayName,
+  photoPath,
+}: {
+  displayName: string | undefined;
+  photoPath: string | null;
+}) {
+  const url = usePhotoUrl(photoPath);
+  return (
+    <span className="grid h-[76px] w-[76px] flex-shrink-0 place-items-center overflow-hidden rounded-full border-4 border-white/25 bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-[28px] font-bold text-[#5a2900]">
+      {url ? (
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span aria-hidden="true">{initialOf(displayName)}</span>
+      )}
+    </span>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  action,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3.5 border-b border-[#f3f1ec] px-[18px] py-4 last:border-b-0">
+      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+        <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-[10px] bg-[#e3efe9]">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#8a847d]">
+            {label}
+          </div>
+          <div className="mt-0.5 truncate text-sm font-medium text-[#131312]">
+            {value}
+          </div>
+        </div>
+      </div>
+      {action && <div className="flex-shrink-0">{action}</div>}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: TaskStatus }) {
+  const palette: Record<TaskStatus, string> = {
+    searching: 'bg-blue-100 text-blue-800',
+    accepted: 'bg-emerald-100 text-emerald-800',
+    in_progress: 'bg-amber-100 text-amber-800',
+    completed: 'bg-emerald-100 text-emerald-800',
+    cancelled: 'bg-[#ececea] text-[#4f4b46]',
+    expired: 'bg-[#ececea] text-[#4f4b46]',
+  };
+  const label: Record<TaskStatus, string> = {
+    searching: 'Searching',
+    accepted: 'Accepted',
+    in_progress: 'In progress',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+    expired: 'Expired',
+  };
+  return (
+    <span
+      className={
+        'flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ' +
+        palette[status]
+      }
+    >
+      {label[status]}
+    </span>
+  );
+}
+
+function usePhotoUrl(path: string | null): string | null {
+  const [cache, setCache] = useState<{ path: string | null; url: string | null }>(
+    { path, url: null },
+  );
+  useEffect(() => {
+    if (!path) return;
+    let cancelled = false;
+    void getDownloadURL(storageRef(storage(), path))
+      .then((u) => {
+        if (!cancelled) setCache({ path, url: u });
+      })
+      .catch(() => {
+        if (!cancelled) setCache({ path, url: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+  return cache.path === path ? cache.url : null;
+}
+
+function initialOf(name: string | undefined): string {
+  if (!name) return 'V';
+  const trimmed = name.trim();
+  if (!trimmed) return 'V';
+  return trimmed[0]?.toUpperCase() ?? 'V';
+}
+
+function formatDistance(m: number): string {
+  if (!Number.isFinite(m) || m < 0) return 'unknown distance';
+  if (m < 1000) return `${String(Math.round(m))} m`;
+  return `${(m / 1000).toFixed(1)} km`;
+}
+
+function formatWhen(t: Timestamp | null): string {
+  if (!t) return 'just now';
+  const ms = t.toMillis();
+  const diff = Date.now() - ms;
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${String(Math.floor(diff / 60_000))} min ago`;
+  if (diff < 86_400_000) return `${String(Math.floor(diff / 3_600_000))} h ago`;
+  return new Date(ms).toLocaleDateString();
+}

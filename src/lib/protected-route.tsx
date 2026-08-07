@@ -29,6 +29,8 @@ function currentStep(state: AuthState): CurrentStep {
       return 'loading';
     case 'signed-out':
       return 'signed-out';
+    case 'error':
+      return 'loading';
     case 'no-doc':
       return 'consent';
     case 'incomplete': {
@@ -59,6 +61,7 @@ export function ProtectedRoute({ children, requires, requiresAdmin }: ProtectedR
   const step = currentStep(state);
   const [now] = useState(() => Date.now());
 
+  if (state.status === 'error') return <DatabaseErrorScreen error={state.error} />;
   if (step === 'loading') return <FullScreenSpinner />;
   if (step === 'signed-out') return <Navigate to="/login" replace />;
 
@@ -223,6 +226,60 @@ function FullScreenSpinner() {
       aria-label="Loading"
     >
       <span className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900" />
+    </div>
+  );
+}
+
+function DatabaseErrorScreen({ error }: { error: Error }) {
+  async function handleSignOut() {
+    await signOut(auth());
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-6 py-12 text-center text-neutral-900">
+      <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-8 shadow-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <h2 className="mt-4 text-2xl font-semibold tracking-tight text-neutral-900">
+          Database Connection Error
+        </h2>
+        <p className="mt-2 text-sm text-neutral-600">
+          Could not connect to Firebase Firestore to load your profile.
+        </p>
+        <div className="mt-4 rounded-lg bg-neutral-50 p-4 text-left text-xs font-mono text-neutral-700 overflow-x-auto">
+          {error.message || 'Firestore connection failed.'}
+        </div>
+        <div className="mt-6 flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="w-full rounded-full bg-neutral-900 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none"
+          >
+            Retry connection
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            className="w-full rounded-full border border-neutral-300 py-2.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -62,16 +62,36 @@ export default function SkillsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
+    <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#ececea] bg-white px-7">
+        <div className="flex items-center gap-2.5 text-[15px] font-bold tracking-tight text-[#131312]">
+          <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-gradient-to-br from-[#1f6f5c] to-[#185845] text-white">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+          </span>
+          Hey Padosi
+        </div>
+      </header>
+
+      <div className="vc-screen-enter mx-auto max-w-3xl px-6 py-12 sm:py-20">
         <OnboardingProgress current={4} includeSkills />
-        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#8a847d]">
           Step 4 of 4
         </p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+        <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#131312]">
           What can you offer?
         </h1>
-        <p className="mt-3 text-neutral-600">
+        <p className="mt-3 text-[#4f4b46]">
           Pick all that apply — you can always update later. Up to {MAX_SKILLS}.
         </p>
 
@@ -91,14 +111,14 @@ export default function SkillsPage() {
                 onClick={() => toggle(s.key)}
                 disabled={atLimit}
                 className={
-                  'group flex aspect-square flex-col items-center justify-center gap-3 rounded-2xl border bg-white p-4 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ' +
+                  'group flex aspect-square flex-col items-center justify-center gap-3 rounded-2xl border p-4 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ' +
                   (isSelected
-                    ? 'border-neutral-900 shadow-sm ring-2 ring-neutral-900'
-                    : 'border-neutral-200 hover:border-neutral-400 hover:shadow-sm')
+                    ? 'border-[#1f6f5c] bg-[#e3efe9]/40 ring-2 ring-[#1f6f5c] shadow-sm'
+                    : 'border-[#ececea] bg-white hover:border-[#d8d4cc] hover:shadow-sm')
                 }
               >
                 <SkillIcon skillKey={s.key} className="h-12 w-12" />
-                <span className="text-sm font-medium text-neutral-800">
+                <span className="text-sm font-semibold text-[#131312]">
                   {s.label}
                 </span>
               </button>
@@ -106,12 +126,12 @@ export default function SkillsPage() {
           })}
         </div>
 
-        <p className="mt-4 text-xs text-neutral-500">
+        <p className="mt-4 text-xs font-medium text-[#8a847d]">
           {selected.length} / {MAX_SKILLS} selected
         </p>
 
         {error && (
-          <p id={errorId} role="alert" className="mt-6 text-sm text-red-700">
+          <p id={errorId} role="alert" className="mt-6 text-sm text-[#a32a22]">
             {error}
           </p>
         )}
@@ -120,7 +140,7 @@ export default function SkillsPage() {
           <button
             type="button"
             onClick={() => void navigate('/onboarding/profile')}
-            className="rounded-full border border-neutral-300 px-5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+            className="rounded-full border border-[#ececea] bg-white px-6 py-3 text-sm font-semibold text-[#4f4b46] transition hover:bg-[#f3f1ec] hover:border-[#d8d4cc] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2"
           >
             ← Back
           </button>
@@ -128,7 +148,7 @@ export default function SkillsPage() {
             type="button"
             onClick={() => void handleContinue()}
             disabled={busy || selected.length === 0}
-            className="rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 disabled:opacity-40"
+            className="rounded-full bg-[#1f6f5c] px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-40"
           >
             {busy ? 'Saving…' : 'Continue →'}
           </button>
