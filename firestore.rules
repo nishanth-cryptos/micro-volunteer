@@ -57,7 +57,8 @@ service cloud.firestore {
         'idImagePath',
         'availableNow',
         'availabilityUpdatedAt',
-        'lastKnownLocation'
+        'lastKnownLocation',
+        'freezeAcknowledgedAt'
       ];
     }
 
@@ -82,9 +83,13 @@ service cloud.firestore {
         'isAdmin',
         'pendingReports',
         'accountStatus',
-        'moderationReason'
+        'moderationReason',
+        'frozenAt',
+        'frozenReason',
+        'warningStrikeCount'
       ];
     }
+
 
     // Consent shape: { tcVersion: string, acceptedAt: timestamp }.
     function hasValidConsent() {
@@ -280,6 +285,13 @@ service cloud.firestore {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if false; // Handled by Cloud Function
     }
+
+    // ----- users/{userId}/violations/{violationId} -----
+    match /users/{userId}/violations/{violationId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Handled by Cloud Function
+    }
+
 
     // ----- activityLog/{entryId} -----
     // Append-only, admin-read site-wide audit feed. All writes go through

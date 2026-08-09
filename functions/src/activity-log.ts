@@ -23,7 +23,10 @@ export type ActivityEventType =
   | 'report_submitted'
   | 'moderation_action'
   | 'user_blocked'
-  | 'user_unblocked';
+  | 'user_unblocked'
+  | 'account_auto_frozen'
+  | 'volunteer_cancel_after_accept'
+  | 'customer_task_delete';
 
 export interface ActivityLogEntry {
   eventType: ActivityEventType;

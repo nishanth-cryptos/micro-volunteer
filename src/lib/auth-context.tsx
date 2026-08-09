@@ -50,7 +50,12 @@ export interface UserDoc {
   accountStatus?: 'active' | 'warned' | 'suspended' | 'banned';
   suspendedUntil?: Timestamp;
   moderationReason?: string;
+  frozenAt?: Timestamp;
+  frozenReason?: string;
+  warningStrikeCount?: number;
+  freezeAcknowledgedAt?: Timestamp;
   isAdmin?: boolean;
+
   points?: number;
   skillPoints?: Record<string, number>;
   verifiedTaskCount?: number;

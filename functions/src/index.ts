@@ -21,3 +21,7 @@ export { onVolunteerAvailable } from './on-volunteer-available';
 export { periodicRedispatchOffers } from './periodic-redispatch-offers';
 export { suggestNextTasks } from './suggest-next-tasks';
 export { unblockUser } from './unblock-user';
+export { cancelAcceptedTask } from './cancel-accepted-task';
+export { deleteTask } from './delete-task';
+export { unfreezeAccount } from './unfreeze-account';
+

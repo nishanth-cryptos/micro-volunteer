@@ -16,7 +16,8 @@ import {
   query,
   type Timestamp,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
 import { getCategory, getSkillLabel } from '../lib/catalog';
 import { CustomerOtpPanel } from '../components/CustomerOtpPanel';
@@ -27,6 +28,8 @@ import { ChatPanel } from '../components/ChatPanel';
 import { KarmaBadge } from '../components/KarmaBadge';
 import { KarmaToast } from '../components/KarmaToast';
 import { PostCompletionSuggestionCard } from '../components/PostCompletionSuggestionCard';
+import { ReasonBottomSheet, type ReasonOption } from '../components/ReasonBottomSheet';
+
 
 type TaskStatus =
   | 'searching'
@@ -97,6 +100,20 @@ export interface EventDoc {
   };
 }
 
+const VOLUNTEER_CANCEL_REASONS: ReasonOption[] = [
+  { id: 'accidental_accept', label: 'Accidentally accepted' },
+  { id: 'other_commitments', label: 'Got other commitments' },
+  { id: 'cant_reach_location', label: "Can't get to the location" },
+  { id: 'other', label: 'Other / prefer not to say' },
+];
+
+const CUSTOMER_DELETE_REASONS: ReasonOption[] = [
+  { id: 'accidental_post', label: 'Accidentally posted' },
+  { id: 'no_longer_needed', label: 'No longer needed' },
+  { id: 'found_help_elsewhere', label: 'Found help another way' },
+  { id: 'other', label: 'Other / prefer not to say' },
+];
+
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
@@ -108,14 +125,65 @@ export default function TaskDetailPage() {
 
   const [completedEvent, setCompletedEvent] = useState<EventDoc | null>(null);
   const [hasReassignedEvent, setHasReassignedEvent] = useState(false);
-  // Frozen "now" — used for the 24h post-completion report window check.
-  // Refreshing per-render trips react-hooks/purity; the window only matters
-  // hours after completion so the mount-time value is plenty accurate.
   const [now] = useState(() => Date.now());
   const prevStatusRef = useRef<TaskStatus | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastPoints, setToastPoints] = useState<number>(0);
   const [hasTriggeredToast, setHasTriggeredToast] = useState(false);
+
+  const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
+  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function handleVolunteerCancel(reasonId: string) {
+    if (!taskId) return;
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      const fn = httpsCallable<{ taskId: string; reason: string }, { success: boolean }>(
+        functions(),
+        'cancelAcceptedTask',
+      );
+      await fn({ taskId, reason: reasonId });
+      setCancelSheetOpen(false);
+      void navigate('/app', {
+        replace: true,
+        state: { toastMessage: 'Task cancellation submitted.' },
+      });
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Could not cancel task.',
+      );
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleCustomerDelete(reasonId: string) {
+    if (!taskId) return;
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      const fn = httpsCallable<{ taskId: string; reason: string }, { success: boolean }>(
+        functions(),
+        'deleteTask',
+      );
+      await fn({ taskId, reason: reasonId });
+      setDeleteSheetOpen(false);
+      void navigate('/app', {
+        replace: true,
+        state: { toastMessage: 'Task deleted.' },
+      });
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Could not delete task.',
+      );
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
 
   useEffect(() => {
     if (!taskId || state.status !== 'ready') return;
@@ -261,6 +329,8 @@ export default function TaskDetailPage() {
               completedEvent={completedEvent}
               viewerIsVolunteer={state.userDoc.roles?.includes('volunteer') ?? false}
               hasReassignedEvent={hasReassignedEvent}
+              onOpenCancelSheet={() => setCancelSheetOpen(true)}
+              onOpenDeleteSheet={() => setDeleteSheetOpen(true)}
             />
             {(() => {
               const viewerUid = state.user.uid;
@@ -268,12 +338,6 @@ export default function TaskDetailPage() {
               const isVolunteer = viewerUid === task.acceptedVolunteerId;
               const hasAcceptedVol = !!task.acceptedVolunteerId;
 
-              // Report/block during accepted + in_progress now live in the
-              // chat header (ChatPanel). This standalone panel only covers the
-              // post-completion window, where the chat is read-only:
-              //   - completed: only if completedAt is within 24h
-              //   - volunteer side additionally requires status !== 'accepted'
-              //     (always true once completed)
               const REPORT_WINDOW_AFTER_COMPLETION_MS = 24 * 60 * 60 * 1000;
               const insidePostCompletionWindow =
                 task.status === 'completed' &&
@@ -282,8 +346,6 @@ export default function TaskDetailPage() {
                   REPORT_WINDOW_AFTER_COMPLETION_MS;
               const inWindow = insidePostCompletionWindow;
 
-              // Volunteer can only report once status has moved past
-              // 'accepted'. Customer can report anytime in-window.
               const allowedForViewer = isCustomer
                 ? true
                 : isVolunteer && task.status !== 'accepted';
@@ -321,10 +383,39 @@ export default function TaskDetailPage() {
             onClose={() => setShowToast(false)}
           />
         )}
+        {actionError && (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-[#fdf0ef] p-3 text-xs text-[#a32a22]"
+          >
+            {actionError}
+          </div>
+        )}
+
+        <ReasonBottomSheet
+          isOpen={cancelSheetOpen}
+          title="Cancel task acceptance?"
+          subtitle="Please select a reason. The task will be re-queued for nearby volunteers."
+          reasons={VOLUNTEER_CANCEL_REASONS}
+          busy={actionBusy}
+          onSelect={(reasonId) => void handleVolunteerCancel(reasonId)}
+          onClose={() => setCancelSheetOpen(false)}
+        />
+
+        <ReasonBottomSheet
+          isOpen={deleteSheetOpen}
+          title="Delete this task?"
+          subtitle="Please select a reason for removing your task posting."
+          reasons={CUSTOMER_DELETE_REASONS}
+          busy={actionBusy}
+          onSelect={(reasonId) => void handleCustomerDelete(reasonId)}
+          onClose={() => setDeleteSheetOpen(false)}
+        />
       </div>
     </main>
   );
 }
+
 
 function TaskSummary({ task }: { task: TaskDoc }) {
   const category = getCategory(task.category);
@@ -392,6 +483,8 @@ function OffersSection({
   completedEvent,
   viewerIsVolunteer = false,
   hasReassignedEvent = false,
+  onOpenCancelSheet,
+  onOpenDeleteSheet,
 }: {
   task: TaskDoc & { taskId?: string };
   offers: OfferDoc[];
@@ -400,9 +493,12 @@ function OffersSection({
   completedEvent?: EventDoc | null;
   viewerIsVolunteer?: boolean;
   hasReassignedEvent?: boolean;
+  onOpenCancelSheet?: () => void;
+  onOpenDeleteSheet?: () => void;
 }) {
   const viewerIsCustomer = viewerUid === task.customerId;
   const viewerIsAcceptedVolunteer = viewerUid === task.acceptedVolunteerId;
+
 
   if (task.status === 'accepted' || task.status === 'in_progress') {
     const accepted = offers.find((o) => o.state === 'accepted');
@@ -504,9 +600,32 @@ function OffersSection({
         {viewerIsAcceptedVolunteer && (
           <VolunteerOtpPanel taskId={task.taskId ?? ''} phase={phase} />
         )}
+        {viewerIsAcceptedVolunteer && task.status === 'accepted' && onOpenCancelSheet && (
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onOpenCancelSheet}
+              className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
+            >
+              Cancel accepted task
+            </button>
+          </div>
+        )}
+        {viewerIsCustomer && task.status === 'accepted' && onOpenDeleteSheet && (
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={onOpenDeleteSheet}
+              className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
+            >
+              Delete task
+            </button>
+          </div>
+        )}
       </>
     );
   }
+
 
   if (task.status === 'completed') {
     const accepted = offers.find((o) => o.state === 'accepted');
@@ -654,6 +773,19 @@ function OffersSection({
         customerInitial={(task.customerName ?? 'You').charAt(0).toUpperCase()}
         recentBlips={pending.slice(0, 6)}
       />
+
+      {viewerIsCustomer && onOpenDeleteSheet && (
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onOpenDeleteSheet}
+            className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
+          >
+            Delete task
+          </button>
+        </div>
+      )}
+
 
       {pending.length > 0 && (
         <ul className="vc-fade-up mt-8 space-y-3">
