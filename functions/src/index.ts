@@ -19,6 +19,5 @@ export { applyModerationAction } from './apply-moderation-action';
 export { scheduledPurgeBannedUsers } from './scheduled-purge-banned-users';
 export { onVolunteerAvailable } from './on-volunteer-available';
 export { periodicRedispatchOffers } from './periodic-redispatch-offers';
-export { logUserRegistered } from './log-user-registered';
-
-
+export { suggestNextTasks } from './suggest-next-tasks';
+export { unblockUser } from './unblock-user';

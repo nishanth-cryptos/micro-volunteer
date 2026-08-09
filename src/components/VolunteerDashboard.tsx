@@ -37,8 +37,10 @@ import { auth, db, functions, storage } from '../lib/firebase';
 import type { UserDoc } from '../lib/auth-context';
 import { getCategory, getSkillLabel } from '../lib/catalog';
 import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
-import { KarmaBadge } from './KarmaBadge';
+import { BlockedUsersList } from './BlockedUsersList';
 import { DeparturePromptModal } from './DeparturePromptModal';
+import { KarmaBadge } from './KarmaBadge';
+import { TaskLocationPicker } from './TaskLocationPicker';
 import {
   calculateRouteSlack,
   createDepartureEvent,
@@ -396,6 +398,7 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
         <div key={screen} className="vc-screen-enter">
           {screen === 'dashboard' && (
             <DashboardScreen
+              uid={uid}
               userDoc={userDoc}
               available={available}
               toggleBusy={toggleBusy}
@@ -587,6 +590,7 @@ function TopBar({
 // ----- Main Dashboard Screen --------------------------------------------
 
 function DashboardScreen({
+  uid,
   userDoc,
   available,
   toggleBusy,
@@ -599,6 +603,7 @@ function DashboardScreen({
   acceptedTasks,
   error,
 }: {
+  uid: string;
   userDoc: UserDoc;
   available: boolean;
   toggleBusy: boolean;
@@ -615,6 +620,37 @@ function DashboardScreen({
   const trustScore = userDoc.trustScore ?? 30;
   const verifiedCount = userDoc.verifiedTaskCount ?? 0;
   const verifiedHours = userDoc.verifiedHours ?? 0;
+
+  const [placeName, setPlaceName] = useState<string | null>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+
+  useEffect(() => {
+    if (!userDoc.lastKnownLocation?.lat || !userDoc.lastKnownLocation?.lng) return;
+    let cancelled = false;
+    const { lat, lng } = userDoc.lastKnownLocation;
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+    )
+      .then((res) => res.json() as Promise<{ address?: { suburb?: string; neighbourhood?: string; residential?: string; city_district?: string; town?: string; city?: string }; name?: string; display_name?: string }>)
+      .then((data) => {
+        if (cancelled) return;
+        const addr = data.address;
+        const place =
+          addr?.suburb ||
+          addr?.neighbourhood ||
+          addr?.residential ||
+          addr?.city_district ||
+          addr?.town ||
+          addr?.city ||
+          data.name ||
+          (data.display_name ? data.display_name.split(',')[0] : null);
+        if (place) setPlaceName(place);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userDoc.lastKnownLocation]);
 
   return (
     <section className="space-y-8">
@@ -756,13 +792,47 @@ function DashboardScreen({
             />
           </button>
         </div>
-        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.06em]" aria-live="polite">
-          <span className={available ? 'text-[#1f6f5c]' : 'text-[#8a847d]'}>
-            {available
-              ? '● You are visible to nearby task posters.'
-              : '○ You are not currently visible.'}
-          </span>
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#ececea] pt-3.5 text-xs text-[#4f4b46]">
+          <div className="flex items-center gap-1.5 font-medium">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4 flex-shrink-0 text-[#1f6f5c]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span>
+              {placeName
+                ? `You are at ${placeName}`
+                : userDoc.lastKnownLocation
+                  ? `You are at ${userDoc.lastKnownLocation.lat.toFixed(3)}, ${userDoc.lastKnownLocation.lng.toFixed(3)}`
+                  : available
+                    ? '● You are visible to nearby task posters.'
+                    : '○ You are not currently visible.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowLocationModal(true)}
+            className="font-semibold text-[#1f6f5c] underline underline-offset-2 transition hover:text-[#185845] focus:outline-none"
+          >
+            Did we get it wrong?
+          </button>
+        </div>
+
+        {showLocationModal && (
+          <LocationCorrectionModal
+            uid={uid}
+            isOpen={showLocationModal}
+            onClose={() => setShowLocationModal(false)}
+          />
+        )}
       </div>
 
       {/* Offers For You Section */}
@@ -1389,7 +1459,10 @@ function VolunteerProfileScreen({
             </div>
           </div>
 
+          <BlockedUsersList uid={uid} />
+
           <div className="mt-5 flex justify-end">
+
             <button
               type="button"
               onClick={onSignOut}
@@ -1957,3 +2030,228 @@ function formatWhen(t: Timestamp | null): string {
   if (diff < 86_400_000) return `${String(Math.floor(diff / 3_600_000))} h ago`;
   return new Date(ms).toLocaleDateString();
 }
+
+interface LocationCorrectionModalProps {
+  uid: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function LocationCorrectionModal({
+  uid,
+  isOpen,
+  onClose,
+}: LocationCorrectionModalProps) {
+  const [mode, setMode] = useState<'detect' | 'map'>('detect');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [mapLoc, setMapLoc] = useState<{
+    lat: number;
+    lng: number;
+    h3Cell: string;
+  } | null>(null);
+
+  if (!isOpen) return null;
+
+  async function handleAutoDetect() {
+    setError(null);
+    setSuccess(null);
+    setBusy(true);
+    try {
+      const loc = await getCurrentLocation();
+      const h3Cell = latLngToCell(loc.lat, loc.lng, H3_RESOLUTION);
+      const userRef = doc(db(), 'users', uid);
+      await updateDoc(userRef, {
+        lastKnownLocation: {
+          lat: loc.lat,
+          lng: loc.lng,
+          h3Cell,
+          updatedAt: serverTimestamp(),
+        },
+      });
+      setSuccess('Location updated automatically!');
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err) {
+      if (err instanceof GeolocationError) {
+        setError(err.userMessage);
+      } else {
+        setError(
+          err instanceof Error ? err.message : 'Could not detect location.',
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSaveMapLocation() {
+    if (!mapLoc) {
+      setError('Please select a location on the map first.');
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setBusy(true);
+    try {
+      const userRef = doc(db(), 'users', uid);
+      await updateDoc(userRef, {
+        lastKnownLocation: {
+          lat: mapLoc.lat,
+          lng: mapLoc.lng,
+          h3Cell: mapLoc.h3Cell,
+          updatedAt: serverTimestamp(),
+        },
+      });
+      setSuccess('Location saved successfully!');
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Could not save location.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm">
+      <div className="vc-fade-up w-full max-w-lg overflow-hidden rounded-3xl border border-[#ececea] bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-bold tracking-tight text-[#131312]">
+              Update your location
+            </h3>
+            <p className="mt-1 text-sm text-[#4f4b46]">
+              Neighbours match with you based on your location (up to 2 km search radius).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition"
+            aria-label="Close"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-[#fdf0ef] p-3 text-xs text-[#a32a22]"
+          >
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"
+          >
+            {success}
+          </div>
+        )}
+
+        <div className="mt-5 flex gap-2 border-b border-[#ececea] pb-3 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setMode('detect')}
+            className={
+              'rounded-full px-4 py-2 transition ' +
+              (mode === 'detect'
+                ? 'bg-[#1f6f5c] text-white shadow-sm'
+                : 'bg-neutral-100 text-[#4f4b46] hover:bg-neutral-200')
+            }
+          >
+            Detect Automatically
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('map')}
+            className={
+              'rounded-full px-4 py-2 transition ' +
+              (mode === 'map'
+                ? 'bg-[#1f6f5c] text-white shadow-sm'
+                : 'bg-neutral-100 text-[#4f4b46] hover:bg-neutral-200')
+            }
+          >
+            Choose on Map
+          </button>
+        </div>
+
+        <div className="mt-4">
+          {mode === 'detect' && (
+            <div className="py-6 text-center">
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-7 w-7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 14a4 4 0 1 1 4-4 4 4 0 0 1-4 4z" />
+                </svg>
+              </div>
+              <p className="mt-3 text-sm font-medium text-[#131312]">
+                Re-detect your current GPS location
+              </p>
+              <p className="mt-1 text-xs text-[#8a847d]">
+                Your browser will request location permission to pin your position.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleAutoDetect()}
+                disabled={busy}
+                className="mt-5 rounded-full bg-[#1f6f5c] px-6 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#185845] transition disabled:opacity-50"
+              >
+                {busy ? 'Detecting…' : 'Allow & Detect Location'}
+              </button>
+            </div>
+          )}
+
+          {mode === 'map' && (
+            <div className="space-y-4">
+              <TaskLocationPicker
+                onLocationChange={(loc) => setMapLoc(loc)}
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveMapLocation()}
+                  disabled={busy || !mapLoc}
+                  className="rounded-full bg-[#1f6f5c] px-5 py-2 text-xs font-semibold text-white hover:bg-[#185845] disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Save Map Location'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+

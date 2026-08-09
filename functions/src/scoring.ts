@@ -204,10 +204,10 @@ export async function rankForTask(task: TaskDoc): Promise<RankedVolunteer[]> {
 // Seam: Corridor matching ranker accepting a set of corridor H3 cells
 export async function rankForCorridor(
   task: TaskDoc,
-  corridorH3Cells: Set<string>,
+  _corridorH3Cells: Set<string>,
 ): Promise<RankedVolunteer[]> {
   const allRanked = await rankForTask(task);
-  return allRanked.filter((v) => {
+  return allRanked.filter((_v) => {
     return true; // Corridor matching filtering happens during task fanout
   });
 }

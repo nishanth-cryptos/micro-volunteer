@@ -22,7 +22,8 @@ export type ActivityEventType =
   | 'task_completed'
   | 'report_submitted'
   | 'moderation_action'
-  | 'user_blocked';
+  | 'user_blocked'
+  | 'user_unblocked';
 
 export interface ActivityLogEntry {
   eventType: ActivityEventType;

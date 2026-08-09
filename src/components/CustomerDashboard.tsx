@@ -39,6 +39,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { auth, db, storage } from '../lib/firebase';
 import type { UserDoc } from '../lib/auth-context';
+import { BlockedUsersList } from './BlockedUsersList';
 
 // Leaflet default-icon fix (same pattern as TaskLocationPicker).
 interface DefaultIconProto {
@@ -257,6 +258,7 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
           )}
           {screen === 'profile' && (
             <ProfileScreen
+              uid={uid}
               userDoc={userDoc}
               tasksPosted={rows.length}
               completionPct={completionPct}
@@ -982,6 +984,7 @@ interface HistoryBuckets {
 }
 
 function ProfileScreen({
+  uid,
   userDoc,
   tasksPosted,
   completionPct,
@@ -992,6 +995,7 @@ function ProfileScreen({
   onFilter,
   onSignOut,
 }: {
+  uid: string;
   userDoc: UserDoc;
   tasksPosted: number;
   completionPct: number | null;
@@ -1144,7 +1148,7 @@ function ProfileScreen({
       {/* Past tasks */}
       <div className="mb-3.5 flex items-baseline justify-between">
         <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
-          Past tasks
+          Past tasks & settings
         </h2>
         <span className="font-mono text-xs text-[#8a847d]">
           {counts.all} total
@@ -1189,10 +1193,15 @@ function ProfileScreen({
         })}
       </div>
 
-      <HistoryList filter={filter} buckets={buckets} blocked={blocked} />
+      {filter === 'blocked' ? (
+        <BlockedUsersList uid={uid} />
+      ) : (
+        <HistoryList filter={filter} buckets={buckets} blocked={blocked} />
+      )}
     </section>
   );
 }
+
 
 function DetailRow({
   icon,

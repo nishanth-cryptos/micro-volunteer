@@ -26,6 +26,7 @@ import { ReportBlockPanel } from '../components/ReportBlockPanel';
 import { ChatPanel } from '../components/ChatPanel';
 import { KarmaBadge } from '../components/KarmaBadge';
 import { KarmaToast } from '../components/KarmaToast';
+import { PostCompletionSuggestionCard } from '../components/PostCompletionSuggestionCard';
 
 type TaskStatus =
   | 'searching'
@@ -556,6 +557,12 @@ function OffersSection({
             </div>
           )}
         </section>
+        {viewerIsAcceptedVolunteer && task.taskId && (
+          <PostCompletionSuggestionCard
+            taskId={task.taskId}
+            volunteerUid={viewerUid}
+          />
+        )}
         {task.taskId && task.acceptedVolunteerId && (
           <ChatPanel
             taskId={task.taskId}

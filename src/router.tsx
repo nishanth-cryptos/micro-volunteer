@@ -1,7 +1,7 @@
 // Route table. Public: home, login, signup.
 // Protected onboarding routes declare the step they serve via `requires`.
 
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -85,6 +85,14 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: '/app/tasks/:taskId',
+    element: (
+      <ProtectedRoute requires="ready">
+        <TaskDetailPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: '/admin',
     element: (
       <ProtectedRoute requires="ready" requiresAdmin={true}>
@@ -92,4 +100,9 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+  {
+    path: '*',
+    element: <Navigate to="/app" replace />,
+  },
 ]);
+
