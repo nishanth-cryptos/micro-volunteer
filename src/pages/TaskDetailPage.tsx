@@ -65,7 +65,13 @@ interface TaskDoc {
   customerRatingComment?: string;
   customerName?: string;
   customerPhotoURL?: string;
+  expectedWaitTier?: 'fast' | 'normal' | 'flexible';
+  waitStartedAt?: Timestamp;
+  lastNudgeStage?: 0 | 1 | 2 | 3;
+  statusMessage?: string | null;
+  nearingExpiry?: boolean;
 }
+
 
 type OfferState = 'offered' | 'accepted' | 'rejected' | 'superseded' | 'expired';
 
@@ -774,7 +780,57 @@ function OffersSection({
         recentBlips={pending.slice(0, 6)}
       />
 
-      {viewerIsCustomer && onOpenDeleteSheet && (
+      {task.statusMessage && (
+        <div
+          className={
+            'vc-fade-up mt-6 rounded-2xl border p-4.5 text-sm transition-all ' +
+            (task.nearingExpiry
+              ? 'border-amber-200 bg-amber-50/80 text-amber-900 shadow-sm'
+              : 'border-[#ececea] bg-white text-[#4f4b46]')
+          }
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className={
+                'grid h-6 w-6 flex-shrink-0 place-items-center rounded-full text-xs font-bold ' +
+                (task.nearingExpiry
+                  ? 'bg-amber-200 text-amber-900'
+                  : 'bg-[#e3efe9] text-[#1f6f5c]')
+              }
+            >
+              ℹ
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium leading-relaxed">{task.statusMessage}</p>
+
+              {task.nearingExpiry ? (
+                <div className="mt-3 flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      /* Keep waiting - acknowledges / no-op */
+                    }}
+                    className="rounded-full bg-[#1f6f5c] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#185845] focus:outline-none"
+                  >
+                    Keep waiting
+                  </button>
+                  {onOpenDeleteSheet && (
+                    <button
+                      type="button"
+                      onClick={onOpenDeleteSheet}
+                      className="rounded-full border border-red-200 bg-white px-4 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none"
+                    >
+                      Cancel task
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewerIsCustomer && !task.nearingExpiry && onOpenDeleteSheet && (
         <div className="mt-6 flex justify-end">
           <button
             type="button"
@@ -785,6 +841,7 @@ function OffersSection({
           </button>
         </div>
       )}
+
 
 
       {pending.length > 0 && (

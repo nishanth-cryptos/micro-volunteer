@@ -170,12 +170,16 @@ export function OfferInbox({ uid }: Props) {
                     >
                       {row.taskRiskLevel === 'medium' ? 'Medium' : 'Low'}
                     </span>{' '}
-                    · {formatDistance(row.distanceM)} away
+                    · {formatDistance(row.distanceM)} away ·{' '}
+                    <span className="font-medium text-neutral-700">
+                      {formatFreshness(row.offeredAt)}
+                    </span>
                   </p>
                   <p className="mt-1 text-xs text-neutral-500">
                     Match score {row.score.toFixed(2)}
                   </p>
                 </div>
+
                 <div className="flex flex-shrink-0 gap-2">
                   <button
                     type="button"
@@ -208,3 +212,15 @@ function formatDistance(m: number): string {
   if (m < 1000) return `${String(Math.round(m))} m`;
   return `${(m / 1000).toFixed(1)} km`;
 }
+
+function formatFreshness(ts: Timestamp | null): string {
+  if (!ts) return 'posted recently';
+  const diffMs = Date.now() - ts.toMillis();
+  if (diffMs < 60 * 1000) return 'posted just now';
+  const mins = Math.floor(diffMs / (60 * 1000));
+  if (mins < 60) return `posted ${String(mins)} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `posted ${String(hours)}h ago`;
+  return `posted ${String(Math.floor(hours / 24))}d ago`;
+}
+

@@ -49,6 +49,7 @@ export default function CreateTaskPage() {
   const [preference, setPreference] = useState('');
   const [safetyNote, setSafetyNote] = useState('');
   const [location, setLocation] = useState<PickedLocation | null>(null);
+  const [expectedWaitTier, setExpectedWaitTier] = useState<'fast' | 'normal' | 'flexible'>('normal');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -143,9 +144,13 @@ export default function CreateTaskPage() {
         estimatedMinutes,
         status: 'searching',
         searchRadiusM: INITIAL_SEARCH_RADIUS_M,
+        expectedWaitTier,
+        waitStartedAt: serverTimestamp(),
+        nextCheckAt: Timestamp.fromMillis(Date.now() + 60 * 1000),
         createdAt: serverTimestamp(),
         expiresAt: Timestamp.fromMillis(Date.now() + TASK_EXPIRY_MS),
       };
+
       if (userDoc.photoURL) {
         taskData.customerPhotoURL = userDoc.photoURL;
       }
@@ -160,6 +165,7 @@ export default function CreateTaskPage() {
       setBusy(false);
     }
   }
+
 
   return (
     <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
@@ -216,6 +222,8 @@ export default function CreateTaskPage() {
         safetyId={safetyId}
         onLocationChange={onLocationChange}
         location={location}
+        expectedWaitTier={expectedWaitTier}
+        setExpectedWaitTier={setExpectedWaitTier}
         error={error}
         errorId={errorId}
       />
@@ -268,6 +276,28 @@ export default function CreateTaskPage() {
   );
 }
 
+const WAIT_TIER_PRESETS: Array<{
+  key: 'fast' | 'normal' | 'flexible';
+  label: string;
+  subtext: string;
+}> = [
+  {
+    key: 'fast',
+    label: 'I need this soon',
+    subtext: 'Best for urgent tasks · Escalates search within 3–15 mins',
+  },
+  {
+    key: 'normal',
+    label: 'Whenever works',
+    subtext: 'Standard matching pace · Escalates search within 5–30 mins',
+  },
+  {
+    key: 'flexible',
+    label: 'No rush',
+    subtext: 'No hurry needed · Escalates search over 10–60 mins',
+  },
+];
+
 interface BodyProps {
   title: string;
   setTitle: (v: string) => void;
@@ -295,9 +325,12 @@ interface BodyProps {
   safetyId: string;
   onLocationChange: (loc: PickedLocation) => void;
   location: PickedLocation | null;
+  expectedWaitTier: 'fast' | 'normal' | 'flexible';
+  setExpectedWaitTier: (tier: 'fast' | 'normal' | 'flexible') => void;
   error: string | null;
   errorId: string;
 }
+
 
 function ContentBody(p: BodyProps) {
   const skillsAtCap = p.selectedSkills.length >= MAX_SKILLS;
@@ -396,9 +429,62 @@ function ContentBody(p: BodyProps) {
           />
         </FormBlock>
 
+        <FormBlock
+          label="How soon do you need help?"
+          hint="Select your wait-time expectation preset."
+        >
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            {WAIT_TIER_PRESETS.map((preset) => {
+              const on = p.expectedWaitTier === preset.key;
+              return (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => p.setExpectedWaitTier(preset.key)}
+                  aria-pressed={on}
+                  className={
+                    'flex flex-col justify-between rounded-2xl border p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 ' +
+                    (on
+                      ? 'border-[#1f6f5c] bg-[#e3efe9]/50 shadow-sm'
+                      : 'border-[#ececea] bg-white hover:border-[#d8d4cc]')
+                  }
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[14px] font-bold text-[#131312]">
+                        {preset.label}
+                      </span>
+                      {on && (
+                        <span className="vc-check-pop grid h-5 w-5 place-items-center rounded-full bg-[#1f6f5c] text-white">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-3 w-3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={3}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-[#4f4b46]">
+                      {preset.subtext}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </FormBlock>
+
         <FormBlock label="Where" hint="Drag the pin to the exact meeting point.">
           <TaskLocationPicker onLocationChange={p.onLocationChange} />
         </FormBlock>
+
 
         <FormBlock label="Instructions">
           <FieldTextarea

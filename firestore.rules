@@ -126,9 +126,14 @@ service cloud.firestore {
         'status',
         'searchRadiusM',
         'createdAt',
-        'expiresAt'
+        'expiresAt',
+        'expectedWaitTier',
+        'waitStartedAt',
+        'nextCheckAt'
       ];
     }
+
+
 
     function taskDescriptionValid() {
       let d = request.resource.data.description;

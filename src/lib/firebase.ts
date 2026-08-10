@@ -25,6 +25,12 @@ import {
   getFunctions,
   type Functions,
 } from 'firebase/functions';
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  type AppCheck,
+} from 'firebase/app-check';
+
 
 const FUNCTIONS_REGION = 'asia-south1';
 const EMULATOR_HOST = '127.0.0.1';
@@ -111,6 +117,37 @@ export function storage(): FirebaseStorage {
   return instance;
 }
 
+let cachedAppCheck: AppCheck | null = null;
+
+export function appCheck(): AppCheck | null {
+  if (cachedAppCheck) return cachedAppCheck;
+  if (typeof window === 'undefined') return null;
+
+  if (useEmulators) {
+    // @ts-expect-error App Check debug token global initialization for emulator mode
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const rawKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY;
+  const siteKey = typeof rawKey === 'string' ? rawKey : '';
+
+  if (!siteKey && !useEmulators) return null;
+
+  try {
+    cachedAppCheck = initializeAppCheck(getFirebaseApp(), {
+      provider: new ReCaptchaEnterpriseProvider(
+        siteKey.length > 0 ? siteKey : '6Ld_debug_token_site_key_placeholder',
+      ),
+      isTokenAutoRefreshEnabled: true,
+    });
+    return cachedAppCheck;
+  } catch {
+    return null;
+  }
+
+}
+
 export function functions(): Functions {
   if (cachedFunctions) return cachedFunctions;
   const instance = getFunctions(getFirebaseApp(), FUNCTIONS_REGION);
@@ -120,3 +157,4 @@ export function functions(): Functions {
   cachedFunctions = instance;
   return instance;
 }
+
