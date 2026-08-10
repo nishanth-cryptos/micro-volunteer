@@ -129,9 +129,12 @@ service cloud.firestore {
         'expiresAt',
         'expectedWaitTier',
         'waitStartedAt',
-        'nextCheckAt'
+        'nextCheckAt',
+        'scheduledFor',
+        'scheduledCreatedAt'
       ];
     }
+
 
 
 
@@ -163,14 +166,17 @@ service cloud.firestore {
         && d.riskLevel in ['low', 'medium']           // 'high' / 'prohibited' rejected here
         && d.estimatedMinutes is number
         && d.estimatedMinutes >= 5 && d.estimatedMinutes <= 480
-        && d.status == 'searching'                    // initial status only
         && d.searchRadiusM is number
         && d.searchRadiusM >= 500 && d.searchRadiusM <= 10000
         && d.createdAt is timestamp
-        && d.expiresAt is timestamp
         && taskDescriptionValid()
-        && taskLocationValid();
+        && taskLocationValid()
+        && (
+          (d.status == 'searching' && d.expiresAt is timestamp)
+          || (d.status == 'scheduled' && d.scheduledFor is timestamp)
+        );
     }
+
 
     match /tasks/{taskId} {
       // Read access:

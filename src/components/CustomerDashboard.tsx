@@ -37,9 +37,12 @@ import L from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-import { auth, db, storage } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions, storage } from '../lib/firebase';
 import type { UserDoc } from '../lib/auth-context';
 import { BlockedUsersList } from './BlockedUsersList';
+import { ReasonBottomSheet } from './ReasonBottomSheet';
+
 
 // Leaflet default-icon fix (same pattern as TaskLocationPicker).
 interface DefaultIconProto {
@@ -58,6 +61,7 @@ const FALLBACK_CENTER: { lat: number; lng: number } = {
 };
 
 type TaskStatus =
+  | 'scheduled'
   | 'searching'
   | 'accepted'
   | 'in_progress'
@@ -71,9 +75,11 @@ interface TaskRow {
   status: TaskStatus;
   riskLevel: 'low' | 'medium';
   createdAt: Timestamp | null;
+  scheduledFor?: Timestamp | null;
   completedAt?: Timestamp | null;
   acceptedVolunteerId?: string | null;
 }
+
 
 interface BlockedRow {
   blockId: string;
@@ -127,6 +133,7 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
             status: TaskStatus;
             riskLevel: 'low' | 'medium';
             createdAt: Timestamp | null;
+            scheduledFor?: Timestamp | null;
             completedAt?: Timestamp | null;
             acceptedVolunteerId?: string | null;
           };
@@ -136,9 +143,11 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
             status: data.status,
             riskLevel: data.riskLevel,
             createdAt: data.createdAt,
+            scheduledFor: data.scheduledFor ?? null,
             completedAt: data.completedAt ?? null,
             acceptedVolunteerId: data.acceptedVolunteerId ?? null,
           };
+
         }),
       );
     });
@@ -193,12 +202,14 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
     };
   }, [uid]);
 
+  const scheduled = rows.filter((r) => r.status === 'scheduled');
   const ongoing = rows.filter(
     (r) =>
       r.status === 'searching' ||
       r.status === 'accepted' ||
       r.status === 'in_progress',
   );
+
   const past = rows.filter(
     (r) =>
       r.status === 'completed' ||
@@ -254,8 +265,10 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
               userDoc={userDoc}
               ongoing={ongoing}
               ongoingCount={ongoing.length}
+              scheduled={scheduled}
             />
           )}
+
           {screen === 'profile' && (
             <ProfileScreen
               uid={uid}
@@ -433,10 +446,12 @@ function TasksScreen({
   userDoc,
   ongoing,
   ongoingCount,
+  scheduled,
 }: {
   userDoc: UserDoc;
   ongoing: TaskRow[];
   ongoingCount: number;
+  scheduled: TaskRow[];
 }) {
   const name = userDoc.displayName ?? 'there';
   return (
@@ -464,6 +479,23 @@ function TasksScreen({
         </div>
 
         <div className="lg:col-span-2">
+          {scheduled.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-3.5 flex items-baseline justify-between">
+                <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+                  Upcoming tasks
+                </h2>
+                <span className="font-mono text-xs text-[#8a847d]">
+                  {scheduled.length} upcoming
+                </span>
+              </div>
+
+              {scheduled.map((t) => (
+                <ScheduledTaskCard key={t.id} task={t} />
+              ))}
+            </div>
+          )}
+
           <div className="mb-3.5 flex items-baseline justify-between">
             <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
               Ongoing tasks
@@ -472,6 +504,7 @@ function TasksScreen({
               {ongoingCount} active
             </span>
           </div>
+
 
           {ongoing.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-7 text-center text-[13px] text-[#8a847d]">
@@ -506,20 +539,20 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
   const center = loc ? { lat: loc.lat, lng: loc.lng } : FALLBACK_CENTER;
   const hasPin = Boolean(loc);
 
-interface NominatimAddress {
-  suburb?: string;
-  neighbourhood?: string;
-  residential?: string;
-  city_district?: string;
-  town?: string;
-  city?: string;
-}
+  interface NominatimAddress {
+    suburb?: string;
+    neighbourhood?: string;
+    residential?: string;
+    city_district?: string;
+    town?: string;
+    city?: string;
+  }
 
-interface NominatimResponse {
-  name?: string;
-  display_name?: string;
-  address?: NominatimAddress;
-}
+  interface NominatimResponse {
+    name?: string;
+    display_name?: string;
+    address?: NominatimAddress;
+  }
 
   useEffect(() => {
     if (!hasPin) return;
@@ -544,7 +577,7 @@ interface NominatimResponse {
           setPlaceName(name);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
@@ -622,7 +655,7 @@ interface NominatimResponse {
           });
         }
       },
-      () => {},
+      () => { },
       { timeout: 10000, maximumAge: 60_000 },
     );
     return () => {
@@ -1596,6 +1629,8 @@ function initialOf(name: string | undefined): string {
 
 function labelForStatus(s: TaskStatus): string {
   switch (s) {
+    case 'scheduled':
+      return 'Scheduled';
     case 'searching':
       return 'Searching';
     case 'accepted':
@@ -1610,6 +1645,7 @@ function labelForStatus(s: TaskStatus): string {
       return 'Expired';
   }
 }
+
 
 function elapsedShort(t: Timestamp): string {
   const diff = Date.now() - t.toMillis();
@@ -1640,4 +1676,247 @@ function badgeForHistoryStatus(
       return { label: 'Blocked', bg: 'bg-[#f1ede6]', ink: 'text-[#4f4b46]' };
   }
 }
+
+
+function ScheduledTaskCard({ task }: { task: TaskRow }) {
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const formattedTime = task.scheduledFor
+    ? task.scheduledFor.toDate().toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+    : 'Pending activation';
+
+  const handleCancel = async (reasonId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const fn = httpsCallable<{ taskId: string; reason: string }, { success: boolean }>(
+        functions(),
+        'deleteTask',
+      );
+      await fn({ taskId: task.id, reason: reasonId });
+      setIsCancelOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel task.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUpdateScheduledTime = async (newScheduledForMs: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const fn = httpsCallable<{ taskId: string; newScheduledForMs: number }, { success: boolean }>(
+        functions(),
+        'updateScheduledTask',
+      );
+      await fn({ taskId: task.id, newScheduledForMs });
+      setIsEditOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update time.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="vc-fade-up mb-3.5 rounded-2xl border border-[#c7d2fe] bg-[#eef2ff] p-4.5 shadow-xs transition-all hover:border-[#a5b4fc]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[15px] font-semibold text-[#131312]">
+            {task.title}
+          </h3>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-[#4f4b46]">
+            <span>🗓</span>
+            <span>
+              Task scheduled at{' '}
+              <span className="font-semibold text-[#4338ca]">{formattedTime}</span>
+            </span>
+          </p>
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditOpen(true)}
+            className="rounded-full border border-[#c7d2fe] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#3730a3] transition hover:bg-[#e0e7ff] hover:border-[#a5b4fc] focus:outline-none shadow-xs"
+          >
+            Edit time
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCancelOpen(true)}
+            className="rounded-full border border-red-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-50 focus:outline-none shadow-xs"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <p className="mt-2 text-xs font-medium text-red-600">{error}</p>
+      )}
+
+      <ReasonBottomSheet
+        isOpen={isCancelOpen}
+        title="Cancel scheduled task?"
+        subtitle="This will remove the task before it goes live."
+        reasons={[
+          { id: 'accidental_post', label: 'Accidental post' },
+          { id: 'no_longer_needed', label: 'No longer needed' },
+          { id: 'found_help_elsewhere', label: 'Found help elsewhere' },
+          { id: 'other', label: 'Other' },
+        ]}
+        busy={busy}
+        onSelect={(r) => void handleCancel(r)}
+        onClose={() => setIsCancelOpen(false)}
+      />
+
+      <EditScheduledTimeModal
+        isOpen={isEditOpen}
+        currentScheduledForMs={task.scheduledFor ? task.scheduledFor.toMillis() : 0}
+        onClose={() => setIsEditOpen(false)}
+        onConfirm={(ms) => void handleUpdateScheduledTime(ms)}
+        isSubmitting={busy}
+      />
+    </div>
+  );
+}
+
+function EditScheduledTimeModal({
+  isOpen,
+  currentScheduledForMs,
+  onClose,
+  onConfirm,
+  isSubmitting,
+}: {
+  isOpen: boolean;
+  currentScheduledForMs: number;
+  onClose: () => void;
+  onConfirm: (scheduledForMs: number) => void;
+  isSubmitting: boolean;
+}) {
+  const [selectedIso, setSelectedIso] = useState(() => {
+    const d = new Date(currentScheduledForMs || Date.now() + 3600000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [nowMs] = useState(() => Date.now());
+
+  if (!isOpen) return null;
+
+  const minMs = nowMs + 30 * 60 * 1000;
+  const maxMs = nowMs + 7 * 24 * 60 * 60 * 1000;
+
+
+  const toLocalIso = (ms: number) => {
+    const d = new Date(ms);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    const pickedMs = new Date(selectedIso).getTime();
+
+    if (isNaN(pickedMs)) {
+      setErrorMsg('Please select a valid date and time.');
+      return;
+    }
+
+    if (pickedMs < minMs) {
+      setErrorMsg('Scheduled time must be at least 30 minutes from now.');
+      return;
+    }
+
+    if (pickedMs > maxMs) {
+      setErrorMsg('Scheduled time cannot be more than 7 days in advance.');
+      return;
+    }
+
+    onConfirm(pickedMs);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+          <h3 className="text-lg font-bold text-neutral-900">
+            Edit scheduled time
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 focus:outline-none"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="edit-scheduled-datetime" className="block text-xs font-semibold uppercase tracking-wider text-neutral-600">
+              New Activation Time
+            </label>
+            <input
+              id="edit-scheduled-datetime"
+              type="datetime-local"
+              min={toLocalIso(minMs)}
+              max={toLocalIso(maxMs)}
+              value={selectedIso}
+              onChange={(e) => {
+                setSelectedIso(e.target.value);
+                setErrorMsg(null);
+              }}
+              className="mt-2 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-900 shadow-sm focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
+              required
+            />
+
+            <p className="mt-1 text-xs text-neutral-500">
+              Min: 30 mins from now · Max: 7 days out
+            </p>
+          </div>
+
+          {errorMsg && (
+            <p className="rounded-xl bg-red-50 p-2.5 text-xs font-medium text-red-700">
+              {errorMsg}
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100 focus:outline-none"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-full bg-[#1f6f5c] px-5 py-2 text-xs font-semibold text-white transition hover:bg-[#185845] focus:outline-none"
+            >
+              {isSubmitting ? 'Saving...' : 'Save time'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 

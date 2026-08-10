@@ -78,7 +78,11 @@ export const deleteTask = onCall(
         );
       }
 
-      if (task.status !== 'searching' && task.status !== 'accepted') {
+      if (
+        task.status !== 'searching' &&
+        task.status !== 'accepted' &&
+        task.status !== 'scheduled'
+      ) {
         throw new HttpsError(
           'failed-precondition',
           task.status === 'in_progress'
@@ -86,6 +90,7 @@ export const deleteTask = onCall(
             : `Cannot delete task in status '${task.status ?? 'unknown'}'.`,
         );
       }
+
 
       wasAccepted = task.status === 'accepted';
 

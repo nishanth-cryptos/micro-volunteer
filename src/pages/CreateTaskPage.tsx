@@ -24,6 +24,8 @@ import {
   type Category,
 } from '../lib/catalog';
 import { TaskLocationPicker } from '../components/TaskLocationPicker';
+import { ScheduleTaskBottomSheet } from '../components/ScheduleTaskBottomSheet';
+
 
 const INITIAL_SEARCH_RADIUS_M = 2000;
 const TASK_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -52,6 +54,12 @@ export default function CreateTaskPage() {
   const [expectedWaitTier, setExpectedWaitTier] = useState<'fast' | 'normal' | 'flexible'>('normal');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const [isScheduleSheetOpen, setIsScheduleSheetOpen] = useState(false);
+  const [scheduledSuccessInfo, setScheduledSuccessInfo] = useState<{
+    taskId: string;
+    scheduledForMs: number;
+  } | null>(null);
 
   const titleId = useId();
   const meetingId = useId();
@@ -89,7 +97,6 @@ export default function CreateTaskPage() {
     (estimatedMinutes >= 5 && estimatedMinutes <= 480 ? 1 : 0) +
     (meetingPoint.trim() ? 1 : 0) +
     (location ? 1 : 0);
-  const progressPct = Math.round((filledRequired / 6) * 100);
   const canPost = filledRequired === 6 && !busy;
 
   function toggleSkill(key: string) {
@@ -108,7 +115,7 @@ export default function CreateTaskPage() {
     );
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(scheduledForMs?: number) {
     setError(null);
     if (!title.trim()) return setError('Add a short title.');
     if (!selectedCategory) return setError('Pick a category.');
@@ -124,13 +131,17 @@ export default function CreateTaskPage() {
     if (!location) return setError('Pick a location on the map.');
 
     setBusy(true);
+
     try {
       const description: Record<string, string> = {
         meetingPoint: meetingPoint.trim(),
         whatToBring: whatToBring.trim(),
       };
+
       if (preference.trim()) description.preference = preference.trim();
       if (safetyNote.trim()) description.safetyNote = safetyNote.trim();
+
+      const isScheduled = typeof scheduledForMs === 'number';
 
       const taskData: Record<string, unknown> = {
         customerId: user.uid,
@@ -142,34 +153,98 @@ export default function CreateTaskPage() {
         location,
         riskLevel: derivedRisk ?? 'low',
         estimatedMinutes,
-        status: 'searching',
+        status: isScheduled ? 'scheduled' : 'searching',
         searchRadiusM: INITIAL_SEARCH_RADIUS_M,
         expectedWaitTier,
-        waitStartedAt: serverTimestamp(),
-        nextCheckAt: Timestamp.fromMillis(Date.now() + 60 * 1000),
         createdAt: serverTimestamp(),
-        expiresAt: Timestamp.fromMillis(Date.now() + TASK_EXPIRY_MS),
       };
+
+      if (isScheduled) {
+        taskData.scheduledFor = Timestamp.fromMillis(scheduledForMs);
+        taskData.scheduledCreatedAt = serverTimestamp();
+      } else {
+        taskData.waitStartedAt = serverTimestamp();
+        taskData.nextCheckAt = Timestamp.fromMillis(Date.now() + 60 * 1000);
+        taskData.expiresAt = Timestamp.fromMillis(Date.now() + TASK_EXPIRY_MS);
+      }
 
       if (userDoc.photoURL) {
         taskData.customerPhotoURL = userDoc.photoURL;
       }
 
       const created = await addDoc(collection(db(), 'tasks'), taskData);
-      void navigate(`/tasks/${created.id}`, { replace: true });
+
+      if (isScheduled) {
+        setScheduledSuccessInfo({
+          taskId: created.id,
+          scheduledForMs,
+        });
+      } else {
+        void navigate(`/tasks/${created.id}`, { replace: true });
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Could not post the task. Try again.',
       );
     } finally {
       setBusy(false);
+      setIsScheduleSheetOpen(false);
     }
   }
 
+  if (scheduledSuccessInfo) {
+    const formattedTime = new Date(
+      scheduledSuccessInfo.scheduledForMs,
+    ).toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+    return (
+      <main className="min-h-screen bg-[#fafaf8] text-[#131312] grid place-items-center p-6">
+        <div className="vc-fade-up w-full max-w-md rounded-3xl border border-[#ececea] bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
+            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+              <line x1="16" x2="16" y1="2" y2="6" />
+              <line x1="8" x2="8" y1="2" y2="6" />
+              <line x1="3" x2="21" y1="10" y2="10" />
+              <path d="m9 16 2 2 4-4" />
+            </svg>
+          </div>
+
+          <h1 className="text-2xl font-bold text-[#131312]">
+            Task scheduled successfully
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-[#4f4b46]">
+            We&apos;ll start reaching out to neighbors on{' '}
+            <span className="font-semibold text-[#1f6f5c]">{formattedTime}</span>.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3">
+            <Link
+              to="/app?tab=scheduled"
+              className="w-full rounded-full bg-[#1f6f5c] py-3 text-sm font-semibold text-white transition hover:bg-[#185845] focus:outline-none shadow-md"
+            >
+              View scheduled tasks
+            </Link>
+            <Link
+              to="/app"
+              className="w-full rounded-full border border-[#ececea] bg-white py-3 text-sm font-semibold text-[#4f4b46] transition hover:bg-[#f3f1ec] focus:outline-none"
+            >
+              Done
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
-      {/* Sticky progress strip */}
       <div className="sticky top-0 z-30 border-b border-[#ececea] bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-3">
           <Link
@@ -181,22 +256,20 @@ export default function CreateTaskPage() {
             </svg>
             Back
           </Link>
-          <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-[#f3f1ec]">
-            <div
-              className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#1f6f5c] to-[#185845] transition-[width] duration-500 ease-out"
-              style={{ width: `${String(progressPct)}%` }}
-            >
-              <div className="vc-shimmer absolute inset-0" aria-hidden="true" />
-            </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[15px] font-semibold text-[#131312]">
+              Need a hand?
+            </h1>
+            <p className="truncate text-[12px] text-[#8a847d]">
+              Describe what you need — local volunteers respond fast.
+            </p>
           </div>
-          <span className="font-mono text-[11px] text-[#4f4b46]" aria-live="polite">
-            {progressPct}%
-          </span>
         </div>
       </div>
 
       <ContentBody
         title={title}
+
         setTitle={setTitle}
         titleId={titleId}
         categoryKey={categoryKey}
@@ -228,7 +301,6 @@ export default function CreateTaskPage() {
         errorId={errorId}
       />
 
-      {/* Sticky bottom action bar */}
       <div
         className={
           'fixed inset-x-0 bottom-0 z-30 border-t border-[#ececea] bg-white/95 backdrop-blur transition-all duration-300 ease-out ' +
@@ -237,7 +309,7 @@ export default function CreateTaskPage() {
             : 'pointer-events-none translate-y-full opacity-0')
         }
       >
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-6 py-4">
           <div className="min-w-0">
             <div className="truncate text-[13px] font-semibold text-[#131312]">
               {canPost
@@ -257,30 +329,56 @@ export default function CreateTaskPage() {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={!canPost}
-            className={
-              'flex-shrink-0 rounded-full px-6 py-3 text-[14px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
-              (canPost
-                ? 'bg-gradient-to-r from-[#1f6f5c] to-[#185845] text-white shadow-[0_8px_20px_-8px_rgba(31,111,92,0.55)] hover:from-[#1d6655] hover:to-[#14503e] focus-visible:ring-[#1f6f5c]'
-                : 'cursor-not-allowed bg-[#ececea] text-[#8a847d]')
-            }
-          >
-            {busy ? 'Posting…' : 'Post task'}
-          </button>
+
+          <div className="flex flex-shrink-0 items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsScheduleSheetOpen(true)}
+              disabled={!canPost || busy}
+              className={
+                'rounded-full border px-4 py-2.5 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+                (canPost
+                  ? 'border-[#1f6f5c] text-[#1f6f5c] hover:bg-[#e3efe9]/50 focus-visible:ring-[#1f6f5c]'
+                  : 'cursor-not-allowed border-[#ececea] text-[#b8b3ad]')
+              }
+            >
+              Schedule for later
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={!canPost || busy}
+              className={
+                'rounded-full px-5 py-2.5 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+                (canPost
+                  ? 'bg-gradient-to-r from-[#1f6f5c] to-[#185845] text-white shadow-[0_8px_20px_-8px_rgba(31,111,92,0.55)] hover:from-[#1d6655] hover:to-[#14503e] focus-visible:ring-[#1f6f5c]'
+                  : 'cursor-not-allowed bg-[#ececea] text-[#8a847d]')
+              }
+            >
+              {busy ? 'Posting…' : 'Post task'}
+            </button>
+          </div>
         </div>
       </div>
+
+      <ScheduleTaskBottomSheet
+        isOpen={isScheduleSheetOpen}
+        onClose={() => setIsScheduleSheetOpen(false)}
+        onConfirm={(scheduledForMs) => void handleSubmit(scheduledForMs)}
+        isSubmitting={busy}
+      />
     </main>
   );
 }
 
 const WAIT_TIER_PRESETS: Array<{
+
   key: 'fast' | 'normal' | 'flexible';
   label: string;
   subtext: string;
 }> = [
+
   {
     key: 'fast',
     label: 'I need this soon',
