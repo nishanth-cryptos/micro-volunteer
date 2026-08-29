@@ -25,9 +25,7 @@ import { VolunteerOtpPanel } from '../components/VolunteerOtpPanel';
 import { CustomerRatingPanel } from '../components/CustomerRatingPanel';
 import { ReportBlockPanel } from '../components/ReportBlockPanel';
 import { ChatPanel } from '../components/ChatPanel';
-import { KarmaBadge } from '../components/KarmaBadge';
 import { KarmaToast } from '../components/KarmaToast';
-import { PostCompletionSuggestionCard } from '../components/PostCompletionSuggestionCard';
 import { ReasonBottomSheet, type ReasonOption } from '../components/ReasonBottomSheet';
 
 
@@ -310,22 +308,47 @@ export default function TaskDetailPage() {
   }, [task, state, navigate]);
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
+    <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
+      <div className="mx-auto max-w-3xl px-6 py-10 sm:py-14">
         <Link
           to="/app"
-          className="text-sm text-neutral-600 underline underline-offset-4 hover:text-neutral-900"
+          className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
         >
-          ← Back
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          Back to dashboard
         </Link>
-        {loading && <p className="mt-8 text-neutral-600">Loading…</p>}
-        {error && (
-          <p role="alert" className="mt-8 text-sm text-red-700">
-            {error}
-          </p>
+
+        {loading && (
+          <div className="mt-8 space-y-4" aria-label="Loading task details">
+            <div className="h-10 w-2/3 animate-pulse rounded-xl bg-[#e8e6e1]" />
+            <div className="h-28 w-full animate-pulse rounded-2xl border border-[#ececea] bg-white" />
+            <div className="h-44 w-full animate-pulse rounded-3xl border border-[#ececea] bg-white" />
+          </div>
         )}
-        {task && <TaskSummary task={task} />}
-        {task && state.status === 'ready' && taskId && (
+
+        {error && (
+          <div role="alert" className="mt-8 rounded-2xl border border-red-200 bg-red-50/80 p-5 text-sm text-red-800">
+            <p className="font-semibold">Unable to load task</p>
+            <p className="mt-1 text-xs">{error}</p>
+            <Link
+              to="/app"
+              className="mt-3 inline-block rounded-full bg-red-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
+            >
+              Return to dashboard
+            </Link>
+          </div>
+        )}
+
+        {task && !loading && (
+          <>
+            <TaskSummary task={task} />
+            <LifecycleProgressTracker status={task.status} />
+          </>
+        )}
+
+        {task && state.status === 'ready' && taskId && !loading && (
           <>
             <OffersSection
               task={{ ...task, taskId }}
@@ -333,7 +356,6 @@ export default function TaskDetailPage() {
               viewerUid={state.user.uid}
               viewerName={state.userDoc.displayName ?? null}
               completedEvent={completedEvent}
-              viewerIsVolunteer={state.userDoc.roles?.includes('volunteer') ?? false}
               hasReassignedEvent={hasReassignedEvent}
               onOpenCancelSheet={() => setCancelSheetOpen(true)}
               onOpenDeleteSheet={() => setDeleteSheetOpen(true)}
@@ -422,56 +444,133 @@ export default function TaskDetailPage() {
   );
 }
 
+function LifecycleProgressTracker({ status }: { status: TaskStatus }) {
+  const steps: Array<{ id: TaskStatus; label: string; sub: string }> = [
+    { id: 'searching', label: 'Finding Volunteer', sub: 'Searching active verified volunteers nearby...' },
+    { id: 'accepted', label: 'Volunteer Matched', sub: 'Volunteer matched. Chat to coordinate arrival.' },
+    { id: 'in_progress', label: 'In Progress', sub: 'Task is actively underway. Have your end code ready.' },
+    { id: 'completed', label: 'Completed', sub: 'Task verified & completed successfully.' },
+  ];
+
+  const getStepIndex = (s: TaskStatus) => {
+    switch (s) {
+      case 'searching':
+        return 0;
+      case 'accepted':
+        return 1;
+      case 'in_progress':
+        return 2;
+      case 'completed':
+        return 3;
+      default:
+        return -1;
+    }
+  };
+
+  const currentIndex = getStepIndex(status);
+  if (currentIndex === -1) return null;
+
+  return (
+    <div className="vc-fade-up mt-6 rounded-3xl border border-[#ececea] bg-white p-5 shadow-xs">
+      <div className="flex items-center justify-between gap-1 sm:gap-2">
+        {steps.map((step, idx) => {
+          const isDone = idx < currentIndex;
+          const isCurrent = idx === currentIndex;
+          return (
+            <div key={step.id} className="flex flex-1 items-center gap-1 sm:gap-2">
+              <div className="flex flex-col items-center flex-1">
+                <div
+                  className={`grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-full text-xs font-bold transition-all ${
+                    isDone
+                      ? 'bg-[#1f6f5c] text-white'
+                      : isCurrent
+                        ? 'bg-[#1f6f5c] text-white ring-4 ring-[#1f6f5c]/20'
+                        : 'bg-[#f3f1ec] text-[#8a847d]'
+                  }`}
+                >
+                  {isDone ? '✓' : idx + 1}
+                </div>
+                <span
+                  className={`mt-1.5 text-center text-[10px] sm:text-xs font-semibold ${
+                    isCurrent ? 'text-[#1f6f5c]' : isDone ? 'text-[#131312]' : 'text-[#8a847d]'
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </div>
+              {idx < steps.length - 1 && (
+                <div
+                  className={`h-0.5 flex-1 mb-5 transition-all ${
+                    idx < currentIndex ? 'bg-[#1f6f5c]' : 'bg-[#ececea]'
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3.5 border-t border-[#f3f1ec] pt-3 text-center text-xs font-medium text-[#4f4b46]">
+        {steps[currentIndex]?.sub}
+      </p>
+    </div>
+  );
+}
 
 function TaskSummary({ task }: { task: TaskDoc }) {
   const category = getCategory(task.category);
   return (
-    <section className="mt-6">
-      <h1 className="text-3xl font-semibold tracking-tight">{task.title}</h1>
-      <p className="mt-1 text-sm text-neutral-600">
-        {category?.label ?? task.category} ·{' '}
-        <span
-          className={
-            task.riskLevel === 'medium'
-              ? 'text-amber-700'
-              : 'text-emerald-700'
-          }
-        >
-          {task.riskLevel === 'medium' ? 'Medium risk' : 'Low risk'}
-        </span>{' '}
-        · {task.estimatedMinutes} min
-      </p>
+    <section className="mt-6 rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#131312]">{task.title}</h1>
+          <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-[#4f4b46]">
+            <span className="font-semibold text-[#131312]">{category?.label ?? task.category}</span>
+            <span>·</span>
+            <span
+              className={
+                task.riskLevel === 'medium'
+                  ? 'rounded-full bg-[#fef3c7] px-2.5 py-0.5 text-xs font-semibold text-[#b45309]'
+                  : 'rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-semibold text-[#1f6f5c]'
+              }
+            >
+              {task.riskLevel === 'medium' ? '🛡️ Verified Volunteer Category' : '✓ Standard Task'}
+            </span>
+            <span>·</span>
+            <span>{task.estimatedMinutes} min</span>
+          </p>
+        </div>
+      </div>
 
-      <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-5 text-sm text-neutral-700">
+      <div className="mt-5 space-y-2.5 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs sm:text-sm text-[#4f4b46]">
         <p>
-          <span className="font-medium text-neutral-900">Meeting point: </span>
+          <strong className="font-semibold text-[#131312]">📍 Meeting point: </strong>
           {task.description.meetingPoint}
         </p>
         {task.description.whatToBring && (
-          <p className="mt-2">
-            <span className="font-medium text-neutral-900">To bring: </span>
+          <p>
+            <strong className="font-semibold text-[#131312]">🎒 To bring: </strong>
             {task.description.whatToBring}
           </p>
         )}
         {task.description.preference && (
-          <p className="mt-2">
-            <span className="font-medium text-neutral-900">Preference: </span>
+          <p>
+            <strong className="font-semibold text-[#131312]">💬 Preference: </strong>
             {task.description.preference}
           </p>
         )}
         {task.description.safetyNote && (
-          <p className="mt-2">
-            <span className="font-medium text-neutral-900">Safety note: </span>
+          <p>
+            <strong className="font-semibold text-[#131312]">⚠️ Note: </strong>
             {task.description.safetyNote}
           </p>
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+      <div className="mt-4 flex flex-wrap gap-1.5 text-xs">
         {task.requiredSkills.map((s) => (
           <span
             key={s}
-            className="rounded-full bg-neutral-100 px-3 py-1 text-neutral-700"
+            className="rounded-full border border-[#ececea] bg-white px-3 py-1 font-medium text-[#4f4b46]"
           >
             {getSkillLabel(s)}
           </span>
@@ -487,7 +586,6 @@ function OffersSection({
   viewerUid,
   viewerName,
   completedEvent,
-  viewerIsVolunteer = false,
   hasReassignedEvent = false,
   onOpenCancelSheet,
   onOpenDeleteSheet,
@@ -497,14 +595,13 @@ function OffersSection({
   viewerUid: string;
   viewerName: string | null;
   completedEvent?: EventDoc | null;
-  viewerIsVolunteer?: boolean;
   hasReassignedEvent?: boolean;
   onOpenCancelSheet?: () => void;
   onOpenDeleteSheet?: () => void;
 }) {
+  const navigate = useNavigate();
   const viewerIsCustomer = viewerUid === task.customerId;
   const viewerIsAcceptedVolunteer = viewerUid === task.acceptedVolunteerId;
-
 
   if (task.status === 'accepted' || task.status === 'in_progress') {
     const accepted = offers.find((o) => o.state === 'accepted');
@@ -515,9 +612,9 @@ function OffersSection({
       : (accepted?.displayName || 'Volunteer');
 
     const subtitle: string | null = viewerIsAcceptedVolunteer
-      ? 'Customer'
+      ? 'Customer · Requester'
       : accepted
-        ? `${formatDistance(accepted.distanceM)} away · score ${accepted.score.toFixed(2)}`
+        ? `${formatDistance(accepted.distanceM)} away · Verified Volunteer`
         : null;
 
     const headline =
@@ -525,7 +622,7 @@ function OffersSection({
         ? 'In progress'
         : viewerIsAcceptedVolunteer
           ? 'You accepted this task'
-          : 'Task accepted';
+          : 'Volunteer matched';
 
     const phase = task.status === 'accepted' ? 'start' : 'end';
 
@@ -539,7 +636,7 @@ function OffersSection({
 
     return (
       <>
-        <section className="vc-fade-up relative mt-10 overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f6f5c] to-[#15493b] p-7 text-white shadow-[0_18px_40px_-20px_rgba(31,111,92,0.45)]">
+        <section className="vc-fade-up relative mt-8 overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f6f5c] to-[#15493b] p-7 text-white shadow-[0_18px_40px_-20px_rgba(31,111,92,0.45)]">
           <span
             className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-white/5"
             aria-hidden="true"
@@ -580,11 +677,15 @@ function OffersSection({
                 {targetName}
               </p>
               {subtitle && (
-                <p className="mt-0.5 truncate text-[13px] text-white/80">
+                <p className="mt-0.5 truncate text-[13px] text-white/85">
                   {subtitle}
                 </p>
               )}
             </div>
+          </div>
+          <div className="relative mt-4 flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs text-white/90 backdrop-blur-xs">
+            <span className="text-sm">🔒</span>
+            <span>Privacy protected · Contact info stays private. Coordinate safely in chat.</span>
           </div>
         </section>
         {task.taskId && otherPartyUid && (
@@ -632,7 +733,6 @@ function OffersSection({
     );
   }
 
-
   if (task.status === 'completed') {
     const accepted = offers.find((o) => o.state === 'accepted');
     const acceptedName =
@@ -646,73 +746,50 @@ function OffersSection({
 
     return (
       <>
-        <section className="mt-12 rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
-          <p className="text-sm font-medium text-emerald-700">Completed</p>
-          {viewerIsAcceptedVolunteer && (
-            <div className="mt-3">
-              <p className="text-sm text-neutral-700">
-                Nice work. You earned:
+        <section className="vc-fade-up mt-8 rounded-3xl border border-[#e3efe9] bg-white p-7 shadow-xs">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-base font-bold text-[#131312]">Task verified &amp; completed</p>
+              <p className="text-xs text-[#4f4b46]">
+                Completed with {acceptedName}
               </p>
-              <div className="mt-2.5">
-                <KarmaBadge points={volunteerPoints} />
-              </div>
             </div>
-          )}
-          {viewerIsCustomer && (
-            <div className="mt-3">
-              {viewerIsVolunteer ? (
-                <>
-                  <p className="text-sm text-neutral-700">
-                    Task completed successfully. You earned:
-                  </p>
-                  <div className="mt-2.5">
-                    <KarmaBadge points={customerPoints} />
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-neutral-700">
-                  Task completed successfully.
-                </p>
-              )}
-              {typeof task.customerRating === 'number' && (
-                <p className="mt-4 text-xs text-neutral-500">
-                  You rated this volunteer {String(task.customerRating)} / 5.
-                </p>
-              )}
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-[#4f4b46]">Neighbourhood Karma awarded:</span>
+              <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 font-bold text-[#1f6f5c]">
+                +{viewerIsCustomer ? customerPoints : volunteerPoints} pts
+              </span>
             </div>
-          )}
+          </div>
         </section>
-        {viewerIsAcceptedVolunteer && task.taskId && (
-          <PostCompletionSuggestionCard
-            taskId={task.taskId}
-            volunteerUid={viewerUid}
-          />
+
+        {viewerIsCustomer && task.taskId && (
+          <CustomerRatingPanel taskId={task.taskId} />
         )}
-        {task.taskId && task.acceptedVolunteerId && (
+
+        {task.taskId && (
           <ChatPanel
             taskId={task.taskId}
             customerId={task.customerId}
-            acceptedVolunteerId={task.acceptedVolunteerId}
+            acceptedVolunteerId={task.acceptedVolunteerId ?? ''}
             status="completed"
             viewerUid={viewerUid}
             viewerRole={viewerIsCustomer ? 'customer' : 'volunteer'}
             otherPartyUid={
-              viewerIsAcceptedVolunteer
-                ? task.customerId
-                : task.acceptedVolunteerId
+              viewerIsCustomer
+                ? (task.acceptedVolunteerId ?? '')
+                : task.customerId
             }
-            otherPartyName={
-              viewerIsAcceptedVolunteer
-                ? task.customerName || 'Customer'
-                : acceptedName
-            }
+            otherPartyName={acceptedName}
             canReport={false}
-          />
-        )}
-        {viewerIsCustomer && typeof task.customerRating !== 'number' && (
-          <CustomerRatingPanel
-            taskId={task.taskId ?? ''}
-            volunteerName={acceptedName}
           />
         )}
       </>
@@ -723,29 +800,58 @@ function OffersSection({
     task.status === 'cancelled' ||
     task.status === 'expired'
   ) {
+    const isCancelled = task.status === 'cancelled';
     return (
-      <section className="mt-12 rounded-2xl border border-neutral-200 bg-white p-6">
-        <p className="text-sm font-medium text-neutral-900">
-          {task.status === 'cancelled' ? 'Cancelled' : 'Expired'}
+      <section className="vc-fade-up mt-8 rounded-3xl border border-[#ececea] bg-white p-7 text-center shadow-xs">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fef3c7] text-[#b45309]">
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <h3 className="mt-4 text-base font-bold text-[#131312]">
+          {isCancelled ? 'This task was cancelled' : 'Task expired without a match'}
+        </h3>
+        <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-[#4f4b46]">
+          {isCancelled
+            ? 'This request was cancelled. If you still need a hand from a neighbour, you can republish it at any time.'
+            : 'No active volunteers were available nearby in time. You can republish with adjusted timing or broader details.'}
         </p>
-        <p className="mt-2 text-sm text-neutral-600">
-          Post a new task if you still need help.
-        </p>
+        {viewerIsCustomer && (
+          <button
+            type="button"
+            onClick={() => {
+              void navigate('/create-task', {
+                state: {
+                  prefill: {
+                    title: task.title,
+                    category: task.category,
+                    requiredSkills: task.requiredSkills,
+                    estimatedMinutes: task.estimatedMinutes,
+                    description: task.description,
+                    location: task.location,
+                    expectedWaitTier: task.expectedWaitTier,
+                  },
+                },
+              });
+            }}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#1f6f5c] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] shadow-sm"
+          >
+            <span>↻</span> Republish this task
+          </button>
+        )}
       </section>
     );
   }
 
   // status === 'searching'
-  // Volunteers shouldn't see the customer's pending-offers queue — only
-  // the customer (task owner) sees that. For volunteers, this section is
-  // empty during searching state (they reach this page via OfferInbox or
-  // AcceptedTasksList only after they've accepted).
   if (!viewerIsCustomer) {
     return null;
   }
   const pending = offers.filter((o) => o.state === 'offered');
   return (
-    <section className="mt-10">
+    <section className="mt-8">
       {hasReassignedEvent && (
         <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm flex gap-3">
           <svg
@@ -842,38 +948,36 @@ function OffersSection({
         </div>
       )}
 
-
-
       {pending.length > 0 && (
         <ul className="vc-fade-up mt-8 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
-            Pending offers ({pending.length})
+            Nearby active volunteers ({pending.length})
           </p>
           {pending.map((o) => {
             const name = o.displayName || 'Volunteer';
             return (
               <li
                 key={o.id}
-                className="vc-fade-up rounded-2xl border border-[#ececea] bg-white p-5 transition hover:border-[#d8d4cc]"
+                className="vc-fade-up rounded-2xl border border-[#ececea] bg-white p-5 transition hover:border-[#d8d4cc] shadow-xs"
               >
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-semibold text-[#5a2900]">
                     {name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-neutral-900">{name}</p>
-                    <p className="mt-0.5 text-sm text-neutral-600">
-                      {formatDistance(o.distanceM)} away · score{' '}
-                      {o.score.toFixed(2)}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      <ScoreChip label="Dist" value={o.scoreBreakdown.distance} />
-                      <ScoreChip label="Skill" value={o.scoreBreakdown.skill} />
-                      <ScoreChip label="Trust" value={o.scoreBreakdown.trust} />
-                      <ScoreChip
-                        label="Past"
-                        value={o.scoreBreakdown.pastCompletion}
-                      />
+                    <p className="font-semibold text-[#131312]">{name}</p>
+                    <div className="mt-2.5 flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 font-semibold text-[#1f6f5c]">
+                        📍 {formatDistance(o.distanceM)} away
+                      </span>
+                      <span className="rounded-full bg-[#f3f1ec] px-2.5 py-0.5 font-medium text-[#4f4b46]">
+                        🛡️ Verified Volunteer
+                      </span>
+                      {o.scoreBreakdown.skill > 0.5 && (
+                        <span className="rounded-full bg-[#e8effb] px-2.5 py-0.5 font-medium text-[#1f4baa]">
+                          ★ Skill Matched
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1042,14 +1146,6 @@ function RadarSearching({
         </span>
       </div>
     </div>
-  );
-}
-
-function ScoreChip({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-neutral-700">
-      {label} {value.toFixed(2)}
-    </span>
   );
 }
 

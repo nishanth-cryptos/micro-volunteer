@@ -8,7 +8,7 @@
 // logic preserved verbatim; only the chrome/styling changed.
 
 import { useCallback, useId, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Timestamp,
   addDoc,
@@ -41,17 +41,35 @@ interface PickedLocation {
 export default function CreateTaskPage() {
   const state = useAuthState();
   const navigate = useNavigate();
+  const routerLocation = useLocation();
 
-  const [title, setTitle] = useState('');
-  const [categoryKey, setCategoryKey] = useState<string>('');
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [estimatedMinutes, setEstimatedMinutes] = useState(30);
-  const [meetingPoint, setMeetingPoint] = useState('');
-  const [whatToBring, setWhatToBring] = useState('');
-  const [preference, setPreference] = useState('');
-  const [safetyNote, setSafetyNote] = useState('');
-  const [location, setLocation] = useState<PickedLocation | null>(null);
-  const [expectedWaitTier, setExpectedWaitTier] = useState<'fast' | 'normal' | 'flexible'>('normal');
+  const prefill = (routerLocation.state as {
+    prefill?: {
+      title?: string;
+      category?: string;
+      requiredSkills?: string[];
+      estimatedMinutes?: number;
+      description?: {
+        meetingPoint?: string;
+        whatToBring?: string;
+        preference?: string;
+        safetyNote?: string;
+      };
+      location?: PickedLocation;
+      expectedWaitTier?: 'fast' | 'normal' | 'flexible';
+    };
+  } | null)?.prefill;
+
+  const [title, setTitle] = useState(() => prefill?.title ?? '');
+  const [categoryKey, setCategoryKey] = useState<string>(() => prefill?.category ?? '');
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(() => prefill?.requiredSkills ?? []);
+  const [estimatedMinutes, setEstimatedMinutes] = useState(() => prefill?.estimatedMinutes ?? 30);
+  const [meetingPoint, setMeetingPoint] = useState(() => prefill?.description?.meetingPoint ?? '');
+  const [whatToBring, setWhatToBring] = useState(() => prefill?.description?.whatToBring ?? '');
+  const [preference, setPreference] = useState(() => prefill?.description?.preference ?? '');
+  const [safetyNote, setSafetyNote] = useState(() => prefill?.description?.safetyNote ?? '');
+  const [location, setLocation] = useState<PickedLocation | null>(() => prefill?.location ?? null);
+  const [expectedWaitTier, setExpectedWaitTier] = useState<'fast' | 'normal' | 'flexible'>(() => prefill?.expectedWaitTier ?? 'normal');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -478,18 +496,23 @@ function ContentBody(p: BodyProps) {
             </p>
           )}
           {p.derivedRisk && (
-            <p className="vc-fade-in mt-2 text-sm">
-              <span className="text-[#8a847d]">Risk: </span>
-              <span
-                className={
-                  p.derivedRisk === 'medium'
-                    ? 'font-semibold text-amber-700'
-                    : 'font-semibold text-[#1f6f5c]'
-                }
-              >
-                {p.derivedRisk === 'medium' ? 'Medium — verified ID needed' : 'Low'}
-              </span>
-            </p>
+            <div className="vc-fade-in mt-3 rounded-xl border border-[#ececea] bg-white p-3.5 text-xs leading-relaxed shadow-xs">
+              {p.derivedRisk === 'medium' ? (
+                <div className="flex items-start gap-2 text-[#854d0e]">
+                  <span className="text-base">🛡️</span>
+                  <span>
+                    <strong className="font-semibold text-[#713f12]">Verified Volunteer Category:</strong> For safety in this category, only volunteers who have completed identity verification can accept your task.
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-[#1f6f5c]">
+                  <span className="text-base">✓</span>
+                  <span>
+                    <strong className="font-semibold text-[#185845]">Low-Risk Community Task:</strong> Open to all helpful, registered neighbourhood volunteers.
+                  </span>
+                </div>
+              )}
+            </div>
           )}
         </FormBlock>
 
@@ -590,7 +613,8 @@ function ContentBody(p: BodyProps) {
             label="Meeting point details"
             value={p.meetingPoint}
             onChange={p.setMeetingPoint}
-            placeholder="e.g. Outside Gate 2 of XYZ Apartments"
+            placeholder="e.g. Outside Main Gate of XYZ Society, near the security desk"
+            helper="Tip: For safety, choose a visible, familiar, or public spot (e.g. society gate, lobby, nearby landmark)."
           />
           <FieldTextarea
             id={p.bringId}
@@ -767,6 +791,7 @@ function FieldTextarea({
   value,
   onChange,
   placeholder,
+  helper,
 }: {
   id: string;
   label: string;
@@ -774,15 +799,21 @@ function FieldTextarea({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  helper?: string;
 }) {
   return (
     <div className="mt-4 first:mt-0">
-      <label htmlFor={id} className="block text-[13px] font-medium text-[#131312]">
-        {label}{' '}
-        {optional && (
-          <span className="font-normal text-[#8a847d]">(optional)</span>
-        )}
-      </label>
+      <div className="flex flex-wrap items-baseline justify-between gap-1">
+        <label htmlFor={id} className="block text-[13px] font-medium text-[#131312]">
+          {label}{' '}
+          {optional && (
+            <span className="font-normal text-[#8a847d]">(optional)</span>
+          )}
+        </label>
+      </div>
+      {helper && (
+        <p className="mt-0.5 text-xs text-[#8a847d]">{helper}</p>
+      )}
       <textarea
         id={id}
         rows={2}

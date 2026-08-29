@@ -61,17 +61,26 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
     }
   }
 
+  const [copied, setCopied] = useState(false);
+
   const phaseLabel = phase === 'start' ? 'Start' : 'End';
   const helpText =
     phase === 'start'
-      ? 'Show this code to the volunteer when they arrive. They’ll enter it on their phone to start the task.'
-      : 'The volunteer says they’re done? Show them this code to finish the task. They’ll enter it on their phone.';
+      ? 'Share this 4-digit code with your volunteer when they arrive to officially start the task.'
+      : 'When the volunteer has completed your task, share this code to confirm task completion.';
+
+  const handleCopy = () => {
+    if (!code) return;
+    void navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <section className="vc-fade-up mt-6 rounded-3xl border border-[#ececea] bg-white p-6">
+    <section className="vc-fade-up mt-6 rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-semibold tracking-tight text-[#131312]">
-          {phaseLabel} code
+        <h2 className="text-[15px] font-bold tracking-tight text-[#131312]">
+          {phaseLabel} Verification Code
         </h2>
         {code && !expired && (
           <span className="font-mono text-[12px] text-[#8a847d]">
@@ -82,28 +91,38 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
       <p className="mt-1 text-[13px] text-[#4f4b46]">{helpText}</p>
 
       {code && !expired && (
-        <div
-          // Re-key so the flip animation re-runs on every fresh code.
-          key={code}
-          className="mt-5 flex justify-center gap-2.5"
-          aria-label={`Your code is ${code.split('').join(' ')}`}
-        >
-          {code.split('').map((digit, i) => (
-            <span
-              key={i}
-              className="vc-cell grid h-14 w-12 place-items-center rounded-xl border border-[#ececea] bg-gradient-to-b from-white to-[#fafaf8] font-mono text-2xl font-bold text-[#131312] shadow-[0_4px_10px_-6px_rgba(20,18,15,0.15)]"
-              style={{ animationDelay: `${(i * 0.08).toFixed(2)}s` }}
-              aria-hidden="true"
-            >
-              {digit}
-            </span>
-          ))}
+        <div className="mt-5 flex flex-col items-center">
+          <div
+            // Re-key so the flip animation re-runs on every fresh code.
+            key={code}
+            className="flex justify-center gap-2.5"
+            aria-label={`Your code is ${code.split('').join(' ')}`}
+          >
+            {code.split('').map((digit, i) => (
+              <span
+                key={i}
+                className="vc-cell grid h-14 w-12 place-items-center rounded-xl border border-[#ececea] bg-gradient-to-b from-white to-[#fafaf8] font-mono text-2xl font-bold text-[#131312] shadow-[0_4px_10px_-6px_rgba(20,18,15,0.15)]"
+                style={{ animationDelay: `${(i * 0.08).toFixed(2)}s` }}
+                aria-hidden="true"
+              >
+                {digit}
+              </span>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-[#fafaf8] px-3.5 py-1 text-xs font-medium text-[#4f4b46] transition hover:border-[#1f6f5c] hover:bg-white hover:text-[#131312] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
+          >
+            {copied ? '✓ Copied to clipboard' : '📋 Copy code'}
+          </button>
         </div>
       )}
 
       {expired && (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          That code has expired. Generate a new one.
+          That code has expired. Please generate a fresh verification code.
         </p>
       )}
 
@@ -116,23 +135,28 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => void handleGenerate()}
-        disabled={busy}
-        className={
-          'mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50 ' +
-          (code && !expired
-            ? 'border border-[#ececea] bg-white text-[#4f4b46] hover:border-[#1f6f5c] hover:text-[#131312]'
-            : 'bg-gradient-to-r from-[#1f6f5c] to-[#185845] text-white shadow-[0_8px_18px_-8px_rgba(31,111,92,0.55)] hover:from-[#1d6655] hover:to-[#14503e]')
-        }
-      >
-        {busy
-          ? 'Getting…'
-          : code && !expired
-            ? 'Get a different code'
-            : `Get ${phase} code`}
-      </button>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#f3f1ec] pt-4">
+        <p className="text-xs text-[#8a847d]">
+          🛡️ Protects you by ensuring tasks only start/finish with your direct confirmation.
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleGenerate()}
+          disabled={busy}
+          className={
+            'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50 ' +
+            (code && !expired
+              ? 'border border-[#ececea] bg-white text-[#4f4b46] hover:border-[#1f6f5c] hover:text-[#131312]'
+              : 'bg-gradient-to-r from-[#1f6f5c] to-[#185845] text-white shadow-[0_8px_18px_-8px_rgba(31,111,92,0.55)] hover:from-[#1d6655] hover:to-[#14503e]')
+          }
+        >
+          {busy
+            ? 'Generating…'
+            : code && !expired
+              ? 'Generate new code'
+              : `Generate ${phaseLabel.toLowerCase()} code`}
+        </button>
+      </div>
     </section>
   );
 }

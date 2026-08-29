@@ -73,12 +73,23 @@ type TaskStatus =
 interface TaskRow {
   id: string;
   title: string;
+  category?: string | undefined;
   status: TaskStatus;
   riskLevel: 'low' | 'medium';
   createdAt: Timestamp | null;
-  scheduledFor?: Timestamp | null;
-  completedAt?: Timestamp | null;
-  acceptedVolunteerId?: string | null;
+  scheduledFor?: Timestamp | null | undefined;
+  completedAt?: Timestamp | null | undefined;
+  acceptedVolunteerId?: string | null | undefined;
+  customerRating?: number | undefined;
+  description?: {
+    meetingPoint: string;
+    whatToBring?: string | undefined;
+    preference?: string | undefined;
+    safetyNote?: string | undefined;
+  } | undefined;
+  requiredSkills?: string[] | undefined;
+  estimatedMinutes?: number | undefined;
+  location?: { lat: number; lng: number; h3Cell: string } | undefined;
 }
 
 
@@ -114,6 +125,7 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
   const navigate = useNavigate();
   const [screen, setScreen] = useState<ScreenKey>('tasks');
   const [rows, setRows] = useState<TaskRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState<BlockedRow[]>([]);
   const [filter, setFilter] = useState<HistoryFilter>('all');
 
@@ -126,32 +138,55 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
       where('customerId', '==', uid),
       orderBy('createdAt', 'desc'),
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setRows(
-        snap.docs.map((d) => {
-          const data = d.data() as {
-            title: string;
-            status: TaskStatus;
-            riskLevel: 'low' | 'medium';
-            createdAt: Timestamp | null;
-            scheduledFor?: Timestamp | null;
-            completedAt?: Timestamp | null;
-            acceptedVolunteerId?: string | null;
-          };
-          return {
-            id: d.id,
-            title: data.title,
-            status: data.status,
-            riskLevel: data.riskLevel,
-            createdAt: data.createdAt,
-            scheduledFor: data.scheduledFor ?? null,
-            completedAt: data.completedAt ?? null,
-            acceptedVolunteerId: data.acceptedVolunteerId ?? null,
-          };
-
-        }),
-      );
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setRows(
+          snap.docs.map((d) => {
+            const data = d.data() as {
+              title: string;
+              category?: string;
+              status: TaskStatus;
+              riskLevel: 'low' | 'medium';
+              createdAt: Timestamp | null;
+              scheduledFor?: Timestamp | null;
+              completedAt?: Timestamp | null;
+              acceptedVolunteerId?: string | null;
+              customerRating?: number;
+              description?: {
+                meetingPoint: string;
+                whatToBring?: string;
+                preference?: string;
+                safetyNote?: string;
+              };
+              requiredSkills?: string[];
+              estimatedMinutes?: number;
+              location?: { lat: number; lng: number; h3Cell: string };
+            };
+            return {
+              id: d.id,
+              title: data.title,
+              category: data.category,
+              status: data.status,
+              riskLevel: data.riskLevel,
+              createdAt: data.createdAt,
+              scheduledFor: data.scheduledFor ?? null,
+              completedAt: data.completedAt ?? null,
+              acceptedVolunteerId: data.acceptedVolunteerId ?? null,
+              customerRating: data.customerRating,
+              description: data.description,
+              requiredSkills: data.requiredSkills,
+              estimatedMinutes: data.estimatedMinutes,
+              location: data.location,
+            };
+          }),
+        );
+        setLoading(false);
+      },
+      () => {
+        setLoading(false);
+      },
+    );
     return unsub;
   }, [uid]);
 
@@ -267,6 +302,7 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
               ongoing={ongoing}
               ongoingCount={ongoing.length}
               scheduled={scheduled}
+              loading={loading}
             />
           )}
 
@@ -434,27 +470,29 @@ function TasksScreen({
   ongoing,
   ongoingCount,
   scheduled,
+  loading,
 }: {
   userDoc: UserDoc;
   ongoing: TaskRow[];
   ongoingCount: number;
   scheduled: TaskRow[];
+  loading: boolean;
 }) {
   const name = userDoc.displayName ?? 'there';
   return (
     <section>
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[32px] font-bold tracking-tight">
-            Welcome, {name}.
+          <h1 className="m-0 text-[28px] sm:text-[32px] font-bold tracking-tight text-[#131312]">
+            Welcome back, {name}.
           </h1>
-          <p className="mt-1.5 text-sm text-[#4f4b46]">
-            Post a small task and we&apos;ll find a nearby hand.
+          <p className="mt-1 text-sm text-[#4f4b46]">
+            Get safe, verified help from neighbours nearby.
           </p>
         </div>
-        <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.06em] text-[#8a847d]">
+        <div className="flex items-center gap-2 rounded-full bg-[#e3efe9] px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1f6f5c]">
           <LiveDot />
-          Live
+          Live Network
         </div>
       </div>
 
@@ -485,17 +523,38 @@ function TasksScreen({
 
           <div className="mb-3.5 flex items-baseline justify-between">
             <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
-              Ongoing tasks
+              Active tasks
             </h2>
             <span className="font-mono text-xs text-[#8a847d]">
               {ongoingCount} active
             </span>
           </div>
 
-
-          {ongoing.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-7 text-center text-[13px] text-[#8a847d]">
-              No active tasks. Post one and we&apos;ll start searching.
+          {loading ? (
+            <div className="space-y-3" aria-label="Loading active tasks">
+              <div className="h-20 w-full animate-pulse rounded-2xl border border-[#ececea] bg-white/70" />
+              <div className="h-20 w-full animate-pulse rounded-2xl border border-[#ececea] bg-white/50" />
+            </div>
+          ) : ongoing.length === 0 ? (
+            <div className="rounded-2xl border border-[#ececea] bg-white p-7 text-center shadow-sm">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              </div>
+              <h3 className="mt-3.5 text-[15px] font-bold text-[#131312]">
+                All caught up — no active tasks
+              </h3>
+              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-[#4f4b46]">
+                Need help picking up groceries, a quick fix, or a neighbourhood errand? Post a task and we&apos;ll match you with a nearby volunteer.
+              </p>
+              <Link
+                to="/create-task"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#1f6f5c] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 shadow-sm"
+              >
+                <span>+</span> Post your first task
+              </Link>
             </div>
           ) : (
             ongoing.map((t) => <OngoingTaskCard key={t.id} task={t} />)
@@ -651,8 +710,8 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
   }, [hasPin]);
 
   return (
-    <div className="overflow-hidden rounded-[20px] border border-[#ececea] bg-white">
-      <div className="relative h-[clamp(360px,55vh,640px)]">
+    <div className="overflow-hidden rounded-[20px] border border-[#ececea] bg-white shadow-sm">
+      <div className="relative h-[clamp(240px,36vh,340px)]">
         <MapContainer
           center={[center.lat, center.lng]}
           zoom={hasPin ? 13 : 11}
@@ -915,25 +974,36 @@ function PostCta() {
 
 function OngoingTaskCard({ task }: { task: TaskRow }) {
   const isSearching = task.status === 'searching';
-  const ringBg = isSearching ? 'bg-[#e8effb]' : 'bg-[#e3efe9]';
-  const ringInk = isSearching ? 'text-[#1f4baa]' : 'text-[#1f6f5c]';
-  const badgeBg = isSearching ? 'bg-[#e8effb]' : 'bg-[#e3efe9]';
-  const badgeInk = isSearching ? 'text-[#1f4baa]' : 'text-[#1f6f5c]';
+  const isAccepted = task.status === 'accepted';
+  const isProgress = task.status === 'in_progress';
 
-  const subParts: string[] = [];
-  if (task.createdAt) subParts.push(elapsedShort(task.createdAt));
-  subParts.push(task.riskLevel === 'medium' ? 'Medium' : 'Low');
+  const ringBg = isSearching ? 'bg-[#e8effb]' : isAccepted ? 'bg-[#e3efe9]' : 'bg-[#fef3c7]';
+  const ringInk = isSearching ? 'text-[#1f4baa]' : isAccepted ? 'text-[#1f6f5c]' : 'text-[#b45309]';
+  const badgeBg = isSearching ? 'bg-[#e8effb]' : isAccepted ? 'bg-[#e3efe9]' : 'bg-[#fef3c7]';
+  const badgeInk = isSearching ? 'text-[#1f4baa]' : isAccepted ? 'text-[#1f6f5c]' : 'text-[#b45309]';
+
+  const statusLabel = isSearching
+    ? 'Finding volunteer'
+    : isAccepted
+      ? 'Volunteer matched'
+      : 'In progress';
+
+  const actionHint = isSearching
+    ? 'Tap to view live radar'
+    : isAccepted
+      ? 'Tap to coordinate in chat'
+      : 'Tap to view completion code';
 
   return (
     <Link
       to={`/tasks/${task.id}`}
-      className="vc-fade-up mb-2.5 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#d8d4cc] hover:shadow-[0_8px_20px_-12px_rgba(20,18,15,0.18)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#131312] focus-visible:ring-offset-2"
+      className="vc-fade-up group mb-3 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#1f6f5c]/40 hover:shadow-[0_12px_28px_-12px_rgba(20,18,15,0.15)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2"
     >
-      <span className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-full ${ringBg}`}>
+      <span className={`grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl ${ringBg} shadow-xs`}>
         {isSearching ? (
           <svg
             viewBox="0 0 24 24"
-            className={`h-[18px] w-[18px] ${ringInk}`}
+            className={`h-5 w-5 ${ringInk}`}
             fill="none"
             stroke="currentColor"
             strokeWidth={2}
@@ -943,10 +1013,23 @@ function OngoingTaskCard({ task }: { task: TaskRow }) {
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />
           </svg>
+        ) : isAccepted ? (
+          <svg
+            viewBox="0 0 24 24"
+            className={`h-5 w-5 ${ringInk}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
         ) : (
           <svg
             viewBox="0 0 24 24"
-            className={`h-[18px] w-[18px] ${ringInk}`}
+            className={`h-5 w-5 ${ringInk}`}
             fill="none"
             stroke="currentColor"
             strokeWidth={2}
@@ -954,32 +1037,50 @@ function OngoingTaskCard({ task }: { task: TaskRow }) {
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <path d="M20 6L9 17l-5-5" />
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
           </svg>
         )}
       </span>
+
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold text-[#131312]">
-          {task.title || 'Untitled task'}
+        <span className="flex items-center gap-2">
+          <span className="truncate text-[15px] font-bold text-[#131312] group-hover:text-[#1f6f5c] transition-colors">
+            {task.title || 'Untitled task'}
+          </span>
         </span>
-        <span className="mt-0.5 flex items-center gap-2 text-xs text-[#8a847d]">
-          {isSearching && <PulseDot />}
-          {isSearching && <>Searching nearby</>}
-          {!isSearching && task.status === 'accepted' && <>Volunteer assigned</>}
-          {!isSearching && task.status === 'in_progress' && <>In progress</>}
-          {subParts.map((p, i) => (
-            <span key={i} className="flex items-center gap-2">
-              <span className="opacity-40">·</span>
-              {p}
+        <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[#4f4b46]">
+          {isSearching && (
+            <span className="inline-flex items-center gap-1.5 font-medium text-[#1f4baa]">
+              <PulseDot />
+              Pinging nearby volunteers
             </span>
-          ))}
+          )}
+          {isAccepted && (
+            <span className="font-medium text-[#1f6f5c]">
+              Matched &amp; awaiting arrival
+            </span>
+          )}
+          {isProgress && (
+            <span className="font-medium text-[#b45309]">
+              Task actively underway
+            </span>
+          )}
+          <span className="text-[#8a847d]">·</span>
+          <span className="text-[#8a847d]">{actionHint}</span>
         </span>
       </span>
-      <span
-        className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${badgeBg} ${badgeInk}`}
-      >
-        {labelForStatus(task.status)}
-      </span>
+
+      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        <span
+          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${badgeBg} ${badgeInk}`}
+        >
+          {statusLabel}
+        </span>
+        <span className="text-[11px] font-medium text-[#8a847d] group-hover:translate-x-0.5 transition-transform">
+          View →
+        </span>
+      </div>
     </Link>
   );
 }
@@ -1260,6 +1361,7 @@ function HistoryList({
 }) {
   type HistoryItem = {
     key: string;
+    taskId?: string;
     title: string;
     sub: string;
     badge: { label: string; bg: string; ink: string };
@@ -1270,11 +1372,26 @@ function HistoryList({
 
   function row(task: TaskRow, status: 'completed' | 'accepted'): HistoryItem {
     const when = task.completedAt ?? task.createdAt;
+    const isCompleted = status === 'completed';
+    const isUnrated = isCompleted && typeof task.customerRating !== 'number';
+
+    let badge = badgeForHistoryStatus(status);
+    if (isUnrated) {
+      badge = { label: '★ Rate now', bg: 'bg-[#fef3c7]', ink: 'text-[#b45309]' };
+    } else if (isCompleted && typeof task.customerRating === 'number') {
+      badge = {
+        label: `★ ${task.customerRating}/5 Rated`,
+        bg: 'bg-[#e3efe9]',
+        ink: 'text-[#1f6f5c]',
+      };
+    }
+
     return {
       key: task.id,
+      taskId: task.id,
       title: task.title || 'Untitled task',
-      sub: `${formatDate(when)} · ${task.riskLevel === 'medium' ? 'Medium' : 'Low'} priority`,
-      badge: badgeForHistoryStatus(status),
+      sub: `${formatDate(when)} · ${task.riskLevel === 'medium' ? 'Verified ID' : 'Low risk'}${isUnrated ? ' · Tap to leave feedback' : ''}`,
+      badge,
     };
   }
 
@@ -1307,9 +1424,6 @@ function HistoryList({
 
   const [pageSize, setPageSize] = useState<number>(5);
   const [page, setPage] = useState<number>(1);
-  // Reset to page 1 whenever the filter prop changes. Render-phase state
-  // update is the React 18+ idiom for "derive state from a prop change"
-  // — preferred over useEffect by the react-hooks/set-state-in-effect rule.
   const [filterAtPage, setFilterAtPage] = useState<HistoryFilter>(filter);
   if (filter !== filterAtPage) {
     setFilterAtPage(filter);
@@ -1318,8 +1432,8 @@ function HistoryList({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-7 text-center text-[13px] text-[#8a847d]">
-        No {filter === 'all' ? '' : filter} {filter === 'blocked' ? 'users' : 'tasks'} yet.
+      <div className="rounded-2xl border border-[#ececea] bg-white p-7 text-center text-[13px] text-[#8a847d] shadow-sm">
+        No {filter === 'all' ? '' : filter} {filter === 'blocked' ? 'users' : 'tasks'} found in your history.
       </div>
     );
   }
@@ -1333,30 +1447,50 @@ function HistoryList({
 
   return (
     <div>
-      {visible.map((row) => (
-        <div
-          key={row.key}
-          className="vc-fade-up mb-2.5 flex items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition hover:border-[#d8d4cc]"
-        >
-          <HistoryAvatar
-            initial={row.avatarInitial}
-            photoPath={row.avatarPhotoPath ?? null}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold text-[#131312]">
-              {row.title}
+      {visible.map((rowItem) => {
+        const content = (
+          <>
+            <HistoryAvatar
+              initial={rowItem.avatarInitial}
+              photoPath={rowItem.avatarPhotoPath ?? null}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-[#131312] group-hover:text-[#1f6f5c] transition-colors">
+                {rowItem.title}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-[#8a847d]">
+                {rowItem.sub}
+              </span>
             </span>
-            <span className="mt-0.5 block truncate text-xs text-[#8a847d]">
-              {row.sub}
+            <span
+              className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${rowItem.badge.bg} ${rowItem.badge.ink}`}
+            >
+              {rowItem.badge.label}
             </span>
-          </span>
-          <span
-            className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${row.badge.bg} ${row.badge.ink}`}
+          </>
+        );
+
+        if (rowItem.taskId) {
+          return (
+            <Link
+              key={rowItem.key}
+              to={`/tasks/${rowItem.taskId}`}
+              className="vc-fade-up group mb-2.5 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#1f6f5c]/30 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
+            >
+              {content}
+            </Link>
+          );
+        }
+
+        return (
+          <div
+            key={rowItem.key}
+            className="vc-fade-up mb-2.5 flex items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white px-[18px] py-4 transition hover:border-[#d8d4cc]"
           >
-            {row.badge.label}
-          </span>
-        </div>
-      ))}
+            {content}
+          </div>
+        );
+      })}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[12px] text-[#8a847d]">
@@ -1612,34 +1746,6 @@ function initialOf(name: string | undefined): string {
   const trimmed = name.trim();
   if (!trimmed) return 'U';
   return trimmed[0]?.toUpperCase() ?? 'U';
-}
-
-function labelForStatus(s: TaskStatus): string {
-  switch (s) {
-    case 'scheduled':
-      return 'Scheduled';
-    case 'searching':
-      return 'Searching';
-    case 'accepted':
-      return 'Accepted';
-    case 'in_progress':
-      return 'In progress';
-    case 'completed':
-      return 'Completed';
-    case 'cancelled':
-      return 'Cancelled';
-    case 'expired':
-      return 'Expired';
-  }
-}
-
-
-function elapsedShort(t: Timestamp): string {
-  const diff = Date.now() - t.toMillis();
-  if (diff < 60_000) return 'just now';
-  if (diff < 3_600_000) return `${String(Math.floor(diff / 60_000))} min elapsed`;
-  if (diff < 86_400_000) return `${String(Math.floor(diff / 3_600_000))} h elapsed`;
-  return new Date(t.toMillis()).toLocaleDateString();
 }
 
 function formatDate(t: Timestamp | null | undefined): string {
