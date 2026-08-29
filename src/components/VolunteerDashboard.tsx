@@ -76,6 +76,7 @@ interface OfferRow {
   distanceM: number;
   score: number;
   offeredAt: Timestamp | null;
+  estimatedMinutes?: number | undefined;
 }
 
 interface NearbyTaskRow {
@@ -84,14 +85,17 @@ interface NearbyTaskRow {
   category: string;
   riskLevel: 'low' | 'medium';
   createdAt: Timestamp | null;
+  estimatedMinutes?: number | undefined;
 }
 
 interface AcceptedTaskRow {
   id: string;
   title: string;
+  category?: string | undefined;
   status: TaskStatus;
   acceptedAt: Timestamp | null;
   riskLevel: 'low' | 'medium';
+  estimatedMinutes?: number | undefined;
 }
 
 type ScreenKey = 'dashboard' | 'profile';
@@ -109,6 +113,7 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
   const [acceptedTasks, setAcceptedTasks] = useState<AcceptedTaskRow[]>([]);
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
   const [toggleBusy, setToggleBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [activeRoutePrompt, setActiveRoutePrompt] = useState<CanonicalRoute | null>(null);
@@ -176,6 +181,7 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
               distanceM: number;
               score: number;
               offeredAt: Timestamp | null;
+              estimatedMinutes?: number;
             };
             return {
               id: d.id,
@@ -186,11 +192,16 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
               distanceM: data.distanceM,
               score: data.score,
               offeredAt: data.offeredAt,
+              estimatedMinutes: data.estimatedMinutes,
             };
           }),
         );
+        setLoading(false);
       },
-      () => setOffers([]),
+      () => {
+        setOffers([]);
+        setLoading(false);
+      },
     );
     return unsub;
   }, [uid]);
@@ -213,6 +224,7 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
               category: string;
               riskLevel: 'low' | 'medium';
               createdAt: Timestamp | null;
+              estimatedMinutes?: number;
             };
             return {
               id: d.id,
@@ -220,6 +232,7 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
               category: data.category,
               riskLevel: data.riskLevel,
               createdAt: data.createdAt,
+              estimatedMinutes: data.estimatedMinutes,
             };
           }),
         );
@@ -244,16 +257,20 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
           snap.docs.map((d) => {
             const data = d.data() as {
               title: string;
+              category?: string;
               status: TaskStatus;
               acceptedAt: Timestamp | null;
               riskLevel: 'low' | 'medium';
+              estimatedMinutes?: number;
             };
             return {
               id: d.id,
               title: data.title,
+              category: data.category,
               status: data.status,
               acceptedAt: data.acceptedAt,
               riskLevel: data.riskLevel,
+              estimatedMinutes: data.estimatedMinutes,
             };
           }),
         );
@@ -410,6 +427,7 @@ export function VolunteerDashboard({ uid, userDoc }: Props) {
               onRejectOffer={(id) => void handleRejectOffer(id)}
               nearbyTasks={nearbyTasks}
               acceptedTasks={acceptedTasks}
+              loading={loading}
               error={error}
             />
           )}
@@ -588,6 +606,7 @@ function DashboardScreen({
   onRejectOffer,
   nearbyTasks,
   acceptedTasks,
+  loading = false,
   error,
 }: {
   uid: string;
@@ -601,6 +620,7 @@ function DashboardScreen({
   onRejectOffer: (id: string) => void;
   nearbyTasks: NearbyTaskRow[];
   acceptedTasks: AcceptedTaskRow[];
+  loading?: boolean;
   error: string | null;
 }) {
   const name = userDoc.displayName ?? 'Volunteer';
@@ -610,6 +630,12 @@ function DashboardScreen({
 
   const [placeName, setPlaceName] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+
+  // Active missions (accepted or in_progress) vs completed history
+  const activeMissions = acceptedTasks.filter(
+    (t) => t.status === 'accepted' || t.status === 'in_progress',
+  );
+  const completedHistory = acceptedTasks.filter((t) => t.status === 'completed');
 
   useEffect(() => {
     if (!userDoc.lastKnownLocation?.lat || !userDoc.lastKnownLocation?.lng) return;
@@ -644,17 +670,24 @@ function DashboardScreen({
       {/* Top Greeting */}
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="m-0 text-[32px] font-bold tracking-tight">
+          <h1 className="m-0 text-[30px] sm:text-[34px] font-bold tracking-tight text-[#131312]">
             Welcome, {name}.
           </h1>
-          <p className="mt-1.5 text-sm text-[#4f4b46]">
-            Ready to help neighbours nearby today?
+          <p className="mt-1 text-sm text-[#4f4b46]">
+            {available
+              ? 'You are active and visible to nearby neighbours.'
+              : 'Ready to help neighbours nearby today?'}
           </p>
         </div>
-        {available && (
-          <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.06em] text-[#8a847d]">
+        {available ? (
+          <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-800">
             <LiveDot />
-            Live
+            Available Live
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 rounded-full border border-[#ececea] bg-[#fafaf8] px-3 py-1 text-[11px] font-medium text-[#8a847d]">
+            <span className="h-2 w-2 rounded-full bg-[#8a847d]" />
+            Offline
           </div>
         )}
       </div>
@@ -665,108 +698,198 @@ function DashboardScreen({
         </div>
       )}
 
-      {/* Hero Card with Stats */}
-      <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1f6f5c] to-[#15493b] px-7 py-7 text-white shadow-sm">
-        <span
-          className="pointer-events-none absolute -right-16 -top-16 h-[220px] w-[220px] rounded-full bg-white/5"
-          aria-hidden="true"
-        />
-        <span
-          className="pointer-events-none absolute -bottom-20 right-10 h-40 w-40 rounded-full bg-white/[0.04]"
-          aria-hidden="true"
-        />
+      {/* 1. URGENT / ACTIVE MISSIONS (Top Priority) */}
+      {activeMissions.length > 0 && (
+        <div className="vc-fade-up">
+          <div className="mb-3.5 flex items-baseline justify-between">
+            <h2 className="m-0 text-[13px] font-bold uppercase tracking-[0.08em] text-[#1f6f5c]">
+              Active Missions ({activeMissions.length})
+            </h2>
+            <span className="font-mono text-xs text-[#8a847d]">
+              Action needed
+            </span>
+          </div>
 
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-[18px]">
-            <HeroAvatar
-              displayName={userDoc.displayName}
-              photoPath={userDoc.photoURL ?? null}
-            />
-            <div>
-              <div className="text-2xl font-bold tracking-tight">
-                {name}
-              </div>
-              <div className="mt-0.5 text-[13px] opacity-80">
-                Volunteer · Hey Padosi
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <TrustBadge score={trustScore} />
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col items-end">
-            <span className="text-[11px] uppercase tracking-[0.08em] opacity-80">Karma Points</span>
-            <KarmaBadge points={userDoc.points ?? 0} />
-          </div>
-        </div>
-
-        <div className="relative mt-7 grid grid-cols-2 gap-4 border-t border-white/15 pt-5 sm:grid-cols-3">
-          <div>
-            <div className="font-mono text-[24px] font-bold tracking-tight">
-              {trustScore}/100
-            </div>
-            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
-              Trust Score
-            </div>
-          </div>
-          <div>
-            <div className="font-mono text-[24px] font-bold tracking-tight">
-              {verifiedCount} tasks
-            </div>
-            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
-              {verifiedHours.toFixed(1)} hrs completed
-            </div>
-          </div>
-          <div className="col-span-2 sm:col-span-1">
-            <div className="font-mono text-[24px] font-bold tracking-tight">
-              {userDoc.skills?.length ?? 0}
-            </div>
-            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
-              Active skills
-            </div>
-          </div>
-        </div>
-
-        {/* Skill Points Pills */}
-        {Object.keys(userDoc.skillPoints ?? {}).length > 0 && (
-          <div className="relative mt-5 border-t border-white/15 pt-4">
-            <div className="mb-2 text-[11px] uppercase tracking-[0.08em] opacity-80">
-              Skill Points
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(userDoc.skillPoints ?? {}).map(([key, val]) => (
-                <span
-                  key={key}
-                  className="inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm"
+          <div className="space-y-3">
+            {activeMissions.map((t) => {
+              const isInProgress = t.status === 'in_progress';
+              return (
+                <div
+                  key={t.id}
+                  className="overflow-hidden rounded-3xl border-2 border-[#1f6f5c]/20 bg-white p-6 shadow-sm transition hover:border-[#1f6f5c]/40"
                 >
-                  {getSkillLabel(key)}: {val}
-                </span>
-              ))}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <span
+                        className={
+                          'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ' +
+                          (isInProgress
+                            ? 'bg-amber-100 text-amber-900'
+                            : 'bg-emerald-100 text-emerald-900')
+                        }
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                        {isInProgress ? 'Task In Progress' : 'Task Accepted'}
+                      </span>
+                      <h3 className="mt-2 text-lg font-bold text-[#131312]">
+                        {t.title || 'Untitled task'}
+                      </h3>
+                      <p className="mt-1 text-xs text-[#4f4b46]">
+                        {isInProgress
+                          ? 'Task is underway. When finished, ask the customer for their 4-digit Completion Code.'
+                          : 'Coordinate arrival in chat. When you arrive, ask the customer for their 4-digit Start Code.'}
+                      </p>
+                    </div>
+
+                    <Link
+                      to={`/tasks/${t.id}`}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#1f6f5c] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
+                    >
+                      {isInProgress ? 'Enter Completion Code →' : 'Open Chat & Details →'}
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. OFFERS FOR YOU */}
+      <div>
+        <div className="mb-3.5 flex items-baseline justify-between">
+          <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
+            Offers for you
+          </h2>
+          <span className="font-mono text-xs text-[#8a847d]">
+            {loading ? 'Checking…' : `${offers.length} pending`}
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-2xl border border-[#ececea] bg-white p-5 space-y-3"
+              >
+                <div className="h-4 w-1/3 rounded bg-[#ececea]" />
+                <div className="h-3 w-1/2 rounded bg-[#ececea]" />
+              </div>
+            ))}
+          </div>
+        ) : offers.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-[#ececea] bg-white p-8 text-center shadow-xs">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f3f1ec] text-[#8a847d]">
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
             </div>
+            <h3 className="mt-3 text-sm font-bold text-[#131312]">
+              No requests right now
+            </h3>
+            <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[#8a847d]">
+              Keep your availability turned on and we&apos;ll notify you when a nearby neighbour needs help matching your skills.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {offers.map((row) => {
+              const category = getCategory(row.taskCategory);
+              const busy = busyTaskIds.has(row.taskId);
+              return (
+                <div
+                  key={`${row.taskId}-${row.id}`}
+                  className="vc-fade-up rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs transition hover:border-[#1f6f5c]/30"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-[11px] font-semibold text-[#1f6f5c]">
+                          {category?.label ?? row.taskCategory}
+                        </span>
+                        <span
+                          className={
+                            'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' +
+                            (row.taskRiskLevel === 'medium'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-[#fafaf8] text-[#4f4b46] border border-[#ececea]')
+                          }
+                        >
+                          {row.taskRiskLevel === 'medium' ? '🛡️ Verified ID Required' : '✓ Standard Task'}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-2.5 text-base font-bold text-[#131312]">
+                        {row.taskTitle || 'Untitled task'}
+                      </h3>
+
+                      {/* Humanized Decision Chips (No raw math scores!) */}
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#4f4b46]">
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          <span>📍</span> {formatDistance(row.distanceM)} away
+                        </span>
+                        <span className="text-[#ececea]">|</span>
+                        <span className="inline-flex items-center gap-1.5 font-medium">
+                          <span>⏱️</span> ~{row.estimatedMinutes ?? 30} mins
+                        </span>
+                        <span className="text-[#ececea]">|</span>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-[#1f6f5c]">
+                          <span>★</span> Matches your skills
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-shrink-0 items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => onRejectOffer(row.taskId)}
+                        disabled={busy}
+                        className="rounded-full border border-[#ececea] bg-white px-4 py-2.5 text-xs font-semibold text-[#4f4b46] transition hover:bg-[#fdf0ef] hover:text-[#a32a22] hover:border-red-200 focus:outline-none disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onAcceptOffer(row.taskId)}
+                        disabled={busy}
+                        className="rounded-full bg-[#1f6f5c] px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] disabled:opacity-50"
+                      >
+                        {busy ? 'Accepting…' : 'Accept & Help'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Available Right Now Switch Card */}
-      <div className="rounded-[20px] border border-[#ececea] bg-white p-6 shadow-sm">
+      {/* 3. AVAILABILITY CONTROL CARD */}
+      <div className="rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
         <div className="flex items-start justify-between gap-6">
           <div>
-            <h2 className="text-lg font-semibold text-[#131312]">
-              Available right now
+            <h2 className="text-base font-bold text-[#131312]">
+              {available
+                ? 'Available · Receiving nearby requests'
+                : 'Offline · You won’t receive new requests'}
             </h2>
-            <p className="mt-1 text-sm text-[#4f4b46]">
-              When turned on, nearby neighbours can offer you tasks that match your skills.
+            <p className="mt-1 text-xs text-[#4f4b46]">
+              {available
+                ? 'When turned on, neighbours within ~2.5 km matching your skills can send you task offers.'
+                : 'Turn on availability when you’re ready to help neighbours.'}
             </p>
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={available}
-            aria-label="Availability"
+            aria-label="Availability switch"
             onClick={onToggleAvailability}
             disabled={toggleBusy}
             className={
-              'relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#131312] focus-visible:ring-offset-2 disabled:opacity-50 ' +
+              'relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:opacity-50 ' +
               (available ? 'bg-[#1f6f5c]' : 'bg-[#ececea]')
             }
           >
@@ -779,6 +902,7 @@ function DashboardScreen({
             />
           </button>
         </div>
+
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#ececea] pt-3.5 text-xs text-[#4f4b46]">
           <div className="flex items-center gap-1.5 font-medium">
             <svg
@@ -800,17 +924,23 @@ function DashboardScreen({
                 : userDoc.lastKnownLocation
                   ? `You are at ${userDoc.lastKnownLocation.lat.toFixed(3)}, ${userDoc.lastKnownLocation.lng.toFixed(3)}`
                   : available
-                    ? '● You are visible to nearby task posters.'
-                    : '○ You are not currently visible.'}
+                    ? '● Visible to nearby task posters'
+                    : '○ Offline'}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowLocationModal(true)}
-            className="font-semibold text-[#1f6f5c] underline underline-offset-2 transition hover:text-[#185845] focus:outline-none"
-          >
-            Did we get it wrong?
-          </button>
+
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-[#8a847d]">
+              🔒 Exact location is never shared
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowLocationModal(true)}
+              className="font-semibold text-[#1f6f5c] underline underline-offset-2 transition hover:text-[#185845] focus:outline-none"
+            >
+              Did we get it wrong?
+            </button>
+          </div>
         </div>
 
         {showLocationModal && (
@@ -822,82 +952,93 @@ function DashboardScreen({
         )}
       </div>
 
-      {/* Offers For You Section */}
-      <div>
-        <div className="mb-3.5 flex items-baseline justify-between">
-          <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
-            Offers for you
-          </h2>
-          <span className="font-mono text-xs text-[#8a847d]">
-            {offers.length} pending
-          </span>
+      {/* 4. COMMUNITY IMPACT & TRUST SUMMARY */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1f6f5c] to-[#15493b] p-7 text-white shadow-sm">
+        <span
+          className="pointer-events-none absolute -right-16 -top-16 h-[220px] w-[220px] rounded-full bg-white/5"
+          aria-hidden="true"
+        />
+        <span
+          className="pointer-events-none absolute -bottom-20 right-10 h-40 w-40 rounded-full bg-white/[0.04]"
+          aria-hidden="true"
+        />
+
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <HeroAvatar
+              displayName={userDoc.displayName}
+              photoPath={userDoc.photoURL ?? null}
+            />
+            <div>
+              <div className="text-xl font-bold tracking-tight">
+                {name}
+              </div>
+              <div className="mt-0.5 text-xs text-white/80">
+                Verified Neighbour · Hey Padosi
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <TrustBadge score={trustScore} />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-[11px] uppercase tracking-[0.08em] opacity-80">Karma Points</span>
+            <KarmaBadge points={userDoc.points ?? 0} />
+          </div>
         </div>
 
-        {offers.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-8 text-center text-[13px] text-[#8a847d]">
-            No task offers right now. When a nearby task matches your skills you&apos;ll see it here.
+        <div className="relative mt-6 grid grid-cols-3 gap-4 border-t border-white/15 pt-4 text-center sm:text-left">
+          <div>
+            <div className="font-mono text-2xl font-bold tracking-tight">
+              {verifiedCount}
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Tasks Completed
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {offers.map((row) => {
-              const category = getCategory(row.taskCategory);
-              const busy = busyTaskIds.has(row.taskId);
-              return (
-                <div
-                  key={`${row.taskId}-${row.id}`}
-                  className="vc-fade-up flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#ececea] bg-white p-5 transition hover:border-[#d8d4cc]"
+          <div>
+            <div className="font-mono text-2xl font-bold tracking-tight">
+              {verifiedHours.toFixed(1)} h
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Volunteered
+            </div>
+          </div>
+          <div>
+            <div className="font-mono text-2xl font-bold tracking-tight">
+              {userDoc.skills?.length ?? 0}
+            </div>
+            <div className="mt-0.5 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Active Skills
+            </div>
+          </div>
+        </div>
+
+        {/* Skill Points Chips */}
+        {Object.keys(userDoc.skillPoints ?? {}).length > 0 && (
+          <div className="relative mt-4 border-t border-white/15 pt-3">
+            <div className="mb-2 text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Skill Points
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(userDoc.skillPoints ?? {}).map(([key, val]) => (
+                <span
+                  key={key}
+                  className="inline-flex items-center rounded-full bg-white/15 px-3 py-0.5 text-xs font-medium text-white backdrop-blur-sm"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold text-[#131312]">
-                      {row.taskTitle || 'Untitled task'}
-                    </p>
-                    <p className="mt-1 text-xs text-[#8a847d]">
-                      {category?.label ?? row.taskCategory} ·{' '}
-                      <span
-                        className={
-                          row.taskRiskLevel === 'medium'
-                            ? 'font-medium text-amber-700'
-                            : 'font-medium text-[#1f6f5c]'
-                        }
-                      >
-                        {row.taskRiskLevel === 'medium' ? 'Medium' : 'Low'} priority
-                      </span>{' '}
-                      · {formatDistance(row.distanceM)} away
-                    </p>
-                    <p className="mt-1 font-mono text-[11px] text-[#8a847d]">
-                      Match score: {row.score.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="flex flex-shrink-0 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onRejectOffer(row.taskId)}
-                      disabled={busy}
-                      className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-[13px] font-medium text-[#4f4b46] transition hover:bg-[#fdf0ef] hover:text-[#a32a22] focus:outline-none disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onAcceptOffer(row.taskId)}
-                      disabled={busy}
-                      className="rounded-full bg-[#1f6f5c] px-5 py-2 text-[13px] font-semibold text-white transition hover:bg-[#185845] focus:outline-none disabled:opacity-50"
-                    >
-                      {busy ? 'Working…' : 'Accept'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                  {getSkillLabel(key)}: {val}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Nearby Requests Section */}
+      {/* 5. NEARBY OPEN REQUESTS */}
       <div>
         <div className="mb-3.5 flex items-baseline justify-between">
           <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
-            Nearby requests near you
+            Nearby requests in your area
           </h2>
           <span className="font-mono text-xs text-[#8a847d]">
             {nearbyTasks.length} open
@@ -905,8 +1046,8 @@ function DashboardScreen({
         </div>
 
         {nearbyTasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#ececea] px-4 py-8 text-center text-[13px] text-[#8a847d]">
-            No nearby requests right now.
+          <div className="rounded-3xl border border-dashed border-[#ececea] bg-white p-6 text-center text-xs text-[#8a847d]">
+            No open requests in your area right now.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -914,10 +1055,10 @@ function DashboardScreen({
               <Link
                 key={t.id}
                 to={`/tasks/${t.id}`}
-                className="vc-fade-up block rounded-2xl border border-[#ececea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#d8d4cc] hover:shadow-[0_8px_20px_-12px_rgba(20,18,15,0.18)]"
+                className="vc-fade-up block rounded-3xl border border-[#ececea] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#1f6f5c]/40 hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[15px] font-semibold text-[#131312]">
+                  <span className="text-[15px] font-bold text-[#131312]">
                     {t.title || 'Untitled task'}
                   </span>
                   <span
@@ -928,32 +1069,33 @@ function DashboardScreen({
                         : 'bg-[#e3efe9] text-[#1f6f5c]')
                     }
                   >
-                    {t.riskLevel === 'medium' ? 'Medium' : 'Low'}
+                    {t.riskLevel === 'medium' ? '🛡️ ID Needed' : '✓ Community'}
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-[#8a847d]">
-                  Category: {getCategory(t.category)?.label ?? t.category}
-                </p>
+                <div className="mt-3 flex items-center justify-between text-xs text-[#8a847d]">
+                  <span>Category: {getCategory(t.category)?.label ?? t.category}</span>
+                  <span className="font-medium text-[#1f6f5c]">View details →</span>
+                </div>
               </Link>
             ))}
           </div>
         )}
       </div>
 
-      {/* Tasks You've Accepted Section */}
-      {acceptedTasks.length > 0 && (
+      {/* 6. COMPLETED TASKS HISTORY (If any) */}
+      {completedHistory.length > 0 && (
         <div>
           <div className="mb-3.5 flex items-baseline justify-between">
             <h2 className="m-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a847d]">
-              Tasks you&apos;ve accepted
+              Completed Tasks History
             </h2>
             <span className="font-mono text-xs text-[#8a847d]">
-              {acceptedTasks.length} total
+              {completedHistory.length} completed
             </span>
           </div>
 
           <div className="space-y-2.5">
-            {acceptedTasks.map((t) => (
+            {completedHistory.map((t) => (
               <Link
                 key={t.id}
                 to={`/tasks/${t.id}`}
@@ -964,16 +1106,7 @@ function DashboardScreen({
                     {t.title || 'Untitled task'}
                   </p>
                   <p className="mt-0.5 text-xs text-[#8a847d]">
-                    Accepted {formatWhen(t.acceptedAt)} ·{' '}
-                    <span
-                      className={
-                        t.riskLevel === 'medium'
-                          ? 'text-amber-700'
-                          : 'text-[#1f6f5c]'
-                      }
-                    >
-                      {t.riskLevel === 'medium' ? 'Medium' : 'Low'}
-                    </span>
+                    Completed {formatWhen(t.acceptedAt)}
                   </p>
                 </div>
                 <StatusBadge status={t.status} />
