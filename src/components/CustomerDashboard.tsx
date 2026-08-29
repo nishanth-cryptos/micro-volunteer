@@ -42,6 +42,7 @@ import { auth, db, functions, storage } from '../lib/firebase';
 import type { UserDoc } from '../lib/auth-context';
 import { BlockedUsersList } from './BlockedUsersList';
 import { ReasonBottomSheet } from './ReasonBottomSheet';
+import { Logo } from './Logo';
 
 
 // Leaflet default-icon fix (same pattern as TaskLocationPicker).
@@ -341,23 +342,9 @@ function TopBar({
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#ececea] bg-white px-7">
-      <div className="flex items-center gap-2.5 text-[15px] font-bold tracking-tight">
-        <span className="grid h-[26px] w-[26px] place-items-center rounded-[7px] bg-gradient-to-br from-[#1f6f5c] to-[#185845] text-white">
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
-          </svg>
-        </span>
-        Hey Padosi
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#ececea] bg-white px-6 sm:px-7">
+      <div className="flex items-center gap-2.5 font-bold tracking-tight">
+        <Logo size="md" />
       </div>
       <div className="relative flex items-center gap-3.5 text-[13px] text-[#4f4b46]">
         <button
