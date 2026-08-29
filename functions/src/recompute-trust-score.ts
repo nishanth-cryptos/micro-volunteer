@@ -92,3 +92,39 @@ export async function recomputeTrustScore(
 
   return trustScore;
 }
+
+export function computeTrustScorePure(params: {
+  verifiedTaskCount?: number;
+  verifiedHours?: number;
+  idVerified?: boolean;
+  totalRating?: number;
+  ratedCount?: number;
+  reportPenalty?: number;
+}): { rawScore: number; clampedScore: number; trustScore: number } {
+  const verifiedTaskCount = params.verifiedTaskCount ?? 0;
+  const verifiedHours = params.verifiedHours ?? 0;
+  const idVerified = params.idVerified === true;
+  const reportPenalty = params.reportPenalty ?? 0;
+
+  const totalRating = params.totalRating ?? 0;
+  const ratedCount = params.ratedCount ?? 0;
+
+  const avgRating = ratedCount > 0 ? totalRating / ratedCount : 5.0;
+  const scaledAvgRating = avgRating / 5.0;
+
+  const taskNorm = Math.min(1, verifiedTaskCount / TASK_SATURATION);
+  const hoursNorm = Math.min(1, verifiedHours / HOURS_SATURATION);
+
+  const rawScore =
+    0.35 * taskNorm +
+    0.30 * scaledAvgRating +
+    0.15 * hoursNorm +
+    (idVerified ? 0.10 : 0) -
+    reportPenalty;
+
+  const clampedScore = Math.max(0.3, Math.min(1.0, rawScore));
+  const trustScore = Math.round(clampedScore * 100);
+
+  return { rawScore, clampedScore, trustScore };
+}
+

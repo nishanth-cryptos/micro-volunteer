@@ -10,9 +10,8 @@
 // Governs: memory-bank/systemPatterns.md (chats/{chatId} + messages shapes).
 // NEVER log message text, display names, or UIDs from this module.
 
-import { FieldValue } from 'firebase-admin/firestore';
-
 const PREVIEW_MAX = 120;
+
 
 function preview(text: string): string {
   const t = text.trim();
@@ -51,8 +50,8 @@ export async function ensureChatForTask(
   await chatRef.set({
     taskId,
     participants: [customerId, volunteerId],
-    createdAt: FieldValue.serverTimestamp(),
-    lastMessageAt: FieldValue.serverTimestamp(),
+    createdAt: new Date(),
+    lastMessageAt: new Date(),
     lastMessagePreview: '',
   });
 }
@@ -75,10 +74,12 @@ export async function appendSystemMessage(
     senderUid: 'system',
     text,
     system: true,
-    sentAt: FieldValue.serverTimestamp(),
+    sentAt: new Date(),
   });
   await chatRef.update({
-    lastMessageAt: FieldValue.serverTimestamp(),
+    lastMessageAt: new Date(),
     lastMessagePreview: preview(text),
   });
 }
+
+

@@ -127,3 +127,38 @@ export const awardPointsOnCompletion = onDocumentUpdated(
     await recomputeTrustScore(db, volunteerId);
   },
 );
+
+export function calculatePointsAwardPure(params: {
+  estimatedMinutes?: number;
+  customerRoles?: string[];
+  requiredSkills?: string[];
+}): {
+  durationBonus: number;
+  volunteerPointsAwarded: number;
+  customerPointsAwarded: number;
+  verifiedHoursIncrement: number;
+  skillsCredited: string[];
+} {
+  const estimatedMinutes = Math.max(0, params.estimatedMinutes ?? 0);
+  const requiredSkills = params.requiredSkills ?? [];
+  const customerRoles = params.customerRoles ?? [];
+
+  const durationBonus = Math.min(
+    MAX_DURATION_BONUS,
+    Math.floor(estimatedMinutes / 15),
+  );
+  const volunteerPointsAwarded = BASE_VOLUNTEER_POINTS + durationBonus;
+
+  const customerIsVolunteer = customerRoles.includes('volunteer');
+  const customerPointsAwarded = customerIsVolunteer ? CUSTOMER_POINTS_REWARD : 0;
+  const verifiedHoursIncrement = estimatedMinutes / 60;
+
+  return {
+    durationBonus,
+    volunteerPointsAwarded,
+    customerPointsAwarded,
+    verifiedHoursIncrement,
+    skillsCredited: requiredSkills,
+  };
+}
+
