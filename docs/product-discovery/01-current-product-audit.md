@@ -17,12 +17,12 @@ Hey Padosi is a verified hyperlocal micro-volunteering web application. Requeste
 
 ## 2. Current Target Users
 
-| Segment | Description |
-|---|---|
+| Segment                    | Description                                              |
+| -------------------------- | -------------------------------------------------------- |
 | **Requesters (Customers)** | Individuals who need help with small, safe, nearby tasks |
-| **Volunteers** | Individuals willing to help neighbours with tasks |
-| **Dual-role users** | Users who both request and volunteer |
-| **Admins** | Platform moderators with access to the admin dashboard |
+| **Volunteers**             | Individuals willing to help neighbours with tasks        |
+| **Dual-role users**        | Users who both request and volunteer                     |
+| **Admins**                 | Platform moderators with access to the admin dashboard   |
 
 **Current geographic focus:** Hyperlocal — 2–5 km matching radius. Seed data is centred around Kalewadi, Pune, India.
 
@@ -30,20 +30,20 @@ Hey Padosi is a verified hyperlocal micro-volunteering web application. Requeste
 
 ## 3. Current Phase 1 Scope (12 Features)
 
-| # | Feature | Status |
-|---|---|---|
-| 1 | Auth & signup (Phone OTP + Email, T&C consent) | ✅ Complete |
-| 2 | Roles (volunteer, customer, or both) | ✅ Complete |
-| 3 | Profile (name, photo required, optional ID, bio) | ✅ Complete |
-| 4 | Volunteer availability toggle (ON/OFF) | ✅ Complete |
-| 5 | Task posting (category, skills, location, duration, structured instructions) | ✅ Complete |
-| 6 | Risk classification (Low/Medium only; High/Prohibited blocked) | ✅ Complete |
-| 7 | H3-based nearby matching (res-9, 2–5 km) | ✅ Complete |
-| 8 | Volunteer ranking (multi-factor scoring formula) | ✅ Complete |
-| 9 | Notifications & accept/reject (offer dispatch, radius expansion) | ✅ Complete |
-| 10 | In-app chat (post-acceptance, report/block aware) | ✅ Complete |
-| 11 | Start/End OTP task verification (server-side, hash+salt+TTL) | ✅ Complete |
-| 12 | Points, trust/safety, admin dashboard | ✅ Complete |
+| #   | Feature                                                                      | Status      |
+| --- | ---------------------------------------------------------------------------- | ----------- |
+| 1   | Auth & signup (Phone OTP + Email, T&C consent)                               | ✅ Complete |
+| 2   | Roles (volunteer, customer, or both)                                         | ✅ Complete |
+| 3   | Profile (name, photo required, optional ID, bio)                             | ✅ Complete |
+| 4   | Volunteer availability toggle (ON/OFF)                                       | ✅ Complete |
+| 5   | Task posting (category, skills, location, duration, structured instructions) | ✅ Complete |
+| 6   | Risk classification (Low/Medium only; High/Prohibited blocked)               | ✅ Complete |
+| 7   | H3-based nearby matching (res-9, 2–5 km)                                     | ✅ Complete |
+| 8   | Volunteer ranking (multi-factor scoring formula)                             | ✅ Complete |
+| 9   | Notifications & accept/reject (offer dispatch, radius expansion)             | ✅ Complete |
+| 10  | In-app chat (post-acceptance, report/block aware)                            | ✅ Complete |
+| 11  | Start/End OTP task verification (server-side, hash+salt+TTL)                 | ✅ Complete |
+| 12  | Points, trust/safety, admin dashboard                                        | ✅ Complete |
 
 **Explicitly out of scope (per `projectbrief.md`):** Cafe vouchers, Aadhaar verification, insurance, masked calling, AI/LLM content review, deposits, advanced certificates, leaderboards, IP-ban-as-primary-control, any high-risk or prohibited task type.
 
@@ -51,12 +51,12 @@ Hey Padosi is a verified hyperlocal micro-volunteering web application. Requeste
 
 ## 4. Current User Roles
 
-| Role | Access | Key Capabilities |
-|---|---|---|
-| **Customer** | Post tasks, view own tasks, chat, rate, report | Task creation, OTP verification, rating |
-| **Volunteer** | Receive offers, accept/reject, chat, complete tasks | Availability toggle, offer inbox, OTP entry |
-| **Dual-role** | Combined customer + volunteer capabilities | Both dashboards available |
-| **Admin** | Admin dashboard, moderation | Reports queue, user lookup, task audit, activity log, warn/suspend/ban |
+| Role          | Access                                              | Key Capabilities                                                       |
+| ------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Customer**  | Post tasks, view own tasks, chat, rate, report      | Task creation, OTP verification, rating                                |
+| **Volunteer** | Receive offers, accept/reject, chat, complete tasks | Availability toggle, offer inbox, OTP entry                            |
+| **Dual-role** | Combined customer + volunteer capabilities          | Both dashboards available                                              |
+| **Admin**     | Admin dashboard, moderation                         | Reports queue, user lookup, task audit, activity log, warn/suspend/ban |
 
 Role assignment occurs during onboarding (step 2). Admin role is set server-side via seed scripts.
 
@@ -65,6 +65,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 ## 5. Current User Journeys
 
 ### Customer Journey
+
 1. Landing page → Signup (Phone OTP or Email)
 2. T&C consent → Role selection → Profile (name, photo, bio) → Skills (if dual-role)
 3. Customer Dashboard → "Post a Task" (category, skills, location, duration, instructions)
@@ -74,6 +75,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 7. Customer rates volunteer (1–5 stars) → Points awarded
 
 ### Volunteer Journey
+
 1. Landing page → Signup → Onboarding (consent, role, profile, skills)
 2. Volunteer Dashboard → Toggle availability ON (triggers geolocation + H3 cell)
 3. Offer appears in inbox → Accept or Reject
@@ -83,6 +85,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 7. Points and skill points awarded, trust score updated
 
 ### Admin Journey
+
 1. Login → Admin Home → Navigate to Admin Dashboard
 2. Review pending reports → Warn / Suspend / Ban / Dismiss
 3. User lookup → View moderation log → Apply actions
@@ -94,17 +97,20 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 ## 6. Current Feature Inventory
 
 ### Authentication
+
 - Firebase Phone OTP (SMS) + Email/Password
 - Auth emulator for development (test numbers, no real SMS)
 - `useRedirectWhenSignedIn` hook to prevent auth-then-navigate race
 
 ### Onboarding (4-step progressive)
+
 - Step 1: T&C consent capture (version + timestamp)
 - Step 2: Role selection (volunteer / customer / both)
 - Step 3: Profile (display name, photo required, bio, optional ID image)
 - Step 4: Skills selection (volunteer/dual-role only; card grid with SVG icons)
 
 ### Task Creation
+
 - Category selection (chip-based)
 - Required skills (multi-select, max 5)
 - Duration (stepper with presets: 15/30/60/120 min)
@@ -114,6 +120,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - Scheduled tasks support (`scheduledFor` field, `activateScheduledTasks` function)
 
 ### Matching Engine
+
 - `rankNearbyVolunteers` HTTPS callable
 - Scoring formula: Distance 30% + Skill 25% + Trust 20% + Availability 15% + Past Completion 10% − Report Penalty
 - H3 resolution 9 (~174m hex edge), ring-based radius expansion
@@ -123,6 +130,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - `periodicRedispatchOffers` scheduler expands radius every 60s (cap 10km)
 
 ### Offer System
+
 - Offer docs at `tasks/{taskId}/offers/{volunteerId}`
 - States: offered → accepted / rejected / expired / superseded
 - Race-safe transaction for acceptance
@@ -130,6 +138,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - Top batch capped at 10 offers per dispatch cycle
 
 ### Chat
+
 - One chat per accepted task (`chatId === taskId`)
 - Participant-only, immutable messages for clients
 - System messages on accept/start/complete (server-side)
@@ -139,12 +148,14 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - Reassignment wipes prior conversation
 
 ### Task Verification (OTP)
+
 - Start OTP: customer generates → verbal handoff → volunteer enters
 - End OTP: same flow for completion
 - Server-side: SHA-256(code+salt), TTL ~10 min, plaintext returned once to customer only
 - Never logged, never returned to volunteer client
 
 ### Points & Trust
+
 - Volunteer: 10 base + 1/15min duration bonus (cap 18 total)
 - Volunteer skill points: +1 per required skill
 - Customer: 2 points on task completion
@@ -152,6 +163,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - Clamped [30, 100], badges: Newcomer (<60), Reliable (60–84), Trusted (≥85)
 
 ### Safety & Moderation
+
 - Report system: safety, no_show, inappropriate, fraud, other
 - Reporting window: accepted/in_progress/completed (within 24h)
 - Duplicate report prevention (same reporter+target+task)
@@ -165,6 +177,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - Full-screen banned/suspended interceptor in ProtectedRoute
 
 ### Admin Dashboard
+
 - 4 tabs: Pending Reports → User Lookup → Task Audit Trail → Activity Log
 - No raw UIDs anywhere (names resolved to display names, roles)
 - Collapsible report cards with inline action buttons
@@ -173,6 +186,7 @@ Role assignment occurs during onboarding (step 2). Admin role is set server-side
 - Activity log: 50 per page, event-type filter, "Load more"
 
 ### Trail Service (Experimental)
+
 - Commute trail mining: stay-point detection, trip segmentation, route clustering
 - Corridor-based task matching along volunteer routes
 - Departure detection with prompt modal
@@ -198,18 +212,18 @@ Created → searching → [offers dispatched]
 
 ## 8. Current Safety Model
 
-| Layer | Implementation |
-|---|---|
+| Layer                        | Implementation                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------ |
 | **Task risk classification** | Low (open), Medium (requires ID verification), High/Prohibited (blocked at creation) |
-| **Identity** | Phone OTP + optional ID image; `idVerified` flag is server-only |
-| **OTP verification** | Hash+salt+TTL for task start/end; prevents false completion claims |
-| **Reporting** | 5 canonical reasons, 24h post-completion window, unique reporter count |
-| **Blocking** | Mutual block; excludes from matching, disables chat |
-| **Moderation** | Admin warn → suspend → ban pipeline; mid-task reassignment |
-| **Account enforcement** | Full-screen interceptors; suspended/banned users blocked from all actions |
-| **Data purge** | 30-day post-ban purge of Auth, Storage, user doc |
-| **Audit trail** | Immutable `tasks/{id}/events` + site-wide `activityLog` |
-| **PII protection** | No logging of phone/email/OTPs/tokens/coordinates |
+| **Identity**                 | Phone OTP + optional ID image; `idVerified` flag is server-only                      |
+| **OTP verification**         | Hash+salt+TTL for task start/end; prevents false completion claims                   |
+| **Reporting**                | 5 canonical reasons, 24h post-completion window, unique reporter count               |
+| **Blocking**                 | Mutual block; excludes from matching, disables chat                                  |
+| **Moderation**               | Admin warn → suspend → ban pipeline; mid-task reassignment                           |
+| **Account enforcement**      | Full-screen interceptors; suspended/banned users blocked from all actions            |
+| **Data purge**               | 30-day post-ban purge of Auth, Storage, user doc                                     |
+| **Audit trail**              | Immutable `tasks/{id}/events` + site-wide `activityLog`                              |
+| **PII protection**           | No logging of phone/email/OTPs/tokens/coordinates                                    |
 
 ---
 
@@ -266,19 +280,19 @@ Created → searching → [offers dispatched]
 
 ## 13. Current Technical Architecture (Product Level)
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | React 19, Vite 8, TypeScript 6 (strict), Tailwind CSS v4 |
-| **UI primitives** | Headless UI for accessible components |
-| **Maps** | Leaflet + OpenStreetMap |
-| **Geo-indexing** | h3-js (resolution 9) |
-| **Auth** | Firebase Phone Auth + Email/Password |
-| **Database** | Cloud Firestore (asia-south1) |
-| **Storage** | Cloud Storage (emulator only; Blaze upgrade needed) |
-| **Server logic** | Cloud Functions v2 (firebase-functions 7.2.5, Node 22) |
-| **Push notifications** | FCM (deferred — emulator only) |
-| **Hosting** | Firebase Hosting |
-| **Plan** | Spark (free); Blaze upgrade required for production |
+| Layer                  | Technology                                               |
+| ---------------------- | -------------------------------------------------------- |
+| **Frontend**           | React 19, Vite 8, TypeScript 6 (strict), Tailwind CSS v4 |
+| **UI primitives**      | Headless UI for accessible components                    |
+| **Maps**               | Leaflet + OpenStreetMap                                  |
+| **Geo-indexing**       | h3-js (resolution 9)                                     |
+| **Auth**               | Firebase Phone Auth + Email/Password                     |
+| **Database**           | Cloud Firestore (asia-south1)                            |
+| **Storage**            | Cloud Storage (emulator only; Blaze upgrade needed)      |
+| **Server logic**       | Cloud Functions v2 (firebase-functions 7.2.5, Node 22)   |
+| **Push notifications** | FCM (deferred — emulator only)                           |
+| **Hosting**            | Firebase Hosting                                         |
+| **Plan**               | Spark (free); Blaze upgrade required for production      |
 
 **Server-authoritative invariant:** Trust scores, points, OTPs, matching, risk levels, and moderation are all computed in Cloud Functions. Firestore rules enforce that clients cannot write these fields.
 
@@ -287,6 +301,7 @@ Created → searching → [offers dispatched]
 ## 14. Current UI/UX Structure
 
 ### Design System
+
 - **Palette:** `#fafaf8` background, `#1f6f5c` emerald green accent, `#ececea` borders, `#131312` text
 - **Typography:** System fonts (no custom web fonts loaded)
 - **Animation system:** `vc-*` prefix keyframes (fade-up, shimmer, radar-ping, check-pop, etc.)
@@ -294,6 +309,7 @@ Created → searching → [offers dispatched]
 - **Layout:** Mobile-first, responsive (max-w-3xl content areas)
 
 ### Navigation
+
 - Public: Landing (`/`), Login (`/login`), Signup (`/signup`)
 - Onboarding: Consent → Role → Profile → Skills (progressive, step-guarded)
 - Authenticated: App Home (`/app`), Create Task (`/create-task`), Task Detail (`/tasks/:id`)
@@ -302,6 +318,7 @@ Created → searching → [offers dispatched]
 - Your Routes page (`/your-routes`) for trail management
 
 ### Key UI Components
+
 - **Customer Dashboard:** Two-screen (Tasks/Profile), gradient hero, Leaflet map, ongoing tasks, past tasks tabs
 - **Volunteer Dashboard:** Hero with karma/trust/completions, availability toggle, offer inbox, nearby requests, accepted tasks, blocked users list
 - **Create Task:** Sticky progress strip, animated chips, time stepper, map picker, sticky bottom action bar
