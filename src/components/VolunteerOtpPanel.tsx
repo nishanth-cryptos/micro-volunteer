@@ -1,4 +1,4 @@
-// Volunteer-side OTP entry. The customer shows them the 4-digit code in person;
+// Volunteer-side OTP entry. The customer shows them the 6-digit code in person;
 // they type it here. Calls verifyStartOtp / verifyEndOtp depending on
 // the current task phase. On success the task doc flips status, the
 // TaskDetailPage re-renders, and this panel unmounts.
@@ -23,8 +23,8 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
     e.preventDefault();
     setError(null);
     const trimmed = code.trim();
-    if (!/^\d{4}$/.test(trimmed)) {
-      setError('Please enter the 4-digit verification code from the customer.');
+    if (!/^\d{4,6}$/.test(trimmed)) {
+      setError('Please enter the 6-digit verification code from the customer.');
       return;
     }
     setBusy(true);
@@ -48,8 +48,8 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
   const isStart = phase === 'start';
   const phaseTitle = isStart ? 'Start Verification Code' : 'Completion Verification Code';
   const helpText = isStart
-    ? 'Ask the customer to show you their 4-digit Start Code when you arrive. Entering it officially starts the task.'
-    : 'Ask the customer for their 4-digit Completion Code once the task is finished to confirm and complete the mission.';
+    ? 'Ask the customer to show you their 6-digit Start Code when you arrive. Entering it officially starts the task.'
+    : 'Ask the customer for their 6-digit Completion Code once the task is finished to confirm and complete the mission.';
   const buttonText = isStart ? 'Verify & start task' : 'Verify & complete task';
 
   return (
@@ -86,13 +86,13 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
             inputMode="numeric"
             autoComplete="one-time-code"
             required
-            maxLength={4}
-            placeholder="• • • •"
+            maxLength={6}
+            placeholder="• • • • • •"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             aria-invalid={error !== null}
             aria-describedby={error ? errorId : undefined}
-            className="w-48 rounded-2xl border border-[#ececea] bg-[#fafaf8] px-4 py-3.5 text-center font-mono text-2xl font-bold tracking-[0.35em] text-[#131312] placeholder-[#b8b3ad] transition focus:border-[#1f6f5c] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#1f6f5c]/10 shadow-xs"
+            className="w-64 rounded-2xl border border-[#ececea] bg-[#fafaf8] px-4 py-3.5 text-center font-mono text-2xl font-bold tracking-[0.25em] text-[#131312] placeholder-[#b8b3ad] transition focus:border-[#1f6f5c] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#1f6f5c]/10 shadow-xs"
           />
         </div>
 
@@ -105,7 +105,7 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
         <div className="flex flex-col items-center gap-2 pt-2">
           <button
             type="submit"
-            disabled={busy || code.trim().length !== 4}
+            disabled={busy || code.trim().length < 4}
             className="inline-flex items-center justify-center gap-2 rounded-full bg-[#1f6f5c] px-8 py-2.5 text-xs font-semibold text-white transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] disabled:opacity-50 shadow-sm"
           >
             {busy ? 'Verifying code…' : buttonText}

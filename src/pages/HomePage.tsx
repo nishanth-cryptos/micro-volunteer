@@ -166,7 +166,7 @@ export default function HomePage() {
                 </span>
                 <h3 className="mt-6 text-xl font-bold text-[#131312]">Complete with OTP</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#4f4b46]">
-                  When meeting in person, exchange verbal 4-digit passcodes to start and finish the task. This ensures mutual agreement and verified completion.
+                  When meeting in person, exchange verbal 6-digit passcodes to start and finish the task. This ensures mutual agreement and verified completion.
                 </p>
                 <div className="mt-6 rounded-xl border border-[#ececea] bg-white p-3 text-xs text-[#8a847d]">
                   <strong className="text-[#131312]">Community trust:</strong> Verified completions award skill points and build permanent trust ratings.
@@ -225,7 +225,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="mt-4 text-base font-bold text-[#131312]">In-Person Passcode Handshake</h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#4f4b46]">
-                  A 4-digit code generated on the customer&apos;s phone must be entered by the volunteer at arrival and upon completion, preventing false confirmations.
+                  A 6-digit code generated on the customer&apos;s phone must be entered by the volunteer at arrival and upon completion, preventing false confirmations.
                 </p>
               </div>
 

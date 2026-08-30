@@ -66,8 +66,8 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
   const phaseLabel = phase === 'start' ? 'Start' : 'End';
   const helpText =
     phase === 'start'
-      ? 'Share this 4-digit code with your volunteer when they arrive to officially start the task.'
-      : 'When the volunteer has completed your task, share this code to confirm task completion.';
+      ? 'Share this 6-digit code with your volunteer when they arrive to officially start the task.'
+      : 'When the volunteer has completed your task, share this 6-digit code to confirm task completion.';
 
   const handleCopy = () => {
     if (!code) return;
