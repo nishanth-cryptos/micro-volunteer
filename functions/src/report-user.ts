@@ -1,5 +1,9 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, type Timestamp } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  getFirestore,
+  type Timestamp,
+} from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { appendActivityLog, safeDisplayName } from './activity-log';
@@ -83,9 +87,11 @@ export const reportUser = onCall(
     };
 
     const isCustomerReporter =
-      task.customerId === reporterId && task.acceptedVolunteerId === reportedUserId;
+      task.customerId === reporterId &&
+      task.acceptedVolunteerId === reportedUserId;
     const isVolunteerReporter =
-      task.acceptedVolunteerId === reporterId && task.customerId === reportedUserId;
+      task.acceptedVolunteerId === reporterId &&
+      task.customerId === reportedUserId;
 
     if (!isCustomerReporter && !isVolunteerReporter) {
       throw new HttpsError(

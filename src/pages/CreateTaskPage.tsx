@@ -17,15 +17,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
-import {
-  CATEGORIES,
-  SKILLS,
-  deriveRisk,
-  type Category,
-} from '../lib/catalog';
+import { CATEGORIES, SKILLS, deriveRisk, type Category } from '../lib/catalog';
 import { TaskLocationPicker } from '../components/TaskLocationPicker';
 import { ScheduleTaskBottomSheet } from '../components/ScheduleTaskBottomSheet';
-
 
 const INITIAL_SEARCH_RADIUS_M = 2000;
 const TASK_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -43,33 +37,53 @@ export default function CreateTaskPage() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
 
-  const prefill = (routerLocation.state as {
-    prefill?: {
-      title?: string;
-      category?: string;
-      requiredSkills?: string[];
-      estimatedMinutes?: number;
-      description?: {
-        meetingPoint?: string;
-        whatToBring?: string;
-        preference?: string;
-        safetyNote?: string;
+  const prefill = (
+    routerLocation.state as {
+      prefill?: {
+        title?: string;
+        category?: string;
+        requiredSkills?: string[];
+        estimatedMinutes?: number;
+        description?: {
+          meetingPoint?: string;
+          whatToBring?: string;
+          preference?: string;
+          safetyNote?: string;
+        };
+        location?: PickedLocation;
+        expectedWaitTier?: 'fast' | 'normal' | 'flexible';
       };
-      location?: PickedLocation;
-      expectedWaitTier?: 'fast' | 'normal' | 'flexible';
-    };
-  } | null)?.prefill;
+    } | null
+  )?.prefill;
 
   const [title, setTitle] = useState(() => prefill?.title ?? '');
-  const [categoryKey, setCategoryKey] = useState<string>(() => prefill?.category ?? '');
-  const [selectedSkills, setSelectedSkills] = useState<string[]>(() => prefill?.requiredSkills ?? []);
-  const [estimatedMinutes, setEstimatedMinutes] = useState(() => prefill?.estimatedMinutes ?? 30);
-  const [meetingPoint, setMeetingPoint] = useState(() => prefill?.description?.meetingPoint ?? '');
-  const [whatToBring, setWhatToBring] = useState(() => prefill?.description?.whatToBring ?? '');
-  const [preference, setPreference] = useState(() => prefill?.description?.preference ?? '');
-  const [safetyNote, setSafetyNote] = useState(() => prefill?.description?.safetyNote ?? '');
-  const [location, setLocation] = useState<PickedLocation | null>(() => prefill?.location ?? null);
-  const [expectedWaitTier, setExpectedWaitTier] = useState<'fast' | 'normal' | 'flexible'>(() => prefill?.expectedWaitTier ?? 'normal');
+  const [categoryKey, setCategoryKey] = useState<string>(
+    () => prefill?.category ?? '',
+  );
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(
+    () => prefill?.requiredSkills ?? [],
+  );
+  const [estimatedMinutes, setEstimatedMinutes] = useState(
+    () => prefill?.estimatedMinutes ?? 30,
+  );
+  const [meetingPoint, setMeetingPoint] = useState(
+    () => prefill?.description?.meetingPoint ?? '',
+  );
+  const [whatToBring, setWhatToBring] = useState(
+    () => prefill?.description?.whatToBring ?? '',
+  );
+  const [preference, setPreference] = useState(
+    () => prefill?.description?.preference ?? '',
+  );
+  const [safetyNote, setSafetyNote] = useState(
+    () => prefill?.description?.safetyNote ?? '',
+  );
+  const [location, setLocation] = useState<PickedLocation | null>(
+    () => prefill?.location ?? null,
+  );
+  const [expectedWaitTier, setExpectedWaitTier] = useState<
+    'fast' | 'normal' | 'flexible'
+  >(() => prefill?.expectedWaitTier ?? 'normal');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -103,7 +117,9 @@ export default function CreateTaskPage() {
   const selectedCategory: Category | undefined = CATEGORIES.find(
     (c) => c.key === categoryKey,
   );
-  const derivedRisk = selectedCategory ? deriveRisk(selectedCategory.key) : null;
+  const derivedRisk = selectedCategory
+    ? deriveRisk(selectedCategory.key)
+    : null;
 
   // 6 required fields drive the progress strip — title, category, ≥1 skill,
   // valid duration, meeting point, location pin. Optional textareas don't
@@ -140,7 +156,11 @@ export default function CreateTaskPage() {
     if (selectedSkills.length === 0) {
       return setError('Pick at least one skill needed.');
     }
-    if (!Number.isFinite(estimatedMinutes) || estimatedMinutes < 5 || estimatedMinutes > 480) {
+    if (
+      !Number.isFinite(estimatedMinutes) ||
+      estimatedMinutes < 5 ||
+      estimatedMinutes > 480
+    ) {
       return setError('Duration must be between 5 and 480 minutes.');
     }
     if (!meetingPoint.trim()) {
@@ -202,7 +222,9 @@ export default function CreateTaskPage() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Could not post the task. Try again.',
+        err instanceof Error
+          ? err.message
+          : 'Could not post the task. Try again.',
       );
     } finally {
       setBusy(false);
@@ -225,7 +247,15 @@ export default function CreateTaskPage() {
       <main className="min-h-screen bg-[#fafaf8] text-[#131312] grid place-items-center p-6">
         <div className="vc-fade-up w-full max-w-md rounded-3xl border border-[#ececea] bg-white p-8 text-center shadow-xl">
           <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
-            <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-8 w-8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
               <line x1="16" x2="16" y1="2" y2="6" />
               <line x1="8" x2="8" y1="2" y2="6" />
@@ -239,7 +269,10 @@ export default function CreateTaskPage() {
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-[#4f4b46]">
             We&apos;ll start reaching out to neighbors on{' '}
-            <span className="font-semibold text-[#1f6f5c]">{formattedTime}</span>.
+            <span className="font-semibold text-[#1f6f5c]">
+              {formattedTime}
+            </span>
+            .
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
@@ -269,7 +302,16 @@ export default function CreateTaskPage() {
             to="/app"
             className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec]"
           >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="m15 18-6-6 6-6" />
             </svg>
             Back
@@ -287,7 +329,6 @@ export default function CreateTaskPage() {
 
       <ContentBody
         title={title}
-
         setTitle={setTitle}
         titleId={titleId}
         categoryKey={categoryKey}
@@ -391,12 +432,10 @@ export default function CreateTaskPage() {
 }
 
 const WAIT_TIER_PRESETS: Array<{
-
   key: 'fast' | 'normal' | 'flexible';
   label: string;
   subtext: string;
 }> = [
-
   {
     key: 'fast',
     label: 'I need this soon',
@@ -447,7 +486,6 @@ interface BodyProps {
   errorId: string;
 }
 
-
 function ContentBody(p: BodyProps) {
   const skillsAtCap = p.selectedSkills.length >= MAX_SKILLS;
 
@@ -461,7 +499,10 @@ function ContentBody(p: BodyProps) {
       </div>
 
       <div className="mt-9 space-y-9">
-        <FormBlock label="Title" hint="A short summary nearby volunteers will see first.">
+        <FormBlock
+          label="Title"
+          hint="A short summary nearby volunteers will see first."
+        >
           <div className="relative">
             <input
               id={p.titleId}
@@ -479,7 +520,10 @@ function ContentBody(p: BodyProps) {
           </div>
         </FormBlock>
 
-        <FormBlock label="Category" hint="Pick the closest fit. This sets the risk level.">
+        <FormBlock
+          label="Category"
+          hint="Pick the closest fit. This sets the risk level."
+        >
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
               <Chip
@@ -496,20 +540,33 @@ function ContentBody(p: BodyProps) {
             </p>
           )}
           {p.derivedRisk && (
-            <div className="vc-fade-in mt-3 rounded-xl border border-[#ececea] bg-white p-3.5 text-xs leading-relaxed shadow-xs">
+            <div className="vc-fade-in mt-3 rounded-2xl border border-[#ececea] bg-[#fafaf8] p-4 text-xs leading-relaxed shadow-xs">
               {p.derivedRisk === 'medium' ? (
-                <div className="flex items-start gap-2 text-[#854d0e]">
-                  <span className="text-base">🛡️</span>
-                  <span>
-                    <strong className="font-semibold text-[#713f12]">Verified Volunteer Category:</strong> For safety in this category, only volunteers who have completed identity verification can accept your task.
-                  </span>
+                <div className="flex items-start gap-2.5 text-[#713f12]">
+                  <span className="text-base flex-shrink-0">🛡️</span>
+                  <div>
+                    <strong className="font-bold text-[#5a2900]">
+                      ID-Verified Task:
+                    </strong>
+                    <p className="mt-0.5 text-[#713f12]">
+                      Involves medicine, errands, or sensitive assistance.
+                      Matched exclusively with ID-verified volunteers for your
+                      safety and peace of mind.
+                    </p>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-2 text-[#1f6f5c]">
-                  <span className="text-base">✓</span>
-                  <span>
-                    <strong className="font-semibold text-[#185845]">Low-Risk Community Task:</strong> Open to all helpful, registered neighbourhood volunteers.
-                  </span>
+                <div className="flex items-start gap-2.5 text-[#1f6f5c]">
+                  <span className="text-base flex-shrink-0">✓</span>
+                  <div>
+                    <strong className="font-bold text-[#185845]">
+                      Everyday Community Task:
+                    </strong>
+                    <p className="mt-0.5 text-[#2c6152]">
+                      Involves everyday neighbourhood micro-assistance. Open to
+                      all active, registered local volunteers.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -602,10 +659,12 @@ function ContentBody(p: BodyProps) {
           </div>
         </FormBlock>
 
-        <FormBlock label="Where" hint="Drag the pin to the exact meeting point.">
+        <FormBlock
+          label="Where"
+          hint="Drag the pin to the exact meeting point."
+        >
           <TaskLocationPicker onLocationChange={p.onLocationChange} />
         </FormBlock>
-
 
         <FormBlock label="Instructions">
           <FieldTextarea
@@ -709,7 +768,16 @@ function Chip({
     >
       {on && (
         <span className="vc-check-pop inline-flex">
-          <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3 w-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="M20 6 9 17l-5-5" />
           </svg>
         </span>
@@ -804,16 +872,17 @@ function FieldTextarea({
   return (
     <div className="mt-4 first:mt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-1">
-        <label htmlFor={id} className="block text-[13px] font-medium text-[#131312]">
+        <label
+          htmlFor={id}
+          className="block text-[13px] font-medium text-[#131312]"
+        >
           {label}{' '}
           {optional && (
             <span className="font-normal text-[#8a847d]">(optional)</span>
           )}
         </label>
       </div>
-      {helper && (
-        <p className="mt-0.5 text-xs text-[#8a847d]">{helper}</p>
-      )}
+      {helper && <p className="mt-0.5 text-xs text-[#8a847d]">{helper}</p>}
       <textarea
         id={id}
         rows={2}

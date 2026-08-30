@@ -26,8 +26,10 @@ import { CustomerRatingPanel } from '../components/CustomerRatingPanel';
 import { ReportBlockPanel } from '../components/ReportBlockPanel';
 import { ChatPanel } from '../components/ChatPanel';
 import { KarmaToast } from '../components/KarmaToast';
-import { ReasonBottomSheet, type ReasonOption } from '../components/ReasonBottomSheet';
-
+import {
+  ReasonBottomSheet,
+  type ReasonOption,
+} from '../components/ReasonBottomSheet';
 
 type TaskStatus =
   | 'searching'
@@ -70,14 +72,18 @@ interface TaskDoc {
   nearingExpiry?: boolean;
 }
 
-
-type OfferState = 'offered' | 'accepted' | 'rejected' | 'superseded' | 'expired';
+type OfferState =
+  | 'offered'
+  | 'accepted'
+  | 'rejected'
+  | 'superseded'
+  | 'expired';
 
 interface OfferDoc {
   id: string;
   volunteerId: string;
-  displayName?: string;        // denormalised by dispatchOffers
-  photoURL?: string | null;    // denormalised by dispatchOffers
+  displayName?: string; // denormalised by dispatchOffers
+  photoURL?: string | null; // denormalised by dispatchOffers
   state: OfferState;
   score: number;
   scoreBreakdown: {
@@ -145,10 +151,10 @@ export default function TaskDetailPage() {
     setActionError(null);
     setActionBusy(true);
     try {
-      const fn = httpsCallable<{ taskId: string; reason: string }, { success: boolean }>(
-        functions(),
-        'cancelAcceptedTask',
-      );
+      const fn = httpsCallable<
+        { taskId: string; reason: string },
+        { success: boolean }
+      >(functions(), 'cancelAcceptedTask');
       await fn({ taskId, reason: reasonId });
       setCancelSheetOpen(false);
       void navigate('/app', {
@@ -169,10 +175,10 @@ export default function TaskDetailPage() {
     setActionError(null);
     setActionBusy(true);
     try {
-      const fn = httpsCallable<{ taskId: string; reason: string }, { success: boolean }>(
-        functions(),
-        'deleteTask',
-      );
+      const fn = httpsCallable<
+        { taskId: string; reason: string },
+        { success: boolean }
+      >(functions(), 'deleteTask');
       await fn({ taskId, reason: reasonId });
       setDeleteSheetOpen(false);
       void navigate('/app', {
@@ -187,7 +193,6 @@ export default function TaskDetailPage() {
       setActionBusy(false);
     }
   }
-
 
   useEffect(() => {
     if (!taskId || state.status !== 'ready') return;
@@ -240,12 +245,14 @@ export default function TaskDetailPage() {
           setCompletedEvent(null);
         }
 
-        const foundReassigned = snap.docs.some((d) => d.data().type === 'reassigned');
+        const foundReassigned = snap.docs.some(
+          (d) => d.data().type === 'reassigned',
+        );
         setHasReassignedEvent(foundReassigned);
       },
       () => {
         // Safe to ignore read permission or missing event errors
-      }
+      },
     );
 
     return () => {
@@ -264,17 +271,25 @@ export default function TaskDetailPage() {
       return;
     }
 
-    if (task.status === 'completed' && prevStatusRef.current !== 'completed' && !hasTriggeredToast) {
-      const isVolunteer = state.status === 'ready' && state.user.uid === task.acceptedVolunteerId;
-      const isCustomer = state.status === 'ready' && state.user.uid === task.customerId;
-      const viewerIsVolunteer = state.status === 'ready' && (state.userDoc.roles?.includes('volunteer') ?? false);
+    if (
+      task.status === 'completed' &&
+      prevStatusRef.current !== 'completed' &&
+      !hasTriggeredToast
+    ) {
+      const isVolunteer =
+        state.status === 'ready' && state.user.uid === task.acceptedVolunteerId;
+      const isCustomer =
+        state.status === 'ready' && state.user.uid === task.customerId;
+      const viewerIsVolunteer =
+        state.status === 'ready' &&
+        (state.userDoc.roles?.includes('volunteer') ?? false);
 
       if (completedEvent) {
         const payload = completedEvent.payload || {};
         const pts = isVolunteer
-          ? (payload.pointsAwarded as number || 0)
-          : (isCustomer && viewerIsVolunteer)
-            ? (payload.customerPointsAwarded as number || 0)
+          ? (payload.pointsAwarded as number) || 0
+          : isCustomer && viewerIsVolunteer
+            ? (payload.customerPointsAwarded as number) || 0
             : 0;
 
         if (pts > 0) {
@@ -314,7 +329,16 @@ export default function TaskDetailPage() {
           to="/app"
           className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="m15 18-6-6 6-6" />
           </svg>
           Back to dashboard
@@ -329,7 +353,10 @@ export default function TaskDetailPage() {
         )}
 
         {error && (
-          <div role="alert" className="mt-8 rounded-2xl border border-red-200 bg-red-50/80 p-5 text-sm text-red-800">
+          <div
+            role="alert"
+            className="mt-8 rounded-2xl border border-red-200 bg-red-50/80 p-5 text-sm text-red-800"
+          >
             <p className="font-semibold">Unable to load task</p>
             <p className="mt-1 text-xs">{error}</p>
             <Link
@@ -446,10 +473,26 @@ export default function TaskDetailPage() {
 
 function LifecycleProgressTracker({ status }: { status: TaskStatus }) {
   const steps: Array<{ id: TaskStatus; label: string; sub: string }> = [
-    { id: 'searching', label: 'Finding Volunteer', sub: 'Searching active verified volunteers nearby...' },
-    { id: 'accepted', label: 'Volunteer Matched', sub: 'Volunteer matched. Chat to coordinate arrival.' },
-    { id: 'in_progress', label: 'In Progress', sub: 'Task is actively underway. Have your end code ready.' },
-    { id: 'completed', label: 'Completed', sub: 'Task verified & completed successfully.' },
+    {
+      id: 'searching',
+      label: 'Finding Volunteer',
+      sub: 'Searching active verified volunteers nearby...',
+    },
+    {
+      id: 'accepted',
+      label: 'Volunteer Matched',
+      sub: 'Volunteer matched. Chat to coordinate arrival.',
+    },
+    {
+      id: 'in_progress',
+      label: 'In Progress',
+      sub: 'Task is actively underway. Have your end code ready.',
+    },
+    {
+      id: 'completed',
+      label: 'Completed',
+      sub: 'Task verified & completed successfully.',
+    },
   ];
 
   const getStepIndex = (s: TaskStatus) => {
@@ -477,7 +520,10 @@ function LifecycleProgressTracker({ status }: { status: TaskStatus }) {
           const isDone = idx < currentIndex;
           const isCurrent = idx === currentIndex;
           return (
-            <div key={step.id} className="flex flex-1 items-center gap-1 sm:gap-2">
+            <div
+              key={step.id}
+              className="flex flex-1 items-center gap-1 sm:gap-2"
+            >
               <div className="flex flex-col items-center flex-1">
                 <div
                   className={`grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-full text-xs font-bold transition-all ${
@@ -492,7 +538,11 @@ function LifecycleProgressTracker({ status }: { status: TaskStatus }) {
                 </div>
                 <span
                   className={`mt-1.5 text-center text-[10px] sm:text-xs font-semibold ${
-                    isCurrent ? 'text-[#1f6f5c]' : isDone ? 'text-[#131312]' : 'text-[#8a847d]'
+                    isCurrent
+                      ? 'text-[#1f6f5c]'
+                      : isDone
+                        ? 'text-[#131312]'
+                        : 'text-[#8a847d]'
                   }`}
                 >
                   {step.label}
@@ -522,9 +572,13 @@ function TaskSummary({ task }: { task: TaskDoc }) {
     <section className="mt-6 rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#131312]">{task.title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#131312]">
+            {task.title}
+          </h1>
           <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-[#4f4b46]">
-            <span className="font-semibold text-[#131312]">{category?.label ?? task.category}</span>
+            <span className="font-semibold text-[#131312]">
+              {category?.label ?? task.category}
+            </span>
             <span>·</span>
             <span
               className={
@@ -533,7 +587,9 @@ function TaskSummary({ task }: { task: TaskDoc }) {
                   : 'rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-semibold text-[#1f6f5c]'
               }
             >
-              {task.riskLevel === 'medium' ? '🛡️ Verified Volunteer Category' : '✓ Standard Task'}
+              {task.riskLevel === 'medium'
+                ? '🛡️ Verified Volunteer Category'
+                : '✓ Standard Task'}
             </span>
             <span>·</span>
             <span>{task.estimatedMinutes} min</span>
@@ -543,18 +599,24 @@ function TaskSummary({ task }: { task: TaskDoc }) {
 
       <div className="mt-5 space-y-2.5 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs sm:text-sm text-[#4f4b46]">
         <p>
-          <strong className="font-semibold text-[#131312]">📍 Meeting point: </strong>
+          <strong className="font-semibold text-[#131312]">
+            📍 Meeting point:{' '}
+          </strong>
           {task.description.meetingPoint}
         </p>
         {task.description.whatToBring && (
           <p>
-            <strong className="font-semibold text-[#131312]">🎒 To bring: </strong>
+            <strong className="font-semibold text-[#131312]">
+              🎒 To bring:{' '}
+            </strong>
             {task.description.whatToBring}
           </p>
         )}
         {task.description.preference && (
           <p>
-            <strong className="font-semibold text-[#131312]">💬 Preference: </strong>
+            <strong className="font-semibold text-[#131312]">
+              💬 Preference:{' '}
+            </strong>
             {task.description.preference}
           </p>
         )}
@@ -605,11 +667,11 @@ function OffersSection({
 
   if (task.status === 'accepted' || task.status === 'in_progress') {
     const accepted = offers.find((o) => o.state === 'accepted');
-    
+
     // Choose target display details based on who is viewing
     const targetName = viewerIsAcceptedVolunteer
-      ? (task.customerName || 'Customer')
-      : (accepted?.displayName || 'Volunteer');
+      ? task.customerName || 'Customer'
+      : accepted?.displayName || 'Volunteer';
 
     const subtitle: string | null = viewerIsAcceptedVolunteer
       ? 'Customer · Requester'
@@ -685,7 +747,10 @@ function OffersSection({
           </div>
           <div className="relative mt-4 flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs text-white/90 backdrop-blur-xs">
             <span className="text-sm">🔒</span>
-            <span>Privacy protected · Contact info stays private. Coordinate safely in chat.</span>
+            <span>
+              Privacy protected · Contact info stays private. Coordinate safely
+              in chat.
+            </span>
           </div>
         </section>
         {task.taskId && otherPartyUid && (
@@ -707,28 +772,32 @@ function OffersSection({
         {viewerIsAcceptedVolunteer && (
           <VolunteerOtpPanel taskId={task.taskId ?? ''} phase={phase} />
         )}
-        {viewerIsAcceptedVolunteer && task.status === 'accepted' && onOpenCancelSheet && (
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={onOpenCancelSheet}
-              className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
-            >
-              Cancel accepted task
-            </button>
-          </div>
-        )}
-        {viewerIsCustomer && task.status === 'accepted' && onOpenDeleteSheet && (
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={onOpenDeleteSheet}
-              className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
-            >
-              Delete task
-            </button>
-          </div>
-        )}
+        {viewerIsAcceptedVolunteer &&
+          task.status === 'accepted' &&
+          onOpenCancelSheet && (
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={onOpenCancelSheet}
+                className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
+              >
+                Cancel accepted task
+              </button>
+            </div>
+          )}
+        {viewerIsCustomer &&
+          task.status === 'accepted' &&
+          onOpenDeleteSheet && (
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={onOpenDeleteSheet}
+                className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
+              >
+                Delete task
+              </button>
+            </div>
+          )}
       </>
     );
   }
@@ -736,25 +805,38 @@ function OffersSection({
   if (task.status === 'completed') {
     const accepted = offers.find((o) => o.state === 'accepted');
     const acceptedName =
-      accepted?.displayName
-      || (viewerIsAcceptedVolunteer ? viewerName : null)
-      || 'Volunteer';
+      accepted?.displayName ||
+      (viewerIsAcceptedVolunteer ? viewerName : null) ||
+      'Volunteer';
 
     const payload = completedEvent?.payload || {};
-    const volunteerPoints = payload.pointsAwarded as number ?? (10 + Math.min(8, Math.floor((task.estimatedMinutes || 0) / 15)));
-    const customerPoints = payload.customerPointsAwarded as number ?? 2;
+    const volunteerPoints =
+      (payload.pointsAwarded as number) ??
+      10 + Math.min(8, Math.floor((task.estimatedMinutes || 0) / 15));
+    const customerPoints = (payload.customerPointsAwarded as number) ?? 2;
 
     return (
       <>
         <section className="vc-fade-up mt-8 rounded-3xl border border-[#e3efe9] bg-white p-7 shadow-xs">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
                 <path d="M20 6L9 17l-5-5" />
               </svg>
             </span>
             <div>
-              <p className="text-base font-bold text-[#131312]">Task verified &amp; completed</p>
+              <p className="text-base font-bold text-[#131312]">
+                Task verified &amp; completed
+              </p>
               <p className="text-xs text-[#4f4b46]">
                 Completed with {acceptedName}
               </p>
@@ -763,7 +845,9 @@ function OffersSection({
 
           <div className="mt-5 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs">
             <div className="flex items-center justify-between">
-              <span className="font-medium text-[#4f4b46]">Neighbourhood Karma awarded:</span>
+              <span className="font-medium text-[#4f4b46]">
+                Neighbourhood Karma awarded:
+              </span>
               <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 font-bold text-[#1f6f5c]">
                 +{viewerIsCustomer ? customerPoints : volunteerPoints} pts
               </span>
@@ -796,22 +880,30 @@ function OffersSection({
     );
   }
 
-  if (
-    task.status === 'cancelled' ||
-    task.status === 'expired'
-  ) {
+  if (task.status === 'cancelled' || task.status === 'expired') {
     const isCancelled = task.status === 'cancelled';
     return (
       <section className="vc-fade-up mt-8 rounded-3xl border border-[#ececea] bg-white p-7 text-center shadow-xs">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fef3c7] text-[#b45309]">
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
         <h3 className="mt-4 text-base font-bold text-[#131312]">
-          {isCancelled ? 'This task was cancelled' : 'Task expired without a match'}
+          {isCancelled
+            ? 'This task was cancelled'
+            : 'Task expired without a match'}
         </h3>
         <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-[#4f4b46]">
           {isCancelled
@@ -870,9 +962,13 @@ function OffersSection({
             />
           </svg>
           <div>
-            <p className="font-semibold text-sm">Reassigning your task to nearby volunteers...</p>
-            <p className="mt-1 text-xs text-blue-800">
-              The assigned volunteer is no longer available. We are automatically looking for another volunteer to take over.
+            <p className="font-bold text-sm text-[#1f4baa]">
+              Finding another volunteer for your task
+            </p>
+            <p className="mt-0.5 text-xs text-[#2c5282]">
+              The previously assigned volunteer became unavailable. We are
+              automatically reaching out to active nearby neighbours to help
+              you.
             </p>
           </div>
         </div>
@@ -907,7 +1003,9 @@ function OffersSection({
               ℹ
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-medium leading-relaxed">{task.statusMessage}</p>
+              <p className="font-medium leading-relaxed">
+                {task.statusMessage}
+              </p>
 
               {task.nearingExpiry ? (
                 <div className="mt-3 flex flex-wrap gap-2.5">
@@ -943,7 +1041,7 @@ function OffersSection({
             onClick={onOpenDeleteSheet}
             className="rounded-full border border-red-200 bg-red-50/70 px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 hover:border-red-300 focus:outline-none"
           >
-            Delete task
+            Cancel task
           </button>
         </div>
       )}
@@ -971,10 +1069,10 @@ function OffersSection({
                         📍 {formatDistance(o.distanceM)} away
                       </span>
                       <span className="rounded-full bg-[#f3f1ec] px-2.5 py-0.5 font-medium text-[#4f4b46]">
-                        🛡️ Verified Volunteer
+                        ✓ Community Volunteer
                       </span>
                       {o.scoreBreakdown.skill > 0.5 && (
-                        <span className="rounded-full bg-[#e8effb] px-2.5 py-0.5 font-medium text-[#1f4baa]">
+                        <span className="rounded-full bg-[#e8effb] px-2.5 py-0.5 font-semibold text-[#1f4baa]">
                           ★ Skill Matched
                         </span>
                       )}
@@ -1031,7 +1129,7 @@ function RadarSearching({
   const blipPositions: Array<{ x: number; y: number; label: string }> =
     recentBlips.map((o, i) => {
       const total = recentBlips.length;
-      const angle = (i / total) * Math.PI * 2 + (Math.PI / 5);
+      const angle = (i / total) * Math.PI * 2 + Math.PI / 5;
       const r = i % 2 === 0 ? 32 : 42;
       const x = 50 + Math.cos(angle) * r;
       const y = 50 + Math.sin(angle) * r;

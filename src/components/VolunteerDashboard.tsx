@@ -39,7 +39,7 @@ import { getCategory, getSkillLabel } from '../lib/catalog';
 import { GeolocationError, getCurrentLocation } from '../lib/geolocation';
 import { BlockedUsersList } from './BlockedUsersList';
 import { DeparturePromptModal } from './DeparturePromptModal';
-import { KarmaBadge } from './KarmaBadge';
+import { KarmaBadge, TrustScorePill, HowTrustWorksModal } from './KarmaBadge';
 import { TaskLocationPicker } from './TaskLocationPicker';
 import { Logo } from './Logo';
 import { RoleSwitcher } from './RoleSwitcher';
@@ -58,7 +58,10 @@ import {
   setTrailConsent,
   wipeAllTrailData,
 } from '../lib/trail-service/trail-store';
-import type { CanonicalRoute, TaskSuggestion } from '../lib/trail-service/types';
+import type {
+  CanonicalRoute,
+  TaskSuggestion,
+} from '../lib/trail-service/types';
 
 const H3_RESOLUTION = 9;
 
@@ -128,8 +131,11 @@ export function VolunteerDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeRoutePrompt, setActiveRoutePrompt] = useState<CanonicalRoute | null>(null);
-  const [promptSuggestions, setPromptSuggestions] = useState<TaskSuggestion[]>([]);
+  const [activeRoutePrompt, setActiveRoutePrompt] =
+    useState<CanonicalRoute | null>(null);
+  const [promptSuggestions, setPromptSuggestions] = useState<TaskSuggestion[]>(
+    [],
+  );
   const [promptSlackMinutes, setPromptSlackMinutes] = useState(15);
 
   const available = userDoc.availableNow ?? false;
@@ -363,9 +369,7 @@ export function VolunteerDashboard({
       );
       await fn({ taskId });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not accept offer.',
-      );
+      setError(err instanceof Error ? err.message : 'Could not accept offer.');
     } finally {
       markBusy(taskId, false);
     }
@@ -381,9 +385,7 @@ export function VolunteerDashboard({
       );
       await fn({ taskId });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not reject offer.',
-      );
+      setError(err instanceof Error ? err.message : 'Could not reject offer.');
     } finally {
       markBusy(taskId, false);
     }
@@ -407,6 +409,43 @@ export function VolunteerDashboard({
         isDualRole={isDualRole}
         onSwitchRole={onSwitchRole}
       />
+      {userDoc.accountStatus && userDoc.accountStatus !== 'active' && (
+        <div className="mx-auto max-w-7xl px-8 pt-4">
+          {userDoc.accountStatus === 'warned' ? (
+            <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-xs">
+              <span className="text-base flex-shrink-0">⚠️</span>
+              <div>
+                <strong className="font-bold text-amber-950">
+                  Community Guidelines Notice (Strike{' '}
+                  {userDoc.warningStrikeCount ?? 1}/3)
+                </strong>
+                <p className="mt-0.5 leading-relaxed text-amber-900">
+                  {userDoc.moderationReason
+                    ? `Reason: "${userDoc.moderationReason}". `
+                    : 'Your account has received a warning for a safety standards violation. '}
+                  Please ensure all neighbourhood interactions adhere to our
+                  safety standards.
+                </p>
+              </div>
+            </div>
+          ) : userDoc.accountStatus === 'suspended' ? (
+            <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 shadow-xs">
+              <span className="text-base flex-shrink-0">🚫</span>
+              <div>
+                <strong className="font-bold text-red-950">
+                  Account Temporarily Suspended
+                </strong>
+                <p className="mt-0.5 leading-relaxed text-red-800">
+                  {userDoc.moderationReason
+                    ? `Reason: "${userDoc.moderationReason}". `
+                    : 'Your account is temporarily restricted from posting or accepting tasks. '}
+                  Our safety team reviews accounts to protect community trust.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-8 pt-6 pb-[124px]">
         {activeRoutePrompt && (
           <DeparturePromptModal
@@ -417,7 +456,10 @@ export function VolunteerDashboard({
             onConfirm={(selectedTaskId) => {
               void (async () => {
                 if (activeRoutePrompt) {
-                  await recordDepartureEvent(uid, createDepartureEvent(activeRoutePrompt.id, true));
+                  await recordDepartureEvent(
+                    uid,
+                    createDepartureEvent(activeRoutePrompt.id, true),
+                  );
                 }
                 setActiveRoutePrompt(null);
                 if (selectedTaskId) {
@@ -428,7 +470,10 @@ export function VolunteerDashboard({
             onDecline={() => {
               void (async () => {
                 if (activeRoutePrompt) {
-                  await recordDepartureEvent(uid, createDepartureEvent(activeRoutePrompt.id, false));
+                  await recordDepartureEvent(
+                    uid,
+                    createDepartureEvent(activeRoutePrompt.id, false),
+                  );
                 }
                 setActiveRoutePrompt(null);
               })();
@@ -504,10 +549,7 @@ function TopBar({
     if (!open) return;
     function onPointer(e: MouseEvent) {
       const t = e.target as Node;
-      if (
-        popoverRef.current?.contains(t) ||
-        triggerRef.current?.contains(t)
-      ) {
+      if (popoverRef.current?.contains(t) || triggerRef.current?.contains(t)) {
         return;
       }
       setOpen(false);
@@ -544,83 +586,89 @@ function TopBar({
             onClick={() => setOpen((o) => !o)}
             className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900] ring-2 ring-transparent transition hover:ring-[#1f6f5c]/30 focus:outline-none focus-visible:ring-[#1f6f5c]/40"
           >
-          {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span aria-hidden="true">{initial}</span>
-          )}
-        </button>
-        {open && (
-          <div
-            ref={popoverRef}
-            role="dialog"
-            aria-label="Account"
-            className="vc-fade-up absolute right-0 top-[44px] z-50 w-64 overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-[0_20px_40px_-16px_rgba(20,18,15,0.18)]"
-          >
-            <div className="flex items-center gap-3 border-b border-[#f3f1ec] px-4 py-4">
-              <span className="grid h-12 w-12 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900]">
-                {photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initial
-                )}
-              </span>
-              <div className="min-w-0">
-                <div className="truncate text-[14px] font-semibold text-[#131312]">
-                  {displayName}
-                </div>
-                {email && (
-                  <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
-                    {email}
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span aria-hidden="true">{initial}</span>
+            )}
+          </button>
+          {open && (
+            <div
+              ref={popoverRef}
+              role="dialog"
+              aria-label="Account"
+              className="vc-fade-up absolute right-0 top-[44px] z-50 w-64 overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-[0_20px_40px_-16px_rgba(20,18,15,0.18)]"
+            >
+              <div className="flex items-center gap-3 border-b border-[#f3f1ec] px-4 py-4">
+                <span className="grid h-12 w-12 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900]">
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initial
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[14px] font-semibold text-[#131312]">
+                    {displayName}
                   </div>
-                )}
+                  {email && (
+                    <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
+                      {email}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <Link
-              to="/your-routes"
-              onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#1f6f5c] transition hover:bg-[#e3efe9]/50 border-b border-[#f3f1ec]"
-            >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              Commute Routes
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onSignOut();
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#a32a22] transition hover:bg-[#fdf0ef]"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+              <Link
+                to="/your-routes"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#1f6f5c] transition hover:bg-[#e3efe9]/50 border-b border-[#f3f1ec]"
               >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="m16 17 5-5-5-5" />
-                <path d="M21 12H9" />
-              </svg>
-              Sign out
-            </button>
-          </div>
-        )}
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                Commute Routes
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onSignOut();
+                }}
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#a32a22] transition hover:bg-[#fdf0ef]"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <path d="m16 17 5-5-5-5" />
+                  <path d="M21 12H9" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -665,21 +713,39 @@ function DashboardScreen({
 
   const [placeName, setPlaceName] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
 
   // Active missions (accepted or in_progress) vs completed history
   const activeMissions = acceptedTasks.filter(
     (t) => t.status === 'accepted' || t.status === 'in_progress',
   );
-  const completedHistory = acceptedTasks.filter((t) => t.status === 'completed');
+  const completedHistory = acceptedTasks.filter(
+    (t) => t.status === 'completed',
+  );
 
   useEffect(() => {
-    if (!userDoc.lastKnownLocation?.lat || !userDoc.lastKnownLocation?.lng) return;
+    if (!userDoc.lastKnownLocation?.lat || !userDoc.lastKnownLocation?.lng)
+      return;
     let cancelled = false;
     const { lat, lng } = userDoc.lastKnownLocation;
     fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
     )
-      .then((res) => res.json() as Promise<{ address?: { suburb?: string; neighbourhood?: string; residential?: string; city_district?: string; town?: string; city?: string }; name?: string; display_name?: string }>)
+      .then(
+        (res) =>
+          res.json() as Promise<{
+            address?: {
+              suburb?: string;
+              neighbourhood?: string;
+              residential?: string;
+              city_district?: string;
+              town?: string;
+              city?: string;
+            };
+            name?: string;
+            display_name?: string;
+          }>,
+      )
       .then((data) => {
         if (cancelled) return;
         const addr = data.address;
@@ -728,7 +794,10 @@ function DashboardScreen({
       </div>
 
       {error && (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-sm text-[#a32a22]">
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-sm text-[#a32a22]"
+        >
           {error}
         </div>
       )}
@@ -780,7 +849,9 @@ function DashboardScreen({
                       to={`/tasks/${t.id}`}
                       className="inline-flex items-center gap-1.5 rounded-full bg-[#1f6f5c] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
                     >
-                      {isInProgress ? 'Enter Completion Code →' : 'Open Chat & Details →'}
+                      {isInProgress
+                        ? 'Enter Completion Code →'
+                        : 'Open Chat & Details →'}
                     </Link>
                   </div>
                 </div>
@@ -816,7 +887,13 @@ function DashboardScreen({
         ) : offers.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-[#ececea] bg-white p-8 text-center shadow-xs">
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#f3f1ec] text-[#8a847d]">
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+              >
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
@@ -824,7 +901,8 @@ function DashboardScreen({
               No requests right now
             </h3>
             <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[#8a847d]">
-              Keep your availability turned on and we&apos;ll notify you when a nearby neighbour needs help matching your skills.
+              Keep your availability turned on and we&apos;ll notify you when a
+              nearby neighbour needs help matching your skills.
             </p>
           </div>
         ) : (
@@ -851,7 +929,9 @@ function DashboardScreen({
                               : 'bg-[#fafaf8] text-[#4f4b46] border border-[#ececea]')
                           }
                         >
-                          {row.taskRiskLevel === 'medium' ? '🛡️ Verified ID Required' : '✓ Standard Task'}
+                          {row.taskRiskLevel === 'medium'
+                            ? '🛡️ Verified ID Required'
+                            : '✓ Standard Task'}
                         </span>
                       </div>
 
@@ -1005,19 +1085,22 @@ function DashboardScreen({
               photoPath={userDoc.photoURL ?? null}
             />
             <div>
-              <div className="text-xl font-bold tracking-tight">
-                {name}
-              </div>
+              <div className="text-xl font-bold tracking-tight">{name}</div>
               <div className="mt-0.5 text-xs text-white/80">
                 Verified Neighbour · Hey Padosi
               </div>
               <div className="mt-1.5 flex items-center gap-2">
-                <TrustBadge score={trustScore} />
+                <TrustScorePill
+                  score={trustScore}
+                  onOpenExplainer={() => setIsTrustModalOpen(true)}
+                />
               </div>
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-[11px] uppercase tracking-[0.08em] opacity-80">Karma Points</span>
+            <span className="text-[11px] uppercase tracking-[0.08em] opacity-80">
+              Karma Points
+            </span>
             <KarmaBadge points={userDoc.points ?? 0} />
           </div>
         </div>
@@ -1108,8 +1191,12 @@ function DashboardScreen({
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-[#8a847d]">
-                  <span>Category: {getCategory(t.category)?.label ?? t.category}</span>
-                  <span className="font-medium text-[#1f6f5c]">View details →</span>
+                  <span>
+                    Category: {getCategory(t.category)?.label ?? t.category}
+                  </span>
+                  <span className="font-medium text-[#1f6f5c]">
+                    View details →
+                  </span>
                 </div>
               </Link>
             ))}
@@ -1150,6 +1237,11 @@ function DashboardScreen({
           </div>
         </div>
       )}
+
+      <HowTrustWorksModal
+        isOpen={isTrustModalOpen}
+        onClose={() => setIsTrustModalOpen(false)}
+      />
     </section>
   );
 }
@@ -1167,10 +1259,6 @@ function VolunteerProfileScreen({
   acceptedTasksCount: number;
   onSignOut: () => void;
 }) {
-  const verified =
-    userDoc.phoneNumber !== undefined ||
-    (userDoc.email !== undefined && userDoc.email !== '');
-
   const [trailConsent, setTrailConsentState] = useState(() =>
     getLocalTrailConsent(uid),
   );
@@ -1178,6 +1266,7 @@ function VolunteerProfileScreen({
     'privacy' | 'terms' | 'security' | null
   >(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
 
   // Phone OTP Modal state
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
@@ -1328,11 +1417,21 @@ function VolunteerProfileScreen({
               <div className="mt-1 truncate text-[13px] opacity-80">
                 Volunteer · Hey Padosi
               </div>
-              {verified && (
-                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium">
-                  ✓ Verified contact
-                </span>
-              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {userDoc.idVerified ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/25 border border-emerald-300/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-100">
+                    🛡️ ID Verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white/90">
+                    ✓ Verified Neighbour
+                  </span>
+                )}
+                <TrustScorePill
+                  score={userDoc.trustScore ?? 80}
+                  onOpenExplainer={() => setIsTrustModalOpen(true)}
+                />
+              </div>
             </div>
           </div>
           <div className="relative mt-6 grid grid-cols-2 gap-4 border-t border-white/15 pt-5">
@@ -1463,7 +1562,8 @@ function VolunteerProfileScreen({
                     Enable Commute Trail Matching
                   </div>
                   <div className="text-xs text-[#8a847d]">
-                    Allow TrailService to infer recurring routes for corridor task matching.
+                    Allow TrailService to infer recurring routes for corridor
+                    task matching.
                   </div>
                 </div>
                 <label
@@ -1617,7 +1717,6 @@ function VolunteerProfileScreen({
           <BlockedUsersList uid={uid} />
 
           <div className="mt-5 flex justify-end">
-
             <button
               type="button"
               onClick={onSignOut}
@@ -1650,13 +1749,20 @@ function VolunteerProfileScreen({
                   </div>
                   <div className="mt-4 space-y-3 text-xs leading-relaxed text-[#4f4b46]">
                     <p>
-                      Hey Padosi processes location and commute trail data strictly under purpose limitation for hyperlocal volunteer matching.
+                      Hey Padosi processes location and commute trail data
+                      strictly under purpose limitation for hyperlocal volunteer
+                      matching.
                     </p>
                     <p>
-                      <strong>On-Device Privacy:</strong> Raw GPS pings are processed locally on your phone. Only derived route summaries are synced to isolated storage.
+                      <strong>On-Device Privacy:</strong> Raw GPS pings are
+                      processed locally on your phone. Only derived route
+                      summaries are synced to isolated storage.
                     </p>
                     <p>
-                      <strong>Data Principal Rights:</strong> You hold complete rights to access, inspect, and delete your inferred commute routes at any time via the self-serve routes screen.
+                      <strong>Data Principal Rights:</strong> You hold complete
+                      rights to access, inspect, and delete your inferred
+                      commute routes at any time via the self-serve routes
+                      screen.
                     </p>
                   </div>
                 </>
@@ -1678,10 +1784,14 @@ function VolunteerProfileScreen({
                   </div>
                   <div className="mt-4 space-y-3 text-xs leading-relaxed text-[#4f4b46]">
                     <p>
-                      <strong>Community Code:</strong> Hey Padosi is a mutual-aid micro-volunteering platform. All volunteers and customers must interact respectfully.
+                      <strong>Community Code:</strong> Hey Padosi is a
+                      mutual-aid micro-volunteering platform. All volunteers and
+                      customers must interact respectfully.
                     </p>
                     <p>
-                      <strong>Task Verification & Risk:</strong> Medium-risk tasks require ID verification. Fraudulent activity or unsafe behavior results in immediate account suspension.
+                      <strong>Task Verification & Risk:</strong> Medium-risk
+                      tasks require ID verification. Fraudulent activity or
+                      unsafe behavior results in immediate account suspension.
                     </p>
                   </div>
                 </>
@@ -1703,10 +1813,15 @@ function VolunteerProfileScreen({
                   </div>
                   <div className="mt-4 space-y-3 text-xs leading-relaxed text-[#4f4b46]">
                     <p>
-                      <strong>AES-256 & Isolation:</strong> Trail data is encrypted in transit and stored in an isolated datastore (`user_trails`) with strict owner-only security rules.
+                      <strong>AES-256 & Isolation:</strong> Trail data is
+                      encrypted in transit and stored in an isolated datastore
+                      (`user_trails`) with strict owner-only security rules.
                     </p>
                     <p>
-                      <strong>Customer Position Shield:</strong> Task posters only ever see "Volunteer on the way, ETA X min". Your live coordinates and route corridors are never exposed to customers.
+                      <strong>Customer Position Shield:</strong> Task posters
+                      only ever see "Volunteer on the way, ETA X min". Your live
+                      coordinates and route corridors are never exposed to
+                      customers.
                     </p>
                   </div>
                 </>
@@ -1766,10 +1881,14 @@ function VolunteerProfileScreen({
               {phoneStep === 'input' ? (
                 <div className="mt-4 space-y-4">
                   <p className="text-xs leading-relaxed text-[#4f4b46]">
-                    Enter your mobile number below. We will send a 6-digit OTP code to verify ownership.
+                    Enter your mobile number below. We will send a 6-digit OTP
+                    code to verify ownership.
                   </p>
                   <div>
-                    <label htmlFor="phone-number-input" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                    <label
+                      htmlFor="phone-number-input"
+                      className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                    >
                       Phone Number
                     </label>
                     <input
@@ -1801,14 +1920,20 @@ function VolunteerProfileScreen({
               ) : (
                 <div className="mt-4 space-y-4">
                   <div className="rounded-xl border border-[#1f6f5c]/20 bg-[#e3efe9]/50 p-3.5 text-xs text-[#1f6f5c]">
-                    <div>Verification code sent to <strong>{phoneInput}</strong>.</div>
+                    <div>
+                      Verification code sent to <strong>{phoneInput}</strong>.
+                    </div>
                     <div className="mt-1 font-mono text-[11px]">
-                      Test OTP Code: <strong className="text-[#131312]">{generatedOtp}</strong>
+                      Test OTP Code:{' '}
+                      <strong className="text-[#131312]">{generatedOtp}</strong>
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="phone-otp-input" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                    <label
+                      htmlFor="phone-otp-input"
+                      className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                    >
                       Enter 6-Digit OTP
                     </label>
                     <input
@@ -1886,10 +2011,14 @@ function VolunteerProfileScreen({
 
               <div className="mt-4 space-y-4">
                 <p className="text-xs leading-relaxed text-[#4f4b46]">
-                  Enter your new email address below. This will update your contact information for notifications and login.
+                  Enter your new email address below. This will update your
+                  contact information for notifications and login.
                 </p>
                 <div>
-                  <label htmlFor="user-email-input" className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                  <label
+                    htmlFor="user-email-input"
+                    className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                  >
                     New Email Address
                   </label>
                   <input
@@ -1923,6 +2052,11 @@ function VolunteerProfileScreen({
           </div>,
           document.body,
         )}
+
+      <HowTrustWorksModal
+        isOpen={isTrustModalOpen}
+        onClose={() => setIsTrustModalOpen(false)}
+      />
     </section>
   );
 }
@@ -2041,28 +2175,6 @@ function LiveDot() {
   );
 }
 
-function TrustBadge({ score }: { score: number }) {
-  if (score >= 85) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-xs font-semibold text-emerald-900">
-        Trusted
-      </span>
-    );
-  }
-  if (score >= 60) {
-    return (
-      <span className="inline-flex items-center rounded-full bg-amber-100/90 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
-        Reliable
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold text-white">
-      Newcomer
-    </span>
-  );
-}
-
 function HeroAvatar({
   displayName,
   photoPath,
@@ -2143,9 +2255,10 @@ function StatusBadge({ status }: { status: TaskStatus }) {
 }
 
 function usePhotoUrl(path: string | null): string | null {
-  const [cache, setCache] = useState<{ path: string | null; url: string | null }>(
-    { path, url: null },
-  );
+  const [cache, setCache] = useState<{
+    path: string | null;
+    url: string | null;
+  }>({ path, url: null });
   useEffect(() => {
     if (!path) return;
     let cancelled = false;
@@ -2265,9 +2378,7 @@ function LocationCorrectionModal({
         onClose();
       }, 1000);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Could not save location.',
-      );
+      setError(err instanceof Error ? err.message : 'Could not save location.');
     } finally {
       setBusy(false);
     }
@@ -2282,7 +2393,8 @@ function LocationCorrectionModal({
               Update your location
             </h3>
             <p className="mt-1 text-sm text-[#4f4b46]">
-              Neighbours match with you based on your location (up to 2 km search radius).
+              Neighbours match with you based on your location (up to 2 km
+              search radius).
             </p>
           </div>
           <button
@@ -2366,7 +2478,8 @@ function LocationCorrectionModal({
                 Re-detect your current GPS location
               </p>
               <p className="mt-1 text-xs text-[#8a847d]">
-                Your browser will request location permission to pin your position.
+                Your browser will request location permission to pin your
+                position.
               </p>
               <button
                 type="button"
@@ -2381,9 +2494,7 @@ function LocationCorrectionModal({
 
           {mode === 'map' && (
             <div className="space-y-4">
-              <TaskLocationPicker
-                onLocationChange={(loc) => setMapLoc(loc)}
-              />
+              <TaskLocationPicker onLocationChange={(loc) => setMapLoc(loc)} />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
@@ -2409,4 +2520,3 @@ function LocationCorrectionModal({
     document.body,
   );
 }
-

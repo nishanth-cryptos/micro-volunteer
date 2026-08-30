@@ -72,11 +72,15 @@ export const blockUser = onCall(
       // snapshots we just wrote — no UID leakage. Skip if a duplicate
       // block is being re-submitted (the `if (!blockSnap.exists)` gate).
       const initiatorName =
-        (callerUid === userA ? userAData.displayName : userBData.displayName)?.trim()
-        || 'A user';
+        (callerUid === userA
+          ? userAData.displayName
+          : userBData.displayName
+        )?.trim() || 'A user';
       const blockedName =
-        (callerUid === userA ? userBData.displayName : userAData.displayName)?.trim()
-        || 'a user';
+        (callerUid === userA
+          ? userBData.displayName
+          : userAData.displayName
+        )?.trim() || 'a user';
       await appendActivityLog(db, {
         eventType: 'user_blocked',
         description: `${initiatorName} blocked ${blockedName}`,

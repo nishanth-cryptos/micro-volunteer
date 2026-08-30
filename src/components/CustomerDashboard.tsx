@@ -32,7 +32,15 @@ import {
 import { getDownloadURL, ref as storageRef } from 'firebase/storage';
 import { latLngToCell } from 'h3-js';
 import { Link, useNavigate } from 'react-router-dom';
-import { Circle, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import {
+  Circle,
+  MapContainer,
+  Marker,
+  TileLayer,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import L from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -46,7 +54,6 @@ import { Logo } from './Logo';
 import { RoleSwitcher } from './RoleSwitcher';
 import { CrossRoleBanner } from './CrossRoleBanner';
 import type { ActiveRole } from '../lib/use-active-role';
-
 
 // Leaflet default-icon fix (same pattern as TaskLocationPicker).
 interface DefaultIconProto {
@@ -84,17 +91,18 @@ interface TaskRow {
   completedAt?: Timestamp | null | undefined;
   acceptedVolunteerId?: string | null | undefined;
   customerRating?: number | undefined;
-  description?: {
-    meetingPoint: string;
-    whatToBring?: string | undefined;
-    preference?: string | undefined;
-    safetyNote?: string | undefined;
-  } | undefined;
+  description?:
+    | {
+        meetingPoint: string;
+        whatToBring?: string | undefined;
+        preference?: string | undefined;
+        safetyNote?: string | undefined;
+      }
+    | undefined;
   requiredSkills?: string[] | undefined;
   estimatedMinutes?: number | undefined;
   location?: { lat: number; lng: number; h3Cell: string } | undefined;
 }
-
 
 interface BlockedRow {
   blockId: string;
@@ -316,6 +324,43 @@ export function CustomerDashboard({
         isDualRole={isDualRole}
         onSwitchRole={onSwitchRole}
       />
+      {userDoc.accountStatus && userDoc.accountStatus !== 'active' && (
+        <div className="mx-auto max-w-7xl px-8 pt-4">
+          {userDoc.accountStatus === 'warned' ? (
+            <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-xs">
+              <span className="text-base flex-shrink-0">⚠️</span>
+              <div>
+                <strong className="font-bold text-amber-950">
+                  Community Guidelines Notice (Strike{' '}
+                  {userDoc.warningStrikeCount ?? 1}/3)
+                </strong>
+                <p className="mt-0.5 leading-relaxed text-amber-900">
+                  {userDoc.moderationReason
+                    ? `Reason: "${userDoc.moderationReason}". `
+                    : 'Your account has received a warning for a safety standards violation. '}
+                  Please ensure all neighbourhood interactions adhere to our
+                  safety standards.
+                </p>
+              </div>
+            </div>
+          ) : userDoc.accountStatus === 'suspended' ? (
+            <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 shadow-xs">
+              <span className="text-base flex-shrink-0">🚫</span>
+              <div>
+                <strong className="font-bold text-red-950">
+                  Account Temporarily Suspended
+                </strong>
+                <p className="mt-0.5 leading-relaxed text-red-800">
+                  {userDoc.moderationReason
+                    ? `Reason: "${userDoc.moderationReason}". `
+                    : 'Your account is temporarily restricted from posting or accepting tasks. '}
+                  Our safety team reviews accounts to protect community trust.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-8 pt-6 pb-[124px]">
         <div key={screen} className="vc-screen-enter">
           {screen === 'tasks' && (
@@ -386,10 +431,7 @@ function TopBar({
     if (!open) return;
     function onPointer(e: MouseEvent) {
       const t = e.target as Node;
-      if (
-        popoverRef.current?.contains(t) ||
-        triggerRef.current?.contains(t)
-      ) {
+      if (popoverRef.current?.contains(t) || triggerRef.current?.contains(t)) {
         return;
       }
       setOpen(false);
@@ -426,72 +468,72 @@ function TopBar({
             onClick={() => setOpen((o) => !o)}
             className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900] ring-2 ring-transparent transition hover:ring-[#1f6f5c]/30 focus:outline-none focus-visible:ring-[#1f6f5c]/40"
           >
-          {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span aria-hidden="true">{initial}</span>
-          )}
-        </button>
-        {open && (
-          <div
-            ref={popoverRef}
-            role="dialog"
-            aria-label="Account"
-            className="vc-fade-up absolute right-0 top-[44px] z-50 w-64 overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-[0_20px_40px_-16px_rgba(20,18,15,0.18)]"
-          >
-            <div className="flex items-center gap-3 border-b border-[#f3f1ec] px-4 py-4">
-              <span className="grid h-12 w-12 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900]">
-                {photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initial
-                )}
-              </span>
-              <div className="min-w-0">
-                <div className="truncate text-[14px] font-semibold text-[#131312]">
-                  {displayName}
-                </div>
-                {email && (
-                  <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
-                    {email}
-                  </div>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onSignOut();
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#a32a22] transition hover:bg-[#fdf0ef]"
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span aria-hidden="true">{initial}</span>
+            )}
+          </button>
+          {open && (
+            <div
+              ref={popoverRef}
+              role="dialog"
+              aria-label="Account"
+              className="vc-fade-up absolute right-0 top-[44px] z-50 w-64 overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-[0_20px_40px_-16px_rgba(20,18,15,0.18)]"
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+              <div className="flex items-center gap-3 border-b border-[#f3f1ec] px-4 py-4">
+                <span className="grid h-12 w-12 flex-shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-base font-bold text-[#5a2900]">
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initial
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[14px] font-semibold text-[#131312]">
+                    {displayName}
+                  </div>
+                  {email && (
+                    <div className="mt-0.5 truncate text-[12px] text-[#8a847d]">
+                      {email}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onSignOut();
+                }}
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] font-medium text-[#a32a22] transition hover:bg-[#fdf0ef]"
               >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="m16 17 5-5-5-5" />
-                <path d="M21 12H9" />
-              </svg>
-              Sign out
-            </button>
-          </div>
-        )}
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <path d="m16 17 5-5-5-5" />
+                  <path d="M21 12H9" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -573,7 +615,16 @@ function TasksScreen({
           ) : ongoing.length === 0 ? (
             <div className="rounded-2xl border border-[#ececea] bg-white p-7 text-center shadow-sm">
               <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
-                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
                   <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                   <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
@@ -582,7 +633,9 @@ function TasksScreen({
                 All caught up — no active tasks
               </h3>
               <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-[#4f4b46]">
-                Need help picking up groceries, a quick fix, or a neighbourhood errand? Post a task and we&apos;ll match you with a nearby volunteer.
+                Need help picking up groceries, a quick fix, or a neighbourhood
+                errand? Post a task and we&apos;ll match you with a nearby
+                volunteer.
               </p>
               <Link
                 to="/create-task"
@@ -658,7 +711,7 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
           setPlaceName(name);
         }
       })
-      .catch(() => { });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -736,7 +789,7 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
           });
         }
       },
-      () => { },
+      () => {},
       { timeout: 10000, maximumAge: 60_000 },
     );
     return () => {
@@ -777,9 +830,17 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
                   },
                 }}
               >
-                <Tooltip direction="top" offset={[0, -20]} opacity={1} permanent>
+                <Tooltip
+                  direction="top"
+                  offset={[0, -20]}
+                  opacity={1}
+                  permanent
+                >
                   <span className="font-sans text-xs font-semibold text-[#131312]">
-                    📍 {placeName ? placeName : `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`}
+                    📍{' '}
+                    {placeName
+                      ? placeName
+                      : `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`}
                   </span>
                 </Tooltip>
               </Marker>
@@ -805,7 +866,9 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
         {!hasPin && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center bg-white/55">
             <span className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-[#4f4b46] shadow">
-              {detecting ? 'Detecting your location…' : 'Set your location to see nearby'}
+              {detecting
+                ? 'Detecting your location…'
+                : 'Set your location to see nearby'}
             </span>
           </div>
         )}
@@ -1012,10 +1075,26 @@ function OngoingTaskCard({ task }: { task: TaskRow }) {
   const isAccepted = task.status === 'accepted';
   const isProgress = task.status === 'in_progress';
 
-  const ringBg = isSearching ? 'bg-[#e8effb]' : isAccepted ? 'bg-[#e3efe9]' : 'bg-[#fef3c7]';
-  const ringInk = isSearching ? 'text-[#1f4baa]' : isAccepted ? 'text-[#1f6f5c]' : 'text-[#b45309]';
-  const badgeBg = isSearching ? 'bg-[#e8effb]' : isAccepted ? 'bg-[#e3efe9]' : 'bg-[#fef3c7]';
-  const badgeInk = isSearching ? 'text-[#1f4baa]' : isAccepted ? 'text-[#1f6f5c]' : 'text-[#b45309]';
+  const ringBg = isSearching
+    ? 'bg-[#e8effb]'
+    : isAccepted
+      ? 'bg-[#e3efe9]'
+      : 'bg-[#fef3c7]';
+  const ringInk = isSearching
+    ? 'text-[#1f4baa]'
+    : isAccepted
+      ? 'text-[#1f6f5c]'
+      : 'text-[#b45309]';
+  const badgeBg = isSearching
+    ? 'bg-[#e8effb]'
+    : isAccepted
+      ? 'bg-[#e3efe9]'
+      : 'bg-[#fef3c7]';
+  const badgeInk = isSearching
+    ? 'text-[#1f4baa]'
+    : isAccepted
+      ? 'text-[#1f6f5c]'
+      : 'text-[#b45309]';
 
   const statusLabel = isSearching
     ? 'Finding volunteer'
@@ -1034,7 +1113,9 @@ function OngoingTaskCard({ task }: { task: TaskRow }) {
       to={`/tasks/${task.id}`}
       className="vc-fade-up group mb-3 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-[#ececea] bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#1f6f5c]/40 hover:shadow-[0_12px_28px_-12px_rgba(20,18,15,0.15)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2"
     >
-      <span className={`grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl ${ringBg} shadow-xs`}>
+      <span
+        className={`grid h-11 w-11 flex-shrink-0 place-items-center rounded-2xl ${ringBg} shadow-xs`}
+      >
         {isSearching ? (
           <svg
             viewBox="0 0 24 24"
@@ -1358,7 +1439,6 @@ function ProfileScreen({
   );
 }
 
-
 function DetailRow({
   icon,
   label,
@@ -1412,7 +1492,11 @@ function HistoryList({
 
     let badge = badgeForHistoryStatus(status);
     if (isUnrated) {
-      badge = { label: '★ Rate now', bg: 'bg-[#fef3c7]', ink: 'text-[#b45309]' };
+      badge = {
+        label: '★ Rate now',
+        bg: 'bg-[#fef3c7]',
+        ink: 'text-[#b45309]',
+      };
     } else if (isCompleted && typeof task.customerRating === 'number') {
       badge = {
         label: `★ ${task.customerRating}/5 Rated`,
@@ -1434,9 +1518,7 @@ function HistoryList({
     return {
       key: b.blockId,
       title: b.otherName || 'Blocked user',
-      sub: b.createdAt
-        ? `Blocked ${formatDate(b.createdAt)}`
-        : 'Blocked',
+      sub: b.createdAt ? `Blocked ${formatDate(b.createdAt)}` : 'Blocked',
       badge: badgeForHistoryStatus('blocked'),
       avatarInitial: (b.otherName || '?').slice(0, 1).toUpperCase(),
       avatarPhotoPath: b.otherPhotoPath,
@@ -1468,7 +1550,8 @@ function HistoryList({
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-[#ececea] bg-white p-7 text-center text-[13px] text-[#8a847d] shadow-sm">
-        No {filter === 'all' ? '' : filter} {filter === 'blocked' ? 'users' : 'tasks'} found in your history.
+        No {filter === 'all' ? '' : filter}{' '}
+        {filter === 'blocked' ? 'users' : 'tasks'} found in your history.
       </div>
     );
   }
@@ -1558,7 +1641,16 @@ function HistoryList({
             className="inline-flex items-center gap-1 rounded-full border border-[#ececea] bg-white px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#1f6f5c] hover:text-[#131312] disabled:cursor-not-allowed disabled:border-[#f3f1ec] disabled:text-[#b8b3ad] disabled:hover:border-[#f3f1ec]"
             aria-label="Previous page"
           >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="m15 18-6-6 6-6" />
             </svg>
             Prev
@@ -1574,7 +1666,16 @@ function HistoryList({
             aria-label="Next page"
           >
             Next
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="m9 18 6-6-6-6" />
             </svg>
           </button>
@@ -1656,9 +1757,10 @@ function HistoryAvatar({
 function usePhotoUrl(path: string | null): string | null {
   // We key the cache on `path` so swapping paths re-runs the effect
   // and the previous URL is dropped before the new fetch resolves.
-  const [cache, setCache] = useState<{ path: string | null; url: string | null }>(
-    { path, url: null },
-  );
+  const [cache, setCache] = useState<{
+    path: string | null;
+    url: string | null;
+  }>({ path, url: null });
   useEffect(() => {
     if (!path) return;
     let cancelled = false;
@@ -1792,9 +1894,11 @@ function formatDate(t: Timestamp | null | undefined): string {
   });
 }
 
-function badgeForHistoryStatus(
-  s: 'completed' | 'accepted' | 'blocked',
-): { label: string; bg: string; ink: string } {
+function badgeForHistoryStatus(s: 'completed' | 'accepted' | 'blocked'): {
+  label: string;
+  bg: string;
+  ink: string;
+} {
   switch (s) {
     case 'completed':
       return { label: 'Completed', bg: 'bg-[#e3efe9]', ink: 'text-[#1f6f5c]' };
@@ -1805,7 +1909,6 @@ function badgeForHistoryStatus(
   }
 }
 
-
 function ScheduledTaskCard({ task }: { task: TaskRow }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
@@ -1814,22 +1917,22 @@ function ScheduledTaskCard({ task }: { task: TaskRow }) {
 
   const formattedTime = task.scheduledFor
     ? task.scheduledFor.toDate().toLocaleString(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
     : 'Pending activation';
 
   const handleCancel = async (reasonId: string) => {
     setBusy(true);
     setError(null);
     try {
-      const fn = httpsCallable<{ taskId: string; reason: string }, { success: boolean }>(
-        functions(),
-        'deleteTask',
-      );
+      const fn = httpsCallable<
+        { taskId: string; reason: string },
+        { success: boolean }
+      >(functions(), 'deleteTask');
       await fn({ taskId: task.id, reason: reasonId });
       setIsCancelOpen(false);
     } catch (err) {
@@ -1843,10 +1946,10 @@ function ScheduledTaskCard({ task }: { task: TaskRow }) {
     setBusy(true);
     setError(null);
     try {
-      const fn = httpsCallable<{ taskId: string; newScheduledForMs: number }, { success: boolean }>(
-        functions(),
-        'updateScheduledTask',
-      );
+      const fn = httpsCallable<
+        { taskId: string; newScheduledForMs: number },
+        { success: boolean }
+      >(functions(), 'updateScheduledTask');
       await fn({ taskId: task.id, newScheduledForMs });
       setIsEditOpen(false);
     } catch (err) {
@@ -1867,7 +1970,9 @@ function ScheduledTaskCard({ task }: { task: TaskRow }) {
             <span>🗓</span>
             <span>
               Task scheduled at{' '}
-              <span className="font-semibold text-[#4338ca]">{formattedTime}</span>
+              <span className="font-semibold text-[#4338ca]">
+                {formattedTime}
+              </span>
             </span>
           </p>
         </div>
@@ -1911,7 +2016,9 @@ function ScheduledTaskCard({ task }: { task: TaskRow }) {
 
       <EditScheduledTimeModal
         isOpen={isEditOpen}
-        currentScheduledForMs={task.scheduledFor ? task.scheduledFor.toMillis() : 0}
+        currentScheduledForMs={
+          task.scheduledFor ? task.scheduledFor.toMillis() : 0
+        }
         onClose={() => setIsEditOpen(false)}
         onConfirm={(ms) => void handleUpdateScheduledTime(ms)}
         isSubmitting={busy}
@@ -1946,7 +2053,6 @@ function EditScheduledTimeModal({
 
   const minMs = nowMs + 30 * 60 * 1000;
   const maxMs = nowMs + 7 * 24 * 60 * 60 * 1000;
-
 
   const toLocalIso = (ms: number) => {
     const d = new Date(ms);
@@ -1996,7 +2102,10 @@ function EditScheduledTimeModal({
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label htmlFor="edit-scheduled-datetime" className="block text-xs font-semibold uppercase tracking-wider text-neutral-600">
+            <label
+              htmlFor="edit-scheduled-datetime"
+              className="block text-xs font-semibold uppercase tracking-wider text-neutral-600"
+            >
               New Activation Time
             </label>
             <input
@@ -2046,5 +2155,3 @@ function EditScheduledTimeModal({
     </div>
   );
 }
-
-

@@ -26,14 +26,12 @@ export function ReportBlockPanel({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
 
-  // Report Form state — values must stay in sync with systemPatterns.md
-  // PII inventory / report taxonomy: safety | no_show | inappropriate | fraud | other.
+  // Report Form state — taxonomy: safety | no_show | inappropriate | fraud | other
   const [reason, setReason] = useState('safety');
   const [details, setDetails] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportSuccess, setReportSuccess] = useState(false);
-  // Set when the Cloud Function rejects with already-exists — neutral copy.
   const [reportDuplicate, setReportDuplicate] = useState(false);
 
   // Block state
@@ -49,7 +47,12 @@ export function ReportBlockPanel({
 
     try {
       const fn = httpsCallable<
-        { reportedUserId: string; taskId: string; reason: string; details: string },
+        {
+          reportedUserId: string;
+          taskId: string;
+          reason: string;
+          details: string;
+        },
         { reportId: string }
       >(functions(), 'reportUser');
 
@@ -67,10 +70,6 @@ export function ReportBlockPanel({
         setReportSuccess(false);
       }, 3000);
     } catch (err) {
-      // Firebase callable surfaces our HttpsError code as `err.code` on a
-      // FirebaseError. Anything tagged 'functions/already-exists' means the
-      // duplicate-prevention check fired — show neutral copy instead of a
-      // red error.
       const code =
         err && typeof err === 'object' && 'code' in err
           ? (err as { code?: string }).code
@@ -79,7 +78,9 @@ export function ReportBlockPanel({
         setReportDuplicate(true);
       } else {
         setReportError(
-          err instanceof Error ? err.message : 'Could not submit report. Try again.',
+          err instanceof Error
+            ? err.message
+            : 'Could not submit report. Try again.',
         );
       }
     } finally {
@@ -96,14 +97,13 @@ export function ReportBlockPanel({
         functions(),
         'blockUser',
       );
-      
+
       await fn({ blockedUserId: reportedUserId });
 
       setBlockSuccess(true);
       setTimeout(() => {
         setShowBlockModal(false);
         setBlockSuccess(false);
-        // Redirect to main app home screen after blocking
         void navigate('/app', { replace: true });
       }, 2000);
     } catch (err) {
@@ -120,23 +120,23 @@ export function ReportBlockPanel({
       className={
         variant === 'inline'
           ? 'flex flex-wrap gap-2'
-          : 'mt-4 flex flex-wrap gap-3'
+          : 'mt-4 flex flex-wrap items-center gap-3'
       }
     >
       <button
         type="button"
         onClick={() => setShowReportModal(true)}
-        className="rounded-full bg-white border border-neutral-300 px-4 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50 hover:text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2"
+        className="rounded-full border border-[#ececea] bg-white px-4 py-1.5 text-xs font-semibold text-[#4f4b46] transition hover:border-[#131312] hover:text-[#131312] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] shadow-2xs"
       >
-        Report {variant === 'inline' ? '' : reportedUserName}
+        🚩 Report {variant === 'inline' ? '' : reportedUserName}
       </button>
       {viewerRole === 'customer' && (
         <button
           type="button"
           onClick={() => setShowBlockModal(true)}
-          className="rounded-full bg-white border border-red-200 px-4 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          className="rounded-full border border-red-200 bg-white px-4 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 hover:border-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 shadow-2xs"
         >
-          Block {variant === 'inline' ? '' : reportedUserName}
+          🚫 Block {variant === 'inline' ? '' : reportedUserName}
         </button>
       )}
     </div>
@@ -145,18 +145,25 @@ export function ReportBlockPanel({
   return (
     <>
       {variant === 'card' ? (
-        <div className="mt-8 rounded-2xl border border-red-100 bg-red-50/30 p-6">
-          <h3 className="text-base font-semibold text-neutral-900">
-            Safety &amp; Trust
-          </h3>
-          <p className="mt-1 text-sm text-neutral-600">
-            If you experience any safety issues, rudeness, or a no-show, please
-            report it.
-            {viewerRole === 'customer'
-              ? ' You can also block this user to prevent matching again.'
-              : ''}
-          </p>
-          {actions}
+        <div className="vc-fade-up mt-8 rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-2xl bg-amber-50 text-amber-700">
+              🛡️
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-bold text-[#131312]">
+                Safety &amp; Community Standards
+              </h3>
+              <p className="mt-1 text-xs text-[#4f4b46] leading-relaxed">
+                If you experience any safety concerns, payment solicitations, or
+                no-shows, report it confidentially to our moderation team.
+                {viewerRole === 'customer'
+                  ? ' You can also block this neighbour to permanently prevent future matching.'
+                  : ''}
+              </p>
+              {actions}
+            </div>
+          </div>
         </div>
       ) : (
         actions
@@ -164,23 +171,59 @@ export function ReportBlockPanel({
 
       {/* REPORT MODAL */}
       {showReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all">
-            <h2 className="text-xl font-semibold text-neutral-900">
-              Report User
-            </h2>
-            <p className="mt-1 text-sm text-neutral-600">
-              Your report will be reviewed by an administrator. The reported user will not know you reported them.
-            </p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-xs">
+          <div
+            className="fixed inset-0"
+            onClick={() => !reportBusy && setShowReportModal(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-labelledby="report-modal-title"
+            className="vc-fade-up relative z-10 w-full max-w-md rounded-3xl border border-[#ececea] bg-white p-7 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  id="report-modal-title"
+                  className="text-lg font-bold text-[#131312]"
+                >
+                  Report {reportedUserName}
+                </h2>
+                <p className="mt-1 text-xs text-[#4f4b46]">
+                  Submitted confidentially to our safety team. The reported user
+                  will not know you reported them.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                disabled={reportBusy}
+                className="rounded-full p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 transition disabled:opacity-50"
+                aria-label="Close"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
             {reportSuccess ? (
-              <div className="mt-6 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-sm font-medium">
-                Report submitted successfully. Thank you for helping keep our community safe.
+              <div className="mt-6 rounded-2xl bg-[#e3efe9] border border-[#1f6f5c]/20 p-4 text-[#1f6f5c] text-xs font-semibold">
+                ✓ Report submitted. Our safety team investigates all reported
+                incidents confidentially. Thank you for keeping the
+                neighbourhood safe.
               </div>
             ) : reportDuplicate ? (
-              <div className="mt-6 rounded-xl bg-neutral-100 border border-neutral-200 p-4 text-neutral-700 text-sm">
-                You've already submitted a report for this user on this task.
-                Administrators are reviewing it.
+              <div className="mt-6 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-[#4f4b46] text-xs">
+                You have already submitted a report for this user on this task.
+                Our moderation team is actively reviewing it.
                 <div className="mt-4 flex justify-end">
                   <button
                     type="button"
@@ -188,35 +231,52 @@ export function ReportBlockPanel({
                       setShowReportModal(false);
                       setReportDuplicate(false);
                     }}
-                    className="rounded-full border border-neutral-300 px-4 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100"
+                    className="rounded-full bg-[#1f6f5c] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#185845]"
                   >
                     Close
                   </button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={(e) => void handleReportSubmit(e)} className="mt-6">
+              <form
+                onSubmit={(e) => void handleReportSubmit(e)}
+                className="mt-6 space-y-4"
+              >
                 <div>
-                  <label htmlFor="report-reason" className="block text-sm font-medium text-neutral-700">
-                    Reason
+                  <label
+                    htmlFor="report-reason"
+                    className="block text-xs font-bold text-[#131312]"
+                  >
+                    Reason for report
                   </label>
                   <select
                     id="report-reason"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    className="mt-1.5 block w-full rounded-2xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs font-medium text-[#131312] shadow-xs focus:border-[#1f6f5c] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1f6f5c]/20"
                   >
-                    <option value="safety">Safety concern</option>
-                    <option value="no_show">No show / did not arrive</option>
-                    <option value="inappropriate">Inappropriate behavior</option>
-                    <option value="fraud">Fraud or scam</option>
-                    <option value="other">Other reason</option>
+                    <option value="safety">
+                      Safety concern or feeling unsafe
+                    </option>
+                    <option value="no_show">
+                      No show / did not arrive at meeting point
+                    </option>
+                    <option value="inappropriate">
+                      Inappropriate or abusive behavior
+                    </option>
+                    <option value="fraud">
+                      Commercial service / fee solicitation attempt
+                    </option>
+                    <option value="other">Other policy violation</option>
                   </select>
                 </div>
 
-                <div className="mt-4">
-                  <label htmlFor="report-details" className="block text-sm font-medium text-neutral-700">
-                    Details (optional, max 500 characters)
+                <div>
+                  <label
+                    htmlFor="report-details"
+                    className="block text-xs font-bold text-[#131312]"
+                  >
+                    Incident details (optional)
                   </label>
                   <textarea
                     id="report-details"
@@ -224,33 +284,36 @@ export function ReportBlockPanel({
                     onChange={(e) => setDetails(e.target.value)}
                     maxLength={500}
                     rows={4}
-                    placeholder="Provide additional details about what happened..."
-                    className="mt-1 block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 shadow-sm placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    placeholder="Briefly describe what happened..."
+                    className="mt-1.5 block w-full rounded-2xl border border-[#ececea] bg-[#fafaf8] p-3 text-xs text-[#131312] shadow-xs placeholder-[#8a847d] focus:border-[#1f6f5c] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1f6f5c]/20"
                   />
-                  <div className="mt-1 text-right text-xs text-neutral-500">
+                  <div className="mt-1 text-right text-[11px] text-[#8a847d]">
                     {details.length}/500
                   </div>
                 </div>
 
                 {reportError && (
-                  <p role="alert" className="mt-4 text-sm text-red-700 font-medium">
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 font-medium"
+                  >
                     {reportError}
                   </p>
                 )}
 
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="mt-6 flex justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setShowReportModal(false)}
                     disabled={reportBusy}
-                    className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-50"
+                    className="rounded-full border border-[#ececea] px-4 py-2 text-xs font-semibold text-[#4f4b46] transition hover:bg-[#fafaf8] disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={reportBusy}
-                    className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none disabled:opacity-50"
+                    className="rounded-full bg-[#1f6f5c] px-5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#185845] focus:outline-none disabled:opacity-50"
                   >
                     {reportBusy ? 'Submitting…' : 'Submit Report'}
                   </button>
@@ -263,33 +326,60 @@ export function ReportBlockPanel({
 
       {/* BLOCK MODAL */}
       {showBlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all">
-            <h2 className="text-xl font-semibold text-neutral-900">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-xs">
+          <div
+            className="fixed inset-0"
+            onClick={() => !blockBusy && setShowBlockModal(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-labelledby="block-modal-title"
+            className="vc-fade-up relative z-10 w-full max-w-md rounded-3xl border border-[#ececea] bg-white p-7 shadow-2xl"
+          >
+            <h2
+              id="block-modal-title"
+              className="text-lg font-bold text-[#131312]"
+            >
               Block {reportedUserName}?
             </h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              Are you sure you want to block this user? You will no longer be matched with them, and you won't be able to chat with them. This action is mutual and cannot be undone directly.
-            </p>
+            <div className="mt-3 space-y-2 text-xs text-[#4f4b46] leading-relaxed">
+              <p>
+                Blocking is <strong>immediate and mutual</strong>:
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  You will never be matched with this neighbour again on future
+                  tasks.
+                </li>
+                <li>Direct chat communication is immediately disabled.</li>
+                <li>
+                  You can manage your blocked users anytime in your Profile.
+                </li>
+              </ul>
+            </div>
 
             {blockSuccess ? (
-              <div className="mt-6 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-sm font-medium">
-                User blocked. Redirecting you home...
+              <div className="mt-6 rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800 text-xs font-semibold">
+                User blocked successfully. Returning home...
               </div>
             ) : (
               <div className="mt-6">
                 {blockError && (
-                  <p role="alert" className="mb-4 text-sm text-red-700 font-medium">
+                  <p
+                    role="alert"
+                    className="mb-4 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 font-medium"
+                  >
                     {blockError}
                   </p>
                 )}
 
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setShowBlockModal(false)}
                     disabled={blockBusy}
-                    className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-50"
+                    className="rounded-full border border-[#ececea] px-4 py-2 text-xs font-semibold text-[#4f4b46] transition hover:bg-[#fafaf8] disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -297,7 +387,7 @@ export function ReportBlockPanel({
                     type="button"
                     onClick={() => void handleBlockConfirm()}
                     disabled={blockBusy}
-                    className="rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-red-700 focus:outline-none disabled:opacity-50"
+                    className="rounded-full bg-red-600 px-5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-red-700 focus:outline-none disabled:opacity-50"
                   >
                     {blockBusy ? 'Blocking…' : 'Confirm Block'}
                   </button>

@@ -67,9 +67,9 @@ export async function recomputeTrustScore(
 
   const rawScore =
     0.35 * taskNorm +
-    0.30 * scaledAvgRating +
+    0.3 * scaledAvgRating +
     0.15 * hoursNorm +
-    (idVerified ? 0.10 : 0) -
+    (idVerified ? 0.1 : 0) -
     reportPenalty;
 
   // Floor of 0.3 (base score), ceiling of 1.0
@@ -117,9 +117,9 @@ export function computeTrustScorePure(params: {
 
   const rawScore =
     0.35 * taskNorm +
-    0.30 * scaledAvgRating +
+    0.3 * scaledAvgRating +
     0.15 * hoursNorm +
-    (idVerified ? 0.10 : 0) -
+    (idVerified ? 0.1 : 0) -
     reportPenalty;
 
   const clampedScore = Math.max(0.3, Math.min(1.0, rawScore));
@@ -127,4 +127,3 @@ export function computeTrustScorePure(params: {
 
   return { rawScore, clampedScore, trustScore };
 }
-

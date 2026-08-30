@@ -19,10 +19,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import {
-  onAuthStateChanged,
-  type User as FirebaseUser,
-} from 'firebase/auth';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
 
@@ -30,19 +27,19 @@ export type Role = 'volunteer' | 'customer' | 'admin';
 
 export interface UserDoc {
   displayName?: string;
-  photoURL?: string;             // Storage path, NOT a public URL
+  photoURL?: string; // Storage path, NOT a public URL
   bio?: string;
   phoneNumber?: string;
   email?: string;
   roles?: Role[];
   skills?: string[];
-  idImagePath?: string;          // Storage path; never client-readable
+  idImagePath?: string; // Storage path; never client-readable
   availableNow?: boolean;
   availabilityUpdatedAt?: Timestamp;
   lastKnownLocation?: {
     lat: number;
     lng: number;
-    h3Cell: string;              // h3-js resolution 9
+    h3Cell: string; // h3-js resolution 9
     updatedAt: Timestamp;
   };
   consent?: { tcVersion: string; acceptedAt: Timestamp };
@@ -61,6 +58,7 @@ export interface UserDoc {
   verifiedTaskCount?: number;
   verifiedHours?: number;
   trustScore?: number;
+  idVerified?: boolean;
 }
 
 export type AuthState =
@@ -81,8 +79,7 @@ function classify(user: FirebaseUser, userDoc: UserDoc | null): AuthState {
   if (!userDoc) return { status: 'no-doc', user };
   const hasConsent = Boolean(userDoc.consent?.acceptedAt);
   const hasRole = (userDoc.roles?.length ?? 0) > 0;
-  const hasProfile =
-    Boolean(userDoc.displayName) && Boolean(userDoc.photoURL);
+  const hasProfile = Boolean(userDoc.displayName) && Boolean(userDoc.photoURL);
   // Volunteers (or dual-role users) must also have at least one skill set
   // before they count as fully onboarded. Customer-only users skip skills.
   const isVolunteer = userDoc.roles?.includes('volunteer') ?? false;
