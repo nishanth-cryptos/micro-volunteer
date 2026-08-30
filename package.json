@@ -6,6 +6,8 @@
   "description": "Hey Padosi — Hyperlocal micro-volunteering web app",
   "scripts": {
     "dev": "vite",
+    "start": "node scripts/dev-all.js",
+    "dev:all": "node scripts/dev-all.js",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -13,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "emulators": "node scripts/start-emulators.js",
+    "seed:all": "node scripts/seed-all.js",
     "seed:admin": "node scripts/seed-admin.js",
     "seed:users": "node scripts/seed-users.js"
   },
