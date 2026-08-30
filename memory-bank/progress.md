@@ -1,18 +1,22 @@
 # Progress
 
 ## Current milestone
+
 **Milestone 7 — In-app chat (Completed 2026-06-14).** Chat was deferred during the M8 push and has now been built and verified. All 12 Phase-1 features are now implemented (M0–M8). Coded, typechecked, linted, built; Firestore rules confirmed to compile in the emulator. **Not yet smoke-tested at runtime in a browser** (per CLAUDE.md anti-hallucination rule 5).
 
 M7 features implemented:
+
 - **Data model** (per systemPatterns.md): `chats/{chatId}` with `chatId === taskId`, `participants: [customerId, volunteerId]`, `lastMessageAt`/`lastMessagePreview`; `chats/{chatId}/messages/{id}` with `senderUid`, `text`, `system`, `sentAt`, optional `reportedBy`.
 - **Backend (`functions/src/chat.ts`):** `ensureChatForTask` (idempotent create; wipes the prior conversation via `recursiveDelete` if the task was reassigned to a new volunteer) + `appendSystemMessage`. Wired into `acceptOffer` (open chat + "connected" message), `verifyStartOtp` ("Task started"), `verifyEndOtp` ("Task completed") — all best-effort, never unwinding the parent action. `reportUser` extended with optional `messageRef` (stored on the report + `arrayUnion`-marked onto the message's `reportedBy`).
 - **Frontend:** `ChatPanel.tsx` (live messages, composer, system messages, per-message report, header report/block, block-aware + read-only states) wired into `TaskDetailPage` for accepted/in_progress (active) and completed (read-only history). `ReportBlockPanel` gained an `inline` variant for the chat header.
 - **Rules:** participant-only chat + messages; messages immutable for clients (system + `reportedBy` are Admin-SDK-only); no new messages once either party blocks the other (`canPostMessage` probes both block-id orderings). **Index:** `chats (participants array-contains, lastMessageAt desc)`.
 
 ## Previous milestone
+
 **Milestone 8 — Points, Trust, Safety & Admin Dashboard (Completed).** All requirements for M8 have been successfully coded, built, and verified.
 
 M8 features implemented:
+
 - **Backend (Cloud Functions):**
   - `awardPointsOnCompletion`: Triggers on task completion to award points (10 base + duration bonus) to volunteer and customer (2 points). Appends an audit trail event and updates verifiedTaskCount / verifiedHours.
   - `recomputeTrustScore`: Triggered on user review/rating submission or reports. Recalculates user trust score based on completed rated tasks, ID verification status, and report penalties. Clamped to `[30, 100]`.
@@ -28,6 +32,7 @@ M8 features implemented:
   - Mid-task suspension handling: Automatically reset tasks to searching state, clear assigned volunteer parameters, trigger matching re-runs, display reassignment notices to customers, and redirect volunteers back to the homepage with a warning toast.
 
 ## Done
+
 - **M0 Foundation** — Vite 8 + React 19 + TS 6 strict, Tailwind v4, ESLint 9 flat + Prettier, Firebase client SDK + lazy initializer, deny-by-default firestore + storage rules, `functions/` scaffold (TS strict, Node 22). Memory bank + CLAUDE.md.
 - **M1 Auth & roles** — Firebase Phone OTP + Email/Password, T&C consent capture, role selection, protected routes with onboarding step machine (`src/lib/protected-route.tsx`), `useRedirectWhenSignedIn` hook to dodge the auth-then-navigate race.
 - **M2 Profile & availability** — display name + required photo + bio + optional ID image, prominent availability ON/OFF toggle for volunteers, geolocation + H3 res-9 cell write on toggle-ON.
@@ -51,16 +56,47 @@ M8 features implemented:
 - Verified at every step: frontend `typecheck` + `lint` + `vite build` clean; functions `build` clean; `firestore.rules` confirmed to compile via `firebase emulators:exec --only firestore`.
 
 ## In progress
+
 - Nothing in active development. All Phase-1 milestones (M0–M8) are implemented. Remaining work is runtime smoke testing + pre-launch (Blaze) tasks below.
 
 ## Post-M8 follow-ups (continued)
+
 - **Customer dashboard redesign (2026-06-14):** New `src/components/CustomerDashboard.tsx` ported from the Claude Design handoff bundle (`Volunteer Dashboard.html`, chat 2026-06-14). Two-screen layout (Tasks / Profile) with floating bottom-nav pill, green-accent gradient hero, Leaflet map showing the customer's `lastKnownLocation` only, ongoing-tasks list (`searching | accepted | in_progress`), and past-tasks segmented tabs (All / Completed / Accepted / Blocked). Wired into `AppHomePage` to render whenever `roles` includes `customer` (dual-role users get this view too; volunteer-only and admin paths unchanged). Scope choices (audience, map fidelity, profile fields, stats source) were confirmed with Nishanth before coding — see decisions.md 2026-06-14. Layout iterated to a desktop-grid (full-width map, Post-CTA + Ongoing tasks below in 2 cols); Rejected tab dropped per request. **Verified:** typecheck + lint + build clean. **Not verified at runtime.**
 
 - **Customer-flow design pass 2 (2026-06-14):** Second handoff bundle (`KOXU9t0cI1y5-j5b1jQ_bg`) added: animation system in `src/index.css` (`vc-*` keyframes; respects `prefers-reduced-motion`); polish on `CustomerDashboard` (screen fade transitions, hover-lift task cards, animated Verified checkmark, scaled active nav); full visual re-theme of `CreateTaskPage` (sticky progress strip with shimmer, animated chips, time stepper, sticky bottom action bar — form fields + Firestore write logic untouched per scope Q&A); new `RadarSearching` component on `TaskDetailPage` for `status=='searching'` (pulsing rings + fade-in blips driven by real `offers` count, live `reached / km radius / mm:ss timer` — no rotating sweep, per design chat); re-themed `accepted/in_progress` hero (gradient card, animated checkmark, vol avatar + online dot, bouncing-dots chat hint); re-themed `CustomerOtpPanel` (flip-cell digit reveal, gradient action button). Underlying callables (`generateStartOtp`, `rankNearbyVolunteers`, `addDoc` to tasks) unchanged. **Verified:** typecheck + lint + build clean. **Not verified at runtime.**
 
 - **Landing & Onboarding pages rebranding (2026-08-07):** Rebranded landing (`HomePage`), auth pages (`LoginPage`, `SignupPage`), and onboarding pages (`ConsentPage`, `RolePage`, `ProfilePage`, `SkillsPage`) alongside supporting components (`OnboardingProgress`, `AuthMethodTabs`, `PhoneAuthForm`, `EmailAuthForm`) to strictly adhere to the Dashboard Design System (`#fafaf8` background, `#1f6f5c` emerald green accents, `#ececea` card borders, `Hey Padosi` brand header emblems, `vc-screen-enter` animations) without modifying content or structure. **Verified:** `npm run typecheck` + `npm run lint` clean.
 
+- **Scheduled tasks up to 7 days (2026-08-10):** Added `ScheduleTaskBottomSheet` with 7-day date/time picker, wait-time tiers (`fast`, `normal`, `flexible`), server-side `activateScheduledTasks` cron, and `nextCheckAt` redispatch. **Verified:** clean build and Firestore rules compilation.
+
+- **Product Discovery & UX/UI Audit (2026-08-29):** Comprehensive product discovery documentation created in `docs/product-discovery/` (00-index, 01-audit, 02-competitive landscape, 03-feature matrix, 04-swot gap analysis, 05-product opportunity strategy, 06-ux-ui audit, 07-roadmap, 08-decisions, 09-customer & volunteer improvements, 10-admin improvements). Replaced placeholder logos with high-res Hey Padosi emblem across header, auth, and dashboard surfaces.
+
+- **Admin & Safety Console Experience Polish (2026-08-30):** Full UX refinement of `/admin` moderation console. Clear 6-section structure: 4 real KPIs (Pending Reports, Open Emergencies, Active Suspensions, Verification Queue), Action-Oriented Pending Reports Queue with one-click Warn/Suspend/Ban/Dismiss modals, Search & User Safety Profile lookup with moderation history, Task Audit Timeline, and Platform Activity Feed. Zero fabricated metrics or data fields.
+
+- **Dual-Role Experience Implementation (2026-08-30):** Implemented native role switching for users holding both `customer` and `volunteer` roles:
+  - `src/lib/use-active-role.ts`: Pure active role hook with UID-scoped `localStorage` persistence.
+  - `src/components/RoleSwitcher.tsx`: Reusable segmented pill switch (`[ 🛒 Need Help ] [ 🤝 Help Others ]`) rendered in top bars for dual-role users.
+  - `src/components/CrossRoleBanner.tsx`: Real-time listener alerting dual-role users to active tasks or available broadcast requests in their opposite role.
+  - Documented in `docs/product-discovery/11-dual-role-experience.md`.
+
+- **6-Digit OTP Length Standardization (2026-08-30):** Synchronized volunteer-side `VolunteerOtpPanel.tsx` to accept 6-digit codes (`maxLength={6}`, `/^\d{4,6}$/`, `w-64`) matching `CustomerOtpPanel.tsx` and Cloud Functions OTP generators.
+
+- **Service Startup Automation & Seed Scripts (2026-08-30):**
+  - Created `scripts/seed-all.js` (`npm run seed:all`) to sync all Admin and Test accounts in one step.
+  - Created `scripts/dev-all.js` for single-terminal orchestration with TCP socket readiness polling.
+  - Created Windows Multi-Window Launchers (`start-all.bat` and `start-all.ps1`) to spawn separate command prompt windows for Emulators and Vite.
+
+- **Deep Trust & Safety UX Refinement (2026-08-30):**
+  - Standardized Trust Score tiers (`Exceptional Community Trust`, `High Community Trust`, `Building Trust`, `Community Member`) and accessible `HowTrustWorksModal` explainer in `KarmaBadge.tsx`.
+  - Standardized badge hierarchy: `🛡️ ID Verified` (Emerald), `✓ Verified Neighbour` (Brand Green), `★ Skill Matched` (Blue).
+  - Contextual Risk Levels in `CreateTaskPage.tsx`: "Everyday Community Task" vs "ID-Verified Task".
+  - Transparent, consequence-aware Reporting and Blocking in `ReportBlockPanel.tsx`.
+  - Account moderation standing banners on Customer and Volunteer dashboards for warned/suspended accounts.
+  - Calm, honest reassignment and searching lifecycle messaging in `TaskDetailPage.tsx`.
+  - Documented in `docs/product-discovery/12-trust-and-safety-experience.md`. **Verified:** `typecheck`, `lint`, and `build` clean.
+
 ## Post-M8 follow-ups
+
 - **Blocked users visibility (2026-06-08):** `blockUser` callable now denormalises initiator (`blockedBy`) + `displayName`/`photoURL` snapshots for both sides onto `blocks/{id}`. New `BlockedUsersList` component on `/app` (customer block) renders the list of users this customer has blocked. Matching exclusion was already in place via `scoring.rankForTask` (mutual filter). Legacy block docs without `blockedBy` are skipped in the UI (can't attribute initiator).
 - **Onboarding step 4 — Skills (2026-06-08):** Volunteer skill picker split out of step 3 (Profile) into its own step 4 at `/onboarding/skills`. Card-grid layout with per-skill SVG icons (new `SkillIcon` component, 25 cases matching `scripts/seed/catalog.json`). Stepper (`OnboardingProgress`) now renders 4 dots when `includeSkills` is set. `auth-context.classify` and `protected-route.currentStep` updated so a volunteer/dual-role user without skills stays `incomplete` and is routed to `/onboarding/skills`. Customer-only users skip step 4. Existing seeded users already have skills so they aren't bumped back into onboarding.
 - **Admin dashboard restructure (2026-06-08):**
@@ -93,6 +129,7 @@ M8 features implemented:
   - `uniqueReporterCount` is computed inside the report transaction and synced across all sibling reports for the same (reportedUid, taskId) pair. Surfaced as an amber chip in the admin pending-reports queue when > 1.
 
 ## Firebase project (created 2026-06-07)
+
 - **Name:** micro - volunteer
 - **Project ID:** `micro---volunteer` (triple hyphen, in `.firebaserc`)
 - **Project number:** 715988734310
@@ -103,6 +140,7 @@ M8 features implemented:
 - **CLI:** firebase-tools 15.19.1, logged in 2026-06-07
 
 ## Console step progress
+
 - **Step 1 (Create project):** done 2026-06-07.
 - **Step 2 (Register web app):** done 2026-06-07. App ID `1:715988734310:web:27ed15be86946eb581b8a7`. `.env.local` populated (gitignored). Hosting site auto-linked (`micro---volunteer.web.app`), no charges. Analytics auto-attached with measurementId `G-5RK4E8HGBE` — unused in code.
 - **`firebase use micro---volunteer`:** confirmed.
@@ -112,6 +150,7 @@ M8 features implemented:
 - **Step 6 (Init emulators locally):** done 2026-06-07. All emulators running (Auth 9099, Firestore 8080, Functions 5001, Hosting 5002, Storage 9199, Extensions 5001, UI 4000). JDK 21 installed and on PATH. AirPlay-port conflict resolved (hosting moved 5000→5002). Node version soft warning logged (dev 26 vs prod 22).
 
 ## Pre-launch / Blaze upgrade checklist
+
 - [ ] Upgrade to Blaze plan with budget alerts at $1 / $5 / $10
 - [ ] Enable Cloud Storage in Console (asia-south1, production-mode rules)
 - [ ] Verify `firebase deploy --only storage` succeeds
@@ -119,11 +158,13 @@ M8 features implemented:
 - [ ] Verify Phone Auth real SMS works (small test batch with real number)
 
 ## Known mocks / TODOs
+
 - `scripts/seed/catalog.json` is starter content — Nishanth to review categories/skills (especially region-specific languages) before launch.
 - FCM real device push deferred (Spark plan + emulator-only dev). No real notifications until Blaze upgrade.
 - Storage uses the emulator only; production Storage gated on Blaze upgrade.
 
 ## Decisions locked 2026-06-07 (see decisions.md)
+
 - Data model approved (collections, doc shapes, indexes, denormalization, security-rules sketch).
 - H3 resolution **9**.
 - Task auto-expiry **24 h**, scheduler `expireStaleTasks` every 15 min.
@@ -133,6 +174,7 @@ M8 features implemented:
 - Customer rating: **1–5 stars + optional comment** post-completion.
 
 ## Next steps
+
 1. Live smoke test of M7 chat in the emulator suite: accept a task (chat opens with "connected" system message) → both parties exchange messages → verify Start OTP (start system message) → verify End OTP (complete system message) → completed chat goes read-only → per-message report marks the message + files a report → customer block disables the composer for both parties.
 2. Live smoke test of M8 in the emulator suite (report → moderation → reassignment → completion); confirm reassignment wipes the old chat conversation.
 3. Pre-launch: Blaze upgrade + real-device FCM smoke test + Storage Console enable.

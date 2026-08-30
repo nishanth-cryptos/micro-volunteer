@@ -3,6 +3,7 @@
 > One line per source file: path → purpose → key exports / responsibilities. Update whenever a file is added, moved, or significantly changed.
 
 ## Root config
+
 - `package.json` — frontend dependencies (pinned exact), npm scripts (`dev`, `build`, `preview`, `typecheck`, `lint`, `format`, `format:check`).
 - `tsconfig.json` — TS strict suite for `src/`. Includes `noUncheckedIndexedAccess`, `noImplicitOverride`, `exactOptionalPropertyTypes`.
 - `tsconfig.node.json` — standalone editor-awareness config for `vite.config.ts` (not referenced from root tsconfig).
@@ -10,7 +11,7 @@
 - `eslint.config.js` — flat config; type-aware lint for `src/**`, plain lint for root configs; ignores `dist/`, `functions/lib/`, `.firebase/`.
 - `.prettierrc.json` — single quotes, trailing comma all, 80 cols.
 - `.prettierignore` — node_modules, dist, build, .firebase, functions/lib, package-lock.json.
-- `.gitignore` — node_modules, dist, .env*, Firebase debug logs, editor/OS junk.
+- `.gitignore` — node_modules, dist, .env\*, Firebase debug logs, editor/OS junk.
 - `.env.example` — Firebase Web SDK env var NAMES (no values).
 - `index.html` — Vite entry HTML. Mounts `#root` and `src/main.tsx`.
 - `firebase.json` — Hosting (dist/), Firestore, Storage, Functions, Emulators (auth 9099 / firestore 8080 / functions 5001 / storage 9199 / hosting 5000 / UI 4000).
@@ -20,6 +21,7 @@
 - `.firebaserc` — `default` project alias = `REPLACE_WITH_FIREBASE_PROJECT_ID` (set during Console step).
 
 ## Frontend src/
+
 - `src/main.tsx` — React root mount. Wraps app in `<AuthProvider>` + `<RouterProvider>`. Throws if `#root` missing.
 - `src/index.css` — `@import "tailwindcss";` (Tailwind v4 model) **plus** the `vc-*` design-system animation keyframes (`vc-fade-up`, `vc-fade-in`, `vc-shimmer`, `vc-check-pop`, `vc-radar-ping`, `vc-radar-halo`, `vc-blip-in`, `vc-cell-flip`, `vc-dot-bounce`) ported from the Claude Design handoff bundle (2026-06-14). Used by CustomerDashboard, CreateTaskPage, TaskDetailPage, CustomerOtpPanel. Respects `prefers-reduced-motion`.
 - `src/vite-env.d.ts` — typed `ImportMetaEnv` for the `VITE_FIREBASE_*` vars + `VITE_USE_EMULATORS`.
@@ -49,6 +51,12 @@
 - `src/pages/CreateTaskPage.tsx` — customer creates a task. Same Firestore write logic (category + skills + duration + textareas + map pin → `tasks/{auto-id}` with status='searching' + 24h expiry; risk auto-derived). **Re-themed 2026-06-14** to match Claude Design handoff: sticky top progress strip with shimmer fill + live %, animated chips (single Category, multi Skills max 5 with disabled-at-cap state), time stepper with +/- buttons + preset pills, sticky bottom action bar with live summary that slides in once any field is filled.
 - `src/pages/TaskDetailPage.tsx` — customer view of a task + offers + lifecycle state. **Re-themed 2026-06-14**: when `status=='searching'` the customer sees a `RadarSearching` component (pulsing rings + fade-in volunteer blips driven by real `offers` count, live `reached / km radius / mm:ss timer` stats — no rotating sweep per design chat); when `accepted`/`in_progress` the "Task accepted" card is now a green gradient hero with animated checkmark, volunteer avatar + online dot, and a bouncing-dots chat-coming-soon hint. Score-breakdown chips for pending offers retained underneath the radar.
 - `src/pages/AdminDashboard.tsx` — Admin-only dashboard with global stats and four tabs (Pending Reports default → User Lookup → Task Audit Trail → Activity Log). Strict no-raw-UID policy throughout: reporter/reported/admin/actor identities all resolved to display names or role labels (Customer / Volunteer / System / Admin). Reports are collapsible cards (collapsed: reporter role · reported name · reason · timestamp; expanded: details + task link + unique reporter count + inline Warn/Suspend/Ban/Dismiss buttons that open the moderation modal pre-set to that action). 10-character minimum reason validation with inline error in both report and lookup moderation forms; success/error banners auto-dismiss after 3 s. Task audit entries are collapsible with role-labelled actor. Activity Log tab paginates `activityLog` (50 per page) with an event-type filter dropdown and "Load more".
+- `src/lib/use-active-role.ts` — `useActiveRole(userDoc)` pure active role resolution hook with UID-scoped `localStorage` persistence.
+- `src/components/RoleSwitcher.tsx` — Reusable accessible segmented pill switcher (`[ 🛒 Need Help ] [ 🤝 Help Others ]`) rendered in top bars for dual-role users.
+- `src/components/CrossRoleBanner.tsx` — Real-time listener alerting dual-role users on active tasks or available broadcast requests in their opposite role.
+- `src/components/VolunteerDashboard.tsx` — Volunteer dashboard with Availability toggle, departure detector modal, live task offers, active missions, and profile screen with Trust Score pill and Karma badge.
+- `src/components/KarmaBadge.tsx` — Indian-themed inline Lotus SVG alongside karma points, plus `TrustScorePill`, `getTrustTier`, and accessible `HowTrustWorksModal` explainer.
+- `src/components/ReportBlockPanel.tsx` — Consequence-aware reporting and mutual blocking panel with confidential submission feedback.
 - `src/lib/geolocation.ts` — `getCurrentLocation()` Promise wrapper over `navigator.geolocation.getCurrentPosition`, plus a `GeolocationError` class with a `userMessage` mapped from the W3C error codes.
 - `src/pages/HomePage.tsx` — public landing.
 - `src/pages/LoginPage.tsx` — sign-in page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
@@ -58,9 +66,17 @@
 - `src/pages/onboarding/ProfilePage.tsx` — Step 3. Name + photo (required), optional bio (everyone), optional ID image. Uploads to Storage at `users/{uid}/photo` and `users/{uid}/id-image`, then updates user doc with displayName, photoURL, bio, idImagePath. Volunteers continue to step 4 (skills); customer-only users go straight to /app.
 - `src/pages/onboarding/SkillsPage.tsx` — Step 4 (volunteers only). "What can you offer?" card grid sourced from `SKILLS` in `src/lib/catalog.ts`. Each card uses `SkillIcon`. Selecting up to 10 then Continue writes `users/{uid}.skills`; ProtectedRoute flips status to 'ready' and lands the user on /app.
 - `src/components/SkillIcon.tsx` — Per-skill 64x64 SVG icon switch. One case per skill key in `scripts/seed/catalog.json` plus a generic fallback. Simple line + accent style, not the bespoke illustrated stickperson art from the Figma reference.
-- `src/pages/AppHomePage.tsx` — authenticated home. Admins short-circuit to a minimal `AdminHomeScreen` (welcome heading, primary "Go to Admin Dashboard" button, neutral alert showing pending-report count if > 0, sign out). Volunteers/customers get the regular dashboard with availability toggle, karma, blocked-users list, etc. Sign-out button on both.
+- `src/pages/AppHomePage.tsx` — authenticated home. Admins short-circuit to a minimal `AdminHomeScreen` (welcome heading, primary "Go to Admin Dashboard" button, neutral alert showing pending-report count if > 0, sign out). Volunteers/customers get the regular dashboard with dynamic dual-role routing, availability toggle, karma, blocked-users list, etc. Sign-out button on both.
+
+## Scripts & Service Launchers
+
+- `scripts/dev-all.js` — Single-terminal Node supervisor with TCP socket polling for emulator readiness, automatic seeding, and Vite launching.
+- `scripts/seed-all.js` — Single-command data seeder running `seed-admin.js` and `seed-users.js`.
+- `start-all.bat` — Windows Batch multi-window launcher (`start cmd /k`).
+- `start-all.ps1` — PowerShell multi-window launcher (`Start-Process cmd.exe`).
 
 ## Scripts / seed
+
 - `scripts/seed/catalog.json` — starter seed for `catalog/categories` and `catalog/skills`. Reviewed pre-launch; loaded into Firestore by an admin-only callable in M1. Replaced by the M8 admin UI for live edits.
 - `scripts/seed-admin.js` — root redirect wrapper that executes the Admin SDK seed script to create the local administrator.
 - `scripts/seed-users.js` — root redirect wrapper that executes the Admin SDK seed script to create test volunteer + customer accounts.
@@ -68,6 +84,7 @@
 - `functions/scripts/seed-users.js` — Admin SDK seed: 3 volunteer-only + 3 customer-only + 3 dual-role test users (all Kalewadi-centred, `pass123`). Same idempotent password resync as seed-admin.
 
 ## Cloud Functions
+
 - `functions/package.json` — `firebase-functions@7.2.5`, `firebase-admin@13.10.0`, Node 22 runtime.
 - `functions/tsconfig.json` — TS strict; `module: node16`, `moduleResolution: node16`, `rootDir: src`, `outDir: lib`.
 - `functions/src/index.ts` — re-exports every concrete Cloud Function from its own file so the emulator + deploy pipeline can find them.
@@ -90,6 +107,7 @@
 - `functions/src/moderation-helper.ts` — Shared helpers for enforcing suspension/ban checks across all callable functions.
 
 ## Documentation
+
 - `CHECKPOINT.md` — thin pointer to `memory-bank/`.
 - `CLAUDE.md` — agent rules summary + pointer to `memory-bank/`.
 - `memory-bank/projectbrief.md` — scope source of truth (12 features + out-of-scope).
