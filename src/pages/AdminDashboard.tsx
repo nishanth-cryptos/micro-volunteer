@@ -16,9 +16,10 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { Link } from 'react-router-dom';
 import { db, functions } from '../lib/firebase';
+import { Logo } from '../components/Logo';
 
 const REASON_MIN_LENGTH = 10;
-const AUTO_DISMISS_MS = 3000;
+const AUTO_DISMISS_MS = 3500;
 const ACTIVITY_LOG_PAGE_SIZE = 50;
 
 interface ReportDoc {
@@ -29,8 +30,6 @@ interface ReportDoc {
   reason: string;
   details: string;
   status: 'pending' | 'actioned' | 'dismissed';
-  // Number of unique reporters who have filed against this (reportedUid,
-  // taskId) pair. Maintained server-side in functions/src/report-user.ts.
   uniqueReporterCount?: number;
   createdAt: Timestamp;
 }
@@ -71,7 +70,7 @@ type AdminTab = 'reports' | 'users' | 'tasks' | 'activity';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('reports');
-  
+
   // Stats
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -82,8 +81,6 @@ export default function AdminDashboard() {
 
   // Load stats
   useEffect(() => {
-    // We can query all of these using onSnapshot to keep stats live or fetch once
-    // In emulator, fetching once or watching is very fast.
     const usersQ = query(collection(db(), 'users'));
     const completedTasksQ = query(collection(db(), 'tasks'), where('status', '==', 'completed'));
     const openReportsQ = query(collection(db(), 'reports'), where('status', '==', 'pending'));
@@ -116,105 +113,179 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="mx-auto max-w-5xl px-6 py-12">
-        <div className="flex items-center justify-between border-b border-neutral-200 pb-6">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Admin Dashboard</h1>
-            <p className="mt-1 text-sm text-neutral-600">
-              Manage safety reports, audit tasks, and moderate user accounts.
-            </p>
+    <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 border-b border-[#ececea] bg-white px-6 py-4 shadow-xs">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <Logo size="md" />
+            <span className="hidden sm:inline-block text-[#ececea] font-light">|</span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-bold text-[#1f6f5c]">
+                🛡️ Safety &amp; Moderation
+              </span>
+            </div>
           </div>
-          <Link
-            to="/app"
-            className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
-          >
-            Go to App Home
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-[#fafaf8] px-4 py-2 text-xs font-semibold text-[#4f4b46] transition hover:bg-[#ececea] hover:text-[#131312] focus:outline-none"
+            >
+              <span>←</span> Return to App Home
+            </Link>
+          </div>
         </div>
+      </header>
 
-        {/* Stats Bar */}
-        <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              Total Users
-            </p>
-            <p className="mt-2 text-3xl font-semibold">
-              {statsLoading ? '...' : stats.totalUsers}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              Tasks Completed
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-emerald-600">
-              {statsLoading ? '...' : stats.completedTasks}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-              Open Reports
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-red-600">
-              {statsLoading ? '...' : stats.openReports}
-            </p>
-          </div>
-        </section>
-
-        {/* Tab Buttons */}
-        <div className="mt-10 flex border-b border-neutral-200">
+      <div className="mx-auto max-w-6xl px-6 py-8 sm:py-10">
+        {/* Action-First Triage Overview Cards */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Urgent Safety Reports Card */}
           <button
             type="button"
             onClick={() => setActiveTab('reports')}
             className={
-              'border-b-2 px-6 py-3 text-sm font-medium transition focus:outline-none ' +
-              (activeTab === 'reports'
-                ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900')
+              'text-left w-full cursor-pointer rounded-3xl border p-6 transition shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] ' +
+              (stats.openReports > 0
+                ? 'border-amber-300 bg-[#fffbeb] hover:border-amber-400'
+                : 'border-[#ececea] bg-white hover:border-[#1f6f5c]/40')
             }
           >
-            Pending Reports ({stats.openReports})
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                Safety Reports Queue
+              </span>
+              {stats.openReports > 0 ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+                  <span className="h-2 w-2 rounded-full bg-amber-600 animate-pulse" />
+                  Review Needed
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                  ✓ All Clear
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-bold tracking-tight text-[#131312]">
+                {statsLoading ? '…' : stats.openReports}
+              </span>
+              <span className="text-xs text-[#4f4b46]">
+                {stats.openReports === 1 ? 'pending report' : 'pending reports'}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-[#8a847d]">
+              {stats.openReports > 0
+                ? 'Neighbour safety reports awaiting administrative review.'
+                : 'Zero open safety flags in queue.'}
+            </p>
           </button>
+
+          {/* Operations: Completed Missions */}
+          <div className="rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                Completed Tasks
+              </span>
+              <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-[11px] font-bold text-[#1f6f5c]">
+                Verified
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-bold tracking-tight text-[#1f6f5c]">
+                {statsLoading ? '…' : stats.completedTasks}
+              </span>
+              <span className="text-xs text-[#4f4b46]">missions completed</span>
+            </div>
+            <p className="mt-2 text-xs text-[#8a847d]">
+              Hyperlocal community tasks safely finished and verified.
+            </p>
+          </div>
+
+          {/* Platform Community Size */}
+          <div className="rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                Community Directory
+              </span>
+              <span className="rounded-full bg-[#f3f1ec] px-2.5 py-0.5 text-[11px] font-bold text-[#4f4b46]">
+                Registered
+              </span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-bold tracking-tight text-[#131312]">
+                {statsLoading ? '…' : stats.totalUsers}
+              </span>
+              <span className="text-xs text-[#4f4b46]">members</span>
+            </div>
+            <p className="mt-2 text-xs text-[#8a847d]">
+              Verified requesters and volunteers in neighbourhood network.
+            </p>
+          </div>
+        </section>
+
+        {/* Tab Navigation */}
+        <div className="mt-8 flex flex-wrap gap-2 border-b border-[#ececea] pb-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab('reports')}
+            className={
+              'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] ' +
+              (activeTab === 'reports'
+                ? 'bg-[#131312] text-white shadow-xs'
+                : 'bg-white border border-[#ececea] text-[#4f4b46] hover:bg-[#fafaf8]')
+            }
+          >
+            <span>Pending Reports</span>
+            {stats.openReports > 0 && (
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                {stats.openReports}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('users')}
             className={
-              'border-b-2 px-6 py-3 text-sm font-medium transition focus:outline-none ' +
+              'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] ' +
               (activeTab === 'users'
-                ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900')
+                ? 'bg-[#131312] text-white shadow-xs'
+                : 'bg-white border border-[#ececea] text-[#4f4b46] hover:bg-[#fafaf8]')
             }
           >
-            User Lookup
+            <span>User Safety Lookup</span>
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('tasks')}
             className={
-              'border-b-2 px-6 py-3 text-sm font-medium transition focus:outline-none ' +
+              'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] ' +
               (activeTab === 'tasks'
-                ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900')
+                ? 'bg-[#131312] text-white shadow-xs'
+                : 'bg-white border border-[#ececea] text-[#4f4b46] hover:bg-[#fafaf8]')
             }
           >
-            Task Audit Trail
+            <span>Task Lifecycle Audit</span>
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('activity')}
             className={
-              'border-b-2 px-6 py-3 text-sm font-medium transition focus:outline-none ' +
+              'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] ' +
               (activeTab === 'activity'
-                ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900')
+                ? 'bg-[#131312] text-white shadow-xs'
+                : 'bg-white border border-[#ececea] text-[#4f4b46] hover:bg-[#fafaf8]')
             }
           >
-            Activity Log
+            <span>Activity &amp; Audit Stream</span>
           </button>
         </div>
 
         {/* Tab Panels */}
-        <div className="mt-8">
+        <div className="mt-6">
           {activeTab === 'reports' && <PendingReportsPanel />}
           {activeTab === 'users' && <UserLookupPanel />}
           {activeTab === 'tasks' && <TaskAuditPanel />}
@@ -235,25 +306,19 @@ function PendingReportsPanel() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Cache of resolved display names keyed by uid. `null` marks a uid we
-  // already tried to resolve but couldn't (missing/deleted user doc) so
-  // we don't refetch on every snapshot tick.
   const [userNames, setUserNames] = useState<Record<string, string | null>>({});
-  // Cache of (customerId, acceptedVolunteerId) per taskId so we can derive
-  // the reporter's role (Customer / Volunteer) without surfacing UIDs.
   const [taskMap, setTaskMap] = useState<
     Record<string, { customerId: string; acceptedVolunteerId?: string }>
   >({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Moderation state
+  // Moderation modal state
   const [selectedReport, setSelectedReport] = useState<ReportDoc | null>(null);
   const [modAction, setModAction] = useState<'warn' | 'suspend' | 'ban' | 'dismiss'>('warn');
   const [reason, setReason] = useState('');
   const [durationDays, setDurationDays] = useState(3);
 
-  // Auto-dismiss the success banner. Errors also clear after the same
-  // window so transient failures don't sit on screen forever.
+  // Auto-dismiss banners
   useEffect(() => {
     if (!actionSuccess) return;
     const id = setTimeout(() => setActionSuccess(null), AUTO_DISMISS_MS);
@@ -289,10 +354,7 @@ function PendingReportsPanel() {
     return unsub;
   }, []);
 
-  // Resolve display names for any new (reporter, reported, customer,
-  // volunteer) uids appearing in the report list or its associated tasks.
-  // firestore.rules grants admins read access to users/{uid}, so a direct
-  // getDoc is fine here.
+  // Resolve user display names
   useEffect(() => {
     let cancelled = false;
     const uids = new Set<string>();
@@ -332,8 +394,7 @@ function PendingReportsPanel() {
     };
   }, [reports, userNames, taskMap]);
 
-  // Resolve task customer/volunteer ids so we can label the reporter's role
-  // (Customer / Volunteer) without surfacing UIDs.
+  // Resolve tasks
   useEffect(() => {
     let cancelled = false;
     const taskIds = new Set(reports.map((r) => r.taskId));
@@ -419,10 +480,9 @@ function PendingReportsPanel() {
 
       await fn(params);
 
-      setActionSuccess(`Successfully applied ${modAction} to user.`);
+      setActionSuccess(`Successfully applied ${modAction} to user account.`);
       setSelectedReport(null);
       setReason('');
-      // auto-dismiss handled by useEffect above
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply moderation action.');
     } finally {
@@ -430,154 +490,193 @@ function PendingReportsPanel() {
     }
   }
 
-  if (loading) return <p className="text-neutral-600 text-sm">Loading reports...</p>;
-  if (error && !selectedReport) return <p className="text-red-700 text-sm font-medium">{error}</p>;
-
   return (
-    <div>
+    <div className="space-y-4">
       {actionSuccess && (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800 animate-fade-in">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 vc-fade-up">
           {actionSuccess}
         </div>
       )}
 
-      {reports.length === 0 ? (
-        <p className="text-neutral-600 text-sm">No pending reports in queue.</p>
+      {error && !selectedReport && (
+        <div className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-sm font-semibold text-[#a32a22]">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="animate-pulse rounded-3xl border border-[#ececea] bg-white p-6 space-y-3"
+            >
+              <div className="h-4 w-1/4 rounded bg-[#ececea]" />
+              <div className="h-3 w-1/2 rounded bg-[#ececea]" />
+            </div>
+          ))}
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-[#ececea] bg-white p-10 text-center shadow-xs">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </div>
+          <h3 className="mt-3 text-base font-bold text-[#131312]">
+            No reports need your attention
+          </h3>
+          <p className="mx-auto mt-1 max-w-sm text-xs text-[#8a847d]">
+            Everything is clear. All submitted reports have been reviewed and resolved.
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {reports.map((report) => {
             const expanded = expandedId === report.id;
             const role = reporterRole(report);
             const reportedName = userNames[report.reportedUid] ?? '…';
+            const reporterName = userNames[report.reporterUid] ?? '…';
             return (
               <div
                 key={report.id}
-                className="rounded-2xl border border-neutral-200 bg-white shadow-sm"
+                className="vc-fade-up overflow-hidden rounded-3xl border border-[#ececea] bg-white shadow-xs transition hover:border-[#d8d4cc]"
               >
-                {/* Collapsed header — always rendered, acts as the toggle */}
+                {/* Header */}
                 <button
                   type="button"
                   aria-expanded={expanded}
                   onClick={() => setExpandedId(expanded ? null : report.id)}
-                  className="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+                  className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-[#fafaf8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-block rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-medium text-neutral-700">
-                        {role}
+                      <span className="rounded-full bg-[#f3f1ec] px-2.5 py-0.5 text-[11px] font-bold text-[#4f4b46]">
+                        {role} · {reporterName}
                       </span>
-                      <span className="text-sm font-medium text-neutral-900 truncate">
-                        reported {reportedName}
+                      <span className="text-xs text-[#8a847d]">reported</span>
+                      <span className="font-bold text-sm text-[#131312] truncate">
+                        {reportedName}
                       </span>
-                      <span className="inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-semibold text-red-800">
-                        {report.reason.replace('_', ' ')}
+                      <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-bold text-red-800">
+                        {report.reason.replace(/_/g, ' ')}
                       </span>
                       {(report.uniqueReporterCount ?? 1) > 1 && (
-                        <span
-                          className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800"
-                          title="Unique reporters against this user on this task"
-                        >
-                          {report.uniqueReporterCount} reporters
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
+                          {report.uniqueReporterCount} unique reporters
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {report.createdAt.toDate().toLocaleString()}
+                    <p className="mt-1.5 text-xs text-[#8a847d]">
+                      Reported {report.createdAt.toDate().toLocaleString()}
                     </p>
                   </div>
                   <span
                     aria-hidden="true"
                     className={
-                      'flex-shrink-0 text-neutral-400 transition ' +
-                      (expanded ? 'rotate-180' : '')
+                      'flex-shrink-0 text-sm font-bold text-[#8a847d] transition ' +
+                      (expanded ? 'rotate-180 text-[#131312]' : '')
                     }
                   >
-                    ▾
+                    ▼
                   </span>
                 </button>
 
-                {/* Expanded body */}
+                {/* Expanded Details */}
                 {expanded && (() => {
                   const t = taskMap[report.taskId];
-                  const customerName = t
-                    ? userNames[t.customerId] ?? '…'
-                    : undefined;
+                  const customerName = t ? userNames[t.customerId] ?? '…' : undefined;
                   const volunteerUid = t?.acceptedVolunteerId;
-                  const volunteerName = volunteerUid
-                    ? userNames[volunteerUid] ?? '…'
-                    : undefined;
+                  const volunteerName = volunteerUid ? userNames[volunteerUid] ?? '…' : undefined;
                   return (
-                  <div className="border-t border-neutral-100 px-5 py-4">
-                    <p className="text-sm text-neutral-700">
-                      <span className="font-semibold text-neutral-900">Details: </span>
-                      {report.details || 'No details provided.'}
-                    </p>
-                    <div className="mt-3 grid grid-cols-1 gap-y-1.5 text-xs text-neutral-600 sm:grid-cols-2 sm:gap-x-6">
-                      {t && (
-                        <span>
-                          <span className="font-medium text-neutral-800">Customer: </span>
-                          <span className="text-neutral-900 font-medium">{customerName}</span>
-                          <span className="ml-1.5 font-mono text-[10px] text-neutral-400">
-                            ({t.customerId})
-                          </span>
-                        </span>
-                      )}
-                      {volunteerUid && (
-                        <span>
-                          <span className="font-medium text-neutral-800">Volunteer: </span>
-                          <span className="text-neutral-900 font-medium">{volunteerName}</span>
-                          <span className="ml-1.5 font-mono text-[10px] text-neutral-400">
-                            ({volunteerUid})
-                          </span>
-                        </span>
-                      )}
-                      <span>
-                        <span className="font-medium text-neutral-800">Task ID: </span>
-                        <Link
-                          to={`/tasks/${report.taskId}`}
-                          className="font-mono text-[11px] text-neutral-900 underline hover:text-neutral-700"
-                        >
-                          {report.taskId}
-                        </Link>
-                      </span>
-                      <span>
-                        <span className="font-medium text-neutral-800">Unique reporters: </span>
-                        {report.uniqueReporterCount ?? 1}
-                      </span>
-                    </div>
+                    <div className="border-t border-[#f3f1ec] bg-[#fafaf8]/50 p-6 space-y-4">
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                          Incident Description
+                        </div>
+                        <p className="mt-1 rounded-2xl border border-[#ececea] bg-white p-4 text-xs leading-relaxed text-[#131312]">
+                          {report.details || 'No additional details provided in report.'}
+                        </p>
+                      </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {(['warn', 'suspend', 'ban', 'dismiss'] as const).map((act) => (
+                      {/* Task & Involved Parties Grid */}
+                      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#ececea] bg-white p-4 text-xs sm:grid-cols-2">
+                        {t && (
+                          <div>
+                            <span className="text-[#8a847d]">Customer: </span>
+                            <span className="font-semibold text-[#131312]">{customerName}</span>
+                          </div>
+                        )}
+                        {volunteerUid && (
+                          <div>
+                            <span className="text-[#8a847d]">Volunteer: </span>
+                            <span className="font-semibold text-[#131312]">{volunteerName}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-[#8a847d]">Task Reference: </span>
+                          <Link
+                            to={`/tasks/${report.taskId}`}
+                            className="font-semibold text-[#1f6f5c] underline underline-offset-2 hover:text-[#185845]"
+                          >
+                            Open Task {report.taskId} →
+                          </Link>
+                        </div>
+                        <div>
+                          <span className="text-[#8a847d]">Report ID: </span>
+                          <span className="font-mono text-[#4f4b46]">{report.id}</span>
+                        </div>
+                      </div>
+
+                      {/* Action Toolbar */}
+                      <div className="flex flex-wrap items-center gap-2 pt-2">
+                        <span className="text-xs font-bold text-[#4f4b46] mr-1">Moderation Action:</span>
                         <button
-                          key={act}
                           type="button"
                           onClick={() => {
                             setSelectedReport(report);
-                            setModAction(act);
+                            setModAction('warn');
                             setReason('');
                           }}
-                          className={
-                            'rounded-full px-4 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
-                            (act === 'ban'
-                              ? 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500'
-                              : act === 'suspend'
-                                ? 'bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-500'
-                                : act === 'warn'
-                                  ? 'bg-neutral-900 text-white hover:bg-neutral-800 focus-visible:ring-neutral-900'
-                                  : 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100 focus-visible:ring-neutral-900')
-                          }
+                          className="rounded-full bg-[#131312] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 transition focus:outline-none"
                         >
-                          {act === 'warn'
-                            ? 'Warn'
-                            : act === 'suspend'
-                              ? 'Suspend'
-                              : act === 'ban'
-                                ? 'Ban'
-                                : 'Dismiss'}
+                          Issue Warning
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReport(report);
+                            setModAction('suspend');
+                            setReason('');
+                          }}
+                          className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 transition focus:outline-none"
+                        >
+                          Suspend Account
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReport(report);
+                            setModAction('ban');
+                            setReason('');
+                          }}
+                          className="rounded-full bg-red-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-800 transition focus:outline-none"
+                        >
+                          Permanent Ban
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReport(report);
+                            setModAction('dismiss');
+                            setReason('Reviewed and dismissed without penalty.');
+                          }}
+                          className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-xs font-semibold text-[#4f4b46] hover:bg-[#ececea] transition focus:outline-none"
+                        >
+                          Dismiss Report
+                        </button>
+                      </div>
                     </div>
-                  </div>
                   );
                 })()}
               </div>
@@ -586,89 +685,144 @@ function PendingReportsPanel() {
         </div>
       )}
 
-      {/* ACTION REPORT MODAL — preset action comes from the inline button
-          the admin clicked in the expanded card. */}
+      {/* CONSEQUENCE-CLEAR MODERATION MODAL */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all">
-            <h2 className="text-xl font-semibold text-neutral-900">
-              {modAction === 'warn'
-                ? 'Issue warning'
-                : modAction === 'suspend'
-                  ? 'Suspend account'
-                  : modAction === 'ban'
-                    ? 'Ban account'
-                    : 'Dismiss report'}
-            </h2>
-            <p className="mt-1 text-xs text-neutral-600">
-              Target: <span className="font-semibold text-neutral-900">
-                {userNames[selectedReport.reportedUid] ?? 'user'}
-              </span>
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="vc-fade-up w-full max-w-lg overflow-hidden rounded-3xl border border-[#ececea] bg-white p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#8a847d]">
+                  Moderation Commitment
+                </span>
+                <h2 className="text-xl font-bold tracking-tight text-[#131312] mt-0.5">
+                  {modAction === 'warn'
+                    ? 'Issue Formal Warning'
+                    : modAction === 'suspend'
+                      ? 'Apply Temporary Suspension'
+                      : modAction === 'ban'
+                        ? 'Permanently Ban Account'
+                        : 'Dismiss Safety Report'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReport(null)}
+                disabled={busyReportId !== null}
+                className="rounded-full p-2 text-[#8a847d] hover:bg-[#fafaf8] transition"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={(e) => void handleModerationSubmit(e)} className="mt-6">
+            <div className="mt-3 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-3 text-xs text-[#4f4b46]">
+              Target User:{' '}
+              <strong className="text-[#131312] font-bold">
+                {userNames[selectedReport.reportedUid] ?? 'User'}
+              </strong>{' '}
+              <span className="font-mono text-[#8a847d]">({selectedReport.reportedUid})</span>
+            </div>
+
+            <form onSubmit={(e) => void handleModerationSubmit(e)} className="mt-5 space-y-4">
               {modAction === 'suspend' && (
                 <div>
-                  <label htmlFor="suspend-duration" className="block text-sm font-medium text-neutral-700">
+                  <label htmlFor="modal-duration" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
                     Suspension Duration
                   </label>
                   <select
-                    id="suspend-duration"
+                    id="modal-duration"
                     value={durationDays}
                     onChange={(e) => setDurationDays(Number(e.target.value))}
-                    className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-sm font-semibold text-[#131312] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
                   >
-                    <option value={1}>1 Day</option>
+                    <option value={1}>1 Day (24 hours)</option>
                     <option value={3}>3 Days</option>
-                    <option value={7}>7 Days</option>
-                    <option value={30}>30 Days</option>
+                    <option value={7}>7 Days (1 week)</option>
+                    <option value={30}>30 Days (1 month)</option>
                   </select>
                 </div>
               )}
 
-              <div className={modAction === 'suspend' ? 'mt-4' : ''}>
-                <label htmlFor="mod-reason" className="block text-sm font-medium text-neutral-700">
-                  Reason (visible to user on warn/suspend/ban, and stored in log)
+              <div>
+                <label htmlFor="modal-reason" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                  Administrative Reason (Stored in permanent audit log)
                 </label>
                 <textarea
-                  id="mod-reason"
+                  id="modal-reason"
                   required
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Explain the reason for this action..."
-                  className="mt-1 block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 shadow-sm placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                  placeholder="State the clear, policy-based reason for this moderation action..."
+                  className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-3 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
                 />
                 {reason.length > 0 && reason.trim().length < REASON_MIN_LENGTH && (
                   <p className="mt-1 text-xs text-red-700">
-                    Please provide a meaningful reason
+                    Reason must be at least {REASON_MIN_LENGTH} characters.
                   </p>
                 )}
               </div>
 
+              {/* Consequence Callout Box */}
+              <div
+                className={
+                  'rounded-2xl p-3.5 text-xs leading-relaxed ' +
+                  (modAction === 'ban'
+                    ? 'border border-red-200 bg-red-50 text-red-900'
+                    : modAction === 'suspend'
+                      ? 'border border-amber-200 bg-amber-50 text-amber-900'
+                      : modAction === 'warn'
+                        ? 'border border-neutral-200 bg-[#f3f1ec] text-[#131312]'
+                        : 'border border-emerald-200 bg-emerald-50 text-emerald-900')
+                }
+              >
+                <span className="font-bold">Consequence: </span>
+                {modAction === 'warn' &&
+                  'Issues an official warning notice and records +1 warning in the user’s permanent moderation record.'}
+                {modAction === 'suspend' &&
+                  `Suspends the user for ${durationDays} days. Prevents all volunteering and task creation during this period.`}
+                {modAction === 'ban' &&
+                  'Irreversible. Permanently disables account access and removes the user from neighbourhood matching.'}
+                {modAction === 'dismiss' &&
+                  'Closes the report and marks it resolved with no disciplinary penalties applied.'}
+              </div>
+
               {error && (
-                <p role="alert" className="mt-4 text-sm text-red-700 font-medium">
+                <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
                   {error}
                 </p>
               )}
 
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="flex justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setSelectedReport(null)}
                   disabled={busyReportId !== null}
-                  className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+                  className="rounded-full border border-[#ececea] bg-white px-5 py-2.5 text-xs font-semibold text-[#4f4b46] hover:bg-[#fafaf8] transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={
-                    busyReportId !== null || reason.trim().length < REASON_MIN_LENGTH
+                  disabled={busyReportId !== null || reason.trim().length < REASON_MIN_LENGTH}
+                  className={
+                    'rounded-full px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition disabled:opacity-50 ' +
+                    (modAction === 'ban'
+                      ? 'bg-red-700 hover:bg-red-800'
+                      : modAction === 'suspend'
+                        ? 'bg-amber-600 hover:bg-amber-700'
+                        : 'bg-[#131312] hover:bg-neutral-800')
                   }
-                  className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 focus:outline-none disabled:opacity-50"
                 >
-                  {busyReportId !== null ? 'Applying...' : 'Apply Action'}
+                  {busyReportId !== null
+                    ? 'Applying…'
+                    : modAction === 'ban'
+                      ? 'Confirm Permanent Ban'
+                      : modAction === 'suspend'
+                        ? `Confirm ${durationDays}-Day Suspension`
+                        : modAction === 'warn'
+                          ? 'Confirm Warning'
+                          : 'Confirm Dismissal'}
                 </button>
               </div>
             </form>
@@ -680,7 +834,7 @@ function PendingReportsPanel() {
 }
 
 /* ============================================================================
-   USER LOOKUP PANEL
+   USER SAFETY LOOKUP PANEL
    ============================================================================ */
 function UserLookupPanel() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -689,20 +843,20 @@ function UserLookupPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Moderation state
+  // Moderation modal state
   const [modAction, setModAction] = useState<'warn' | 'suspend' | 'ban' | 'dismiss'>('warn');
   const [reason, setReason] = useState('');
   const [durationDays, setDurationDays] = useState(3);
   const [busy, setBusy] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Reactivation dialog modal state
+  const [reactivateModalOpen, setReactivateModalOpen] = useState(false);
+  const [reactivateReason, setReactivateReason] = useState('Account reinstated by administrator.');
   const [revoking, setRevoking] = useState(false);
 
-  // Cache of admin display names so the Moderation Log never surfaces raw
-  // UIDs. firestore.rules already lets admins read other users/{uid}.
   const [adminNames, setAdminNames] = useState<Record<string, string | null>>({});
 
-  // Auto-dismiss any success / error banner after 3s — matches the same
-  // behaviour in PendingReportsPanel for consistency.
   useEffect(() => {
     if (!actionSuccess) return;
     const id = setTimeout(() => setActionSuccess(null), AUTO_DISMISS_MS);
@@ -714,7 +868,6 @@ function UserLookupPanel() {
     return () => clearTimeout(id);
   }, [error]);
 
-  // Resolve admin display names referenced in the moderation log.
   useEffect(() => {
     let cancelled = false;
     const uids = new Set(modLogs.map((l) => l.adminId).filter(Boolean));
@@ -761,8 +914,6 @@ function UserLookupPanel() {
 
       if (userSnap.exists()) {
         setUser({ uid: userSnap.id, ...(userSnap.data() as Omit<UserSummary, 'uid'>) });
-
-        // Load moderation logs
         const logsQ = query(
           collection(db(), 'users', uid, 'moderationLog'),
           orderBy('timestamp', 'desc'),
@@ -775,7 +926,6 @@ function UserLookupPanel() {
           })),
         );
       } else {
-        // Try searching by displayName (prefix search)
         const nameQ = query(
           collection(db(), 'users'),
           where('displayName', '>=', searchQuery),
@@ -786,7 +936,6 @@ function UserLookupPanel() {
           const firstDoc = nameSnap.docs[0];
           if (firstDoc) {
             setUser({ uid: firstDoc.id, ...(firstDoc.data() as Omit<UserSummary, 'uid'>) });
-            // Load moderation logs
             const logsQ = query(
               collection(db(), 'users', firstDoc.id, 'moderationLog'),
               orderBy('timestamp', 'desc'),
@@ -800,7 +949,7 @@ function UserLookupPanel() {
             );
           }
         } else {
-          setError('No user found by UID or display name.');
+          setError('No user found matching that UID or display name.');
         }
       }
     } catch (err) {
@@ -846,10 +995,10 @@ function UserLookupPanel() {
 
       await fn(params);
 
-      setActionSuccess(`Successfully applied ${modAction} to user.`);
+      setActionSuccess(`Successfully applied ${modAction} to user account.`);
       setReason('');
-      
-      // Reload user document and logs
+
+      // Reload user
       const userSnap = await getDoc(doc(db(), 'users', user.uid));
       if (userSnap.exists()) {
         setUser({ uid: userSnap.id, ...(userSnap.data() as Omit<UserSummary, 'uid'>) });
@@ -865,8 +1014,6 @@ function UserLookupPanel() {
           ...(d.data() as Omit<ModerationLogEntry, 'id'>),
         })),
       );
-
-      // auto-dismiss handled by useEffect above
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply moderation action.');
     } finally {
@@ -874,15 +1021,10 @@ function UserLookupPanel() {
     }
   }
 
-  async function handleReactivate() {
-    if (!user) return;
-    const inputReason = prompt('Enter reason for reactivating this account:', 'Account reinstated by administrator.');
-    if (inputReason === null) return; // cancelled
-    if (inputReason.trim().length === 0) {
-      alert('A reason is required to reactivate the account.');
-      return;
-    }
-    
+  async function handleReactivateCommit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || reactivateReason.trim().length < REASON_MIN_LENGTH) return;
+
     setError(null);
     setRevoking(true);
     try {
@@ -898,12 +1040,12 @@ function UserLookupPanel() {
       await fn({
         userId: user.uid,
         action: 'dismiss',
-        reason: inputReason.trim(),
+        reason: reactivateReason.trim(),
       });
 
-      setActionSuccess(`Successfully reactivated user account.`);
-      
-      // Reload user document and logs
+      setActionSuccess('Successfully reinstated user account.');
+      setReactivateModalOpen(false);
+
       const userSnap = await getDoc(doc(db(), 'users', user.uid));
       if (userSnap.exists()) {
         setUser({ uid: userSnap.id, ...(userSnap.data() as Omit<UserSummary, 'uid'>) });
@@ -927,128 +1069,178 @@ function UserLookupPanel() {
   }
 
   return (
-    <div>
-      <form onSubmit={(e) => void handleSearch(e)} className="flex max-w-md gap-3">
+    <div className="space-y-6">
+      {/* Search Bar */}
+      <form onSubmit={(e) => void handleSearch(e)} className="flex max-w-xl gap-2.5">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search by User UID or display name..."
           required
-          className="block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+          className="w-full rounded-2xl border border-[#ececea] bg-white px-4 py-3 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:outline-none shadow-xs"
         />
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+          className="rounded-full bg-[#131312] px-6 py-3 text-xs font-bold text-white shadow-xs hover:bg-neutral-800 transition disabled:opacity-50 flex-shrink-0"
         >
-          {loading ? 'Searching...' : 'Search'}
+          {loading ? 'Searching…' : 'Search User'}
         </button>
       </form>
 
-      {error && <p className="mt-4 text-red-700 text-sm font-medium">{error}</p>}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-xs font-semibold text-[#a32a22]">
+          {error}
+        </div>
+      )}
+
       {actionSuccess && (
-        <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-900 vc-fade-up">
           {actionSuccess}
         </div>
       )}
 
       {user && (
-        <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-3">
-          {/* User profile details */}
-          <div className="md:col-span-2 space-y-6">
-            <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-neutral-900">Profile Summary</h3>
-              <div className="mt-4 flex items-center gap-4">
-                <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-neutral-200 text-xl font-semibold text-neutral-700">
-                  {(user.displayName || 'U').charAt(0).toUpperCase()}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3 vc-fade-up">
+          {/* Main User Profile & History (2 cols) */}
+          <div className="space-y-6 md:col-span-2">
+            {/* Identity & Status */}
+            <section className="rounded-3xl border border-[#ececea] bg-white p-7 shadow-xs">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-2xl font-bold text-[#5a2900]">
+                    {(user.displayName || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold tracking-tight text-[#131312]">
+                      {user.displayName ?? 'Unnamed User'}
+                    </h3>
+                    <p className="mt-0.5 font-mono text-[11px] text-[#8a847d]">{user.uid}</p>
+                    <p className="mt-1 text-xs text-[#4f4b46]">
+                      {user.phoneNumber || 'No phone'} {user.email ? `· ${user.email}` : ''}
+                    </p>
+                  </div>
                 </div>
+
                 <div>
-                  <h4 className="text-base font-semibold text-neutral-950">
-                    {user.displayName ?? 'Unnamed User'}
-                  </h4>
-                  <p className="text-xs text-neutral-500 font-mono mt-0.5">{user.uid}</p>
-                  <p className="mt-1 text-sm text-neutral-600">
-                    {user.phoneNumber} {user.email ? `· ${user.email}` : ''}
-                  </p>
+                  <span
+                    className={
+                      'inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ' +
+                      (user.accountStatus === 'banned'
+                        ? 'bg-red-100 text-red-900'
+                        : user.accountStatus === 'suspended'
+                          ? 'bg-amber-100 text-amber-900'
+                          : user.accountStatus === 'warned'
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                            : 'bg-emerald-100 text-emerald-900')
+                    }
+                  >
+                    Status: {user.accountStatus?.toUpperCase() ?? 'ACTIVE'}
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-neutral-100 pt-6 text-sm">
-                <div>
-                  <p className="text-xs font-medium text-neutral-500">Account Status</p>
-                  <p className="mt-1 font-semibold uppercase text-neutral-900 flex flex-wrap items-center gap-3">
-                    <span
-                      className={
-                        user.accountStatus === 'banned'
-                          ? 'text-red-700'
-                          : user.accountStatus === 'suspended'
-                            ? 'text-amber-700'
-                            : user.accountStatus === 'warned'
-                              ? 'text-amber-600'
-                              : 'text-emerald-700'
-                      }
-                    >
-                      {user.accountStatus ?? 'active'}
-                    </span>
-                    {user.accountStatus && user.accountStatus !== 'active' && (
-                      <button
-                        type="button"
-                        onClick={() => void handleReactivate()}
-                        disabled={revoking}
-                        className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition focus:outline-none disabled:opacity-50 cursor-pointer"
-                      >
-                        {revoking ? 'Reactivating...' : 'Reactivate / Lift'}
-                      </button>
+              {user.accountStatus && user.accountStatus !== 'active' && (
+                <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs">
+                  <div>
+                    <span className="font-bold text-[#131312]">Account is restricted.</span>{' '}
+                    {user.suspendedUntil && (
+                      <span className="text-[#8a847d]">
+                        Suspended until {user.suspendedUntil.toDate().toLocaleString()}
+                      </span>
                     )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-neutral-500">Trust Score</p>
-                  <p className="mt-1 font-semibold text-neutral-900">
-                    {user.trustScore ?? 30} / 100
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-neutral-500">Verified Tasks / Hours</p>
-                  <p className="mt-1 font-semibold text-neutral-900">
-                    {user.verifiedTaskCount ?? 0} tasks ({user.verifiedHours?.toFixed(1) ?? '0.0'}h)
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-neutral-500">Pending / Total Reports</p>
-                  <p className="mt-1 font-semibold text-neutral-900">
-                    {user.pendingReports ?? 0} pending ({user.reportPenalty ?? 0} penalty)
-                  </p>
-                </div>
-              </div>
-
-              {user.accountStatus === 'suspended' && user.suspendedUntil && (
-                <div className="mt-6 rounded-lg bg-amber-50 border border-amber-200 p-4 text-xs text-amber-800">
-                  <span className="font-semibold">Suspended Until: </span>
-                  {user.suspendedUntil.toDate().toLocaleString()}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReactivateModalOpen(true)}
+                    className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 transition"
+                  >
+                    Reactivate Account
+                  </button>
                 </div>
               )}
+
+              {/* Safety & Performance Metrics */}
+              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-[#f3f1ec] pt-5 sm:grid-cols-4 text-center">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                    Trust Score
+                  </span>
+                  <div className="mt-1 font-mono text-xl font-bold text-[#131312]">
+                    {user.trustScore ?? 30}/100
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                    Completed Tasks
+                  </span>
+                  <div className="mt-1 font-mono text-xl font-bold text-[#1f6f5c]">
+                    {user.verifiedTaskCount ?? 0}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                    Pending Reports
+                  </span>
+                  <div className="mt-1 font-mono text-xl font-bold text-amber-700">
+                    {user.pendingReports ?? 0}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                    Penalty Score
+                  </span>
+                  <div className="mt-1 font-mono text-xl font-bold text-red-700">
+                    {user.reportPenalty ?? 0}
+                  </div>
+                </div>
+              </div>
             </section>
 
-            {/* Moderation log */}
-            <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-neutral-900 font-medium">Moderation Log</h3>
+            {/* Permanent Moderation Log */}
+            <section className="rounded-3xl border border-[#ececea] bg-white p-7 shadow-xs">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-[#131312]">
+                  Permanent Moderation History
+                </h3>
+                <span className="font-mono text-xs text-[#8a847d]">
+                  {modLogs.length} events
+                </span>
+              </div>
+
               {modLogs.length === 0 ? (
-                <p className="mt-4 text-sm text-neutral-600">No moderation events logged for this user.</p>
+                <p className="mt-4 text-xs text-[#8a847d]">
+                  No prior moderation actions or penalties recorded for this user.
+                </p>
               ) : (
-                <ul className="mt-4 divide-y divide-neutral-100">
+                <ul className="mt-4 divide-y divide-[#f3f1ec]">
                   {modLogs.map((log) => (
-                    <li key={log.id} className="py-3 text-sm">
-                      <div className="flex justify-between font-medium">
-                        <span className="uppercase text-neutral-900">{log.action}</span>
-                        <span className="text-xs text-neutral-500">
+                    <li key={log.id} className="py-3.5 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={
+                            'rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ' +
+                            (log.action === 'ban'
+                              ? 'bg-red-100 text-red-800'
+                              : log.action === 'suspend'
+                                ? 'bg-amber-100 text-amber-800'
+                                : log.action === 'warn'
+                                  ? 'bg-neutral-100 text-neutral-800'
+                                  : 'bg-emerald-100 text-emerald-800')
+                          }
+                        >
+                          {log.action}
+                        </span>
+                        <span className="text-[#8a847d]">
                           {log.timestamp.toDate().toLocaleString()}
                         </span>
                       </div>
-                      <p className="mt-1 text-neutral-600">Reason: {log.reason}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">
-                        Admin: {adminNames[log.adminId] || 'Admin'}
+                      <p className="text-[#131312] font-medium pt-1">
+                        Reason: {log.reason}
+                      </p>
+                      <p className="text-[11px] text-[#8a847d]">
+                        Admin: {adminNames[log.adminId] || log.adminId || 'Admin'}
                       </p>
                     </li>
                   ))}
@@ -1057,63 +1249,63 @@ function UserLookupPanel() {
             </section>
           </div>
 
-          {/* Quick Moderation Action Panel */}
-          <div className="space-y-6">
-            <section className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-              <h3 className="text-base font-semibold text-neutral-900">Moderate User</h3>
-              <form onSubmit={(e) => void handleModerationSubmit(e)} className="mt-4 space-y-4">
+          {/* Quick Action Panel (1 col) */}
+          <div>
+            <section className="sticky top-24 rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs space-y-4">
+              <h3 className="text-base font-bold text-[#131312]">Apply Moderation</h3>
+              <form onSubmit={(e) => void handleModerationSubmit(e)} className="space-y-4">
                 <div>
-                  <label htmlFor="mod-action-lookup" className="block text-xs font-semibold text-neutral-500">
+                  <label htmlFor="user-mod-action" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
                     Action
                   </label>
                   <select
-                    id="mod-action-lookup"
+                    id="user-mod-action"
                     value={modAction}
                     onChange={(e) => setModAction(e.target.value as typeof modAction)}
-                    className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs font-bold text-[#131312] focus:border-[#1f6f5c] focus:outline-none"
                   >
-                    <option value="warn">Issue Warning</option>
+                    <option value="warn">Issue Policy Warning</option>
                     <option value="suspend">Temporary Suspension</option>
-                    <option value="ban">Permanent Ban</option>
-                    <option value="dismiss">Reactivate Account / Dismiss</option>
+                    <option value="ban">Permanent Account Ban</option>
+                    <option value="dismiss">Reactivate / Clear</option>
                   </select>
                 </div>
 
                 {modAction === 'suspend' && (
                   <div>
-                    <label htmlFor="suspend-duration-lookup" className="block text-xs font-semibold text-neutral-500">
-                      Suspension Duration
+                    <label htmlFor="user-suspend-duration" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                      Duration
                     </label>
                     <select
-                      id="suspend-duration-lookup"
+                      id="user-suspend-duration"
                       value={durationDays}
                       onChange={(e) => setDurationDays(Number(e.target.value))}
-                      className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs font-bold text-[#131312] focus:border-[#1f6f5c] focus:outline-none"
                     >
-                      <option value={1}>1 Day</option>
+                      <option value={1}>1 Day (24 hrs)</option>
                       <option value={3}>3 Days</option>
-                      <option value={7}>7 Days</option>
-                      <option value={30}>30 Days</option>
+                      <option value={7}>7 Days (1 week)</option>
+                      <option value={30}>30 Days (1 month)</option>
                     </select>
                   </div>
                 )}
 
                 <div>
-                  <label htmlFor="mod-reason-lookup" className="block text-xs font-semibold text-neutral-500">
+                  <label htmlFor="user-mod-reason" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
                     Reason
                   </label>
                   <textarea
-                    id="mod-reason-lookup"
+                    id="user-mod-reason"
                     required
                     rows={3}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="Enter reason..."
-                    className="mt-1 block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    placeholder="Enter policy reason for moderation..."
+                    className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
                   />
                   {reason.length > 0 && reason.trim().length < REASON_MIN_LENGTH && (
                     <p className="mt-1 text-xs text-red-700">
-                      Please provide a meaningful reason
+                      Reason must be at least {REASON_MIN_LENGTH} characters.
                     </p>
                   )}
                 </div>
@@ -1121,12 +1313,61 @@ function UserLookupPanel() {
                 <button
                   type="submit"
                   disabled={busy || reason.trim().length < REASON_MIN_LENGTH}
-                  className="w-full rounded-full bg-neutral-900 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
+                  className="w-full rounded-full bg-[#131312] py-2.5 text-xs font-bold text-white shadow-xs hover:bg-neutral-800 transition disabled:opacity-50"
                 >
-                  {busy ? 'Applying...' : 'Apply Action'}
+                  {busy ? 'Applying Action…' : 'Apply Action'}
                 </button>
               </form>
             </section>
+          </div>
+        </div>
+      )}
+
+      {/* REACTIVATION MODAL */}
+      {reactivateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="vc-fade-up w-full max-w-md overflow-hidden rounded-3xl border border-[#ececea] bg-white p-7 shadow-2xl">
+            <h3 className="text-lg font-bold text-[#131312]">
+              Reactivate User Account
+            </h3>
+            <p className="mt-1 text-xs text-[#4f4b46]">
+              Reinstate account privileges for <strong className="text-[#131312]">{user?.displayName}</strong>.
+            </p>
+
+            <form onSubmit={(e) => void handleReactivateCommit(e)} className="mt-4 space-y-4">
+              <div>
+                <label htmlFor="reactivate-reason-input" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                  Administrative Reinstatement Reason
+                </label>
+                <textarea
+                  id="reactivate-reason-input"
+                  required
+                  rows={3}
+                  value={reactivateReason}
+                  onChange={(e) => setReactivateReason(e.target.value)}
+                  placeholder="Explain reason for lifting restrictions..."
+                  className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setReactivateModalOpen(false)}
+                  disabled={revoking}
+                  className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-xs font-semibold text-[#4f4b46] hover:bg-[#fafaf8]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={revoking || reactivateReason.trim().length < REASON_MIN_LENGTH}
+                  className="rounded-full bg-emerald-700 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 transition disabled:opacity-50"
+                >
+                  {revoking ? 'Reinstating…' : 'Reactivate Account'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1142,8 +1383,6 @@ function TaskAuditPanel() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Customer / volunteer ids for the loaded task — used to label the
-  // actor of each audit event as a role (never a raw UID).
   const [taskActors, setTaskActors] = useState<{
     customerId?: string;
     acceptedVolunteerId?: string;
@@ -1181,7 +1420,6 @@ function TaskAuditPanel() {
           : {}),
       });
 
-      // Query subcollection events
       const eventsQ = query(
         collection(db(), 'tasks', id, 'events'),
         orderBy('at', 'asc'),
@@ -1203,89 +1441,114 @@ function TaskAuditPanel() {
   function actorLabel(actorUid: string): string {
     if (actorUid === 'system') return 'System';
     if (taskActors?.customerId && actorUid === taskActors.customerId) return 'Customer';
-    if (
-      taskActors?.acceptedVolunteerId &&
-      actorUid === taskActors.acceptedVolunteerId
-    ) {
+    if (taskActors?.acceptedVolunteerId && actorUid === taskActors.acceptedVolunteerId) {
       return 'Volunteer';
     }
     return 'Admin';
   }
 
   return (
-    <div>
-      <form onSubmit={(e) => void handleAuditSearch(e)} className="flex max-w-md gap-3">
+    <div className="space-y-6">
+      {/* Search Bar */}
+      <form onSubmit={(e) => void handleAuditSearch(e)} className="flex max-w-xl gap-2.5">
         <input
           type="text"
           value={taskIdInput}
           onChange={(e) => setTaskIdInput(e.target.value)}
-          placeholder="Enter Task ID"
+          placeholder="Enter Task ID to inspect lifecycle events..."
           required
-          className="block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+          className="w-full rounded-2xl border border-[#ececea] bg-white px-4 py-3 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:outline-none shadow-xs"
         />
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800"
+          className="rounded-full bg-[#131312] px-6 py-3 text-xs font-bold text-white shadow-xs hover:bg-neutral-800 transition disabled:opacity-50 flex-shrink-0"
         >
-          {loading ? 'Searching...' : 'Audit'}
+          {loading ? 'Auditing…' : 'Inspect Task'}
         </button>
       </form>
 
-      {error && <p className="mt-4 text-red-700 text-sm font-medium">{error}</p>}
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-xs font-semibold text-[#a32a22]">
+          {error}
+        </div>
+      )}
 
       {events.length > 0 && (
-        <section className="mt-8 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-neutral-900">Task Lifecycle History</h3>
-          <p className="mt-1 text-xs text-neutral-500 font-mono">ID: {taskIdInput.trim()}</p>
+        <section className="vc-fade-up rounded-3xl border border-[#ececea] bg-white p-7 shadow-xs">
+          <div className="flex items-center justify-between border-b border-[#f3f1ec] pb-4">
+            <div>
+              <h3 className="text-base font-bold text-[#131312]">
+                Task Lifecycle Timeline
+              </h3>
+              <p className="mt-0.5 font-mono text-xs text-[#8a847d]">Task ID: {taskIdInput.trim()}</p>
+            </div>
+            <Link
+              to={`/tasks/${taskIdInput.trim()}`}
+              className="text-xs font-semibold text-[#1f6f5c] hover:underline"
+            >
+              View Task Detail Page →
+            </Link>
+          </div>
 
-          <ul className="mt-6 space-y-2">
+          <ul className="mt-6 space-y-3">
             {events.map((event, eventIdx) => {
               const expanded = expandedEventId === event.id;
+              const actor = actorLabel(event.actorUid);
               return (
                 <li
                   key={event.id}
-                  className="rounded-xl border border-neutral-200"
+                  className="rounded-2xl border border-[#ececea] bg-[#fafaf8]/50 overflow-hidden transition hover:border-[#d8d4cc]"
                 >
                   <button
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => setExpandedEventId(expanded ? null : event.id)}
-                    className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+                    className="flex w-full items-center gap-3.5 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
                   >
-                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-700">
+                    <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full bg-[#1f6f5c] text-xs font-bold text-white">
                       {eventIdx + 1}
                     </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium text-neutral-900 uppercase tracking-wide">
-                        {event.type.replace('_', ' ')}
-                      </span>
-                      <span className="block text-xs text-neutral-500">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#131312]">
+                          {event.type.replace(/_/g, ' ')}
+                        </span>
+                        <span className="rounded-full bg-[#e3efe9] px-2 py-0.5 text-[10px] font-bold text-[#1f6f5c]">
+                          {actor}
+                        </span>
+                      </div>
+                      <span className="mt-0.5 block text-xs text-[#8a847d]">
                         {event.at.toDate().toLocaleString()}
                       </span>
-                    </span>
+                    </div>
                     <span
                       aria-hidden="true"
                       className={
-                        'flex-shrink-0 text-neutral-400 transition ' +
-                        (expanded ? 'rotate-180' : '')
+                        'flex-shrink-0 text-xs font-bold text-[#8a847d] transition ' +
+                        (expanded ? 'rotate-180 text-[#131312]' : '')
                       }
                     >
-                      ▾
+                      ▼
                     </span>
                   </button>
+
                   {expanded && (
-                    <div className="border-t border-neutral-100 px-4 py-3">
-                      <p className="text-xs text-neutral-500">
+                    <div className="border-t border-[#ececea] bg-white p-4 text-xs space-y-2">
+                      <p className="text-[#4f4b46]">
                         Triggered by:{' '}
-                        <span className="font-medium text-neutral-900">
-                          {actorLabel(event.actorUid)}
-                        </span>
+                        <strong className="text-[#131312]">{actor}</strong>{' '}
+                        <span className="font-mono text-[11px] text-[#8a847d]">({event.actorUid})</span>
                       </p>
                       {event.payload && Object.keys(event.payload).length > 0 && (
-                        <pre className="mt-2 text-xs bg-neutral-50 p-2 rounded-md font-mono text-neutral-700 max-w-full overflow-x-auto">
-                          {JSON.stringify(event.payload, null, 2)}
-                        </pre>
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[#8a847d]">
+                            Event Payload Metadata
+                          </span>
+                          <pre className="mt-1.5 overflow-x-auto rounded-xl bg-[#fafaf8] border border-[#ececea] p-3 font-mono text-[11px] text-[#131312]">
+                            {JSON.stringify(event.payload, null, 2)}
+                          </pre>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1300,7 +1563,7 @@ function TaskAuditPanel() {
 }
 
 /* ============================================================================
-   ACTIVITY LOG PANEL
+   ACTIVITY & AUDIT STREAM PANEL
    ============================================================================ */
 interface ActivityLogDoc {
   id: string;
@@ -1312,14 +1575,14 @@ interface ActivityLogDoc {
 }
 
 const ACTIVITY_EVENT_LABELS: Record<string, string> = {
-  user_registered: 'User registered',
-  task_created: 'Task created',
-  task_accepted: 'Task accepted',
-  task_started: 'Task started',
-  task_completed: 'Task completed',
-  report_submitted: 'Report submitted',
-  moderation_action: 'Moderation action',
-  user_blocked: 'User blocked',
+  user_registered: 'User Registered',
+  task_created: 'Task Created',
+  task_accepted: 'Task Accepted',
+  task_started: 'Task Started',
+  task_completed: 'Task Completed',
+  report_submitted: 'Report Submitted',
+  moderation_action: 'Moderation Action',
+  user_blocked: 'User Blocked',
 };
 
 function ActivityLogPanel() {
@@ -1333,7 +1596,7 @@ function ActivityLogPanel() {
 
   const filterOptions = useMemo(
     () => [
-      { value: 'all', label: 'All event types' },
+      { value: 'all', label: 'All Event Types' },
       ...Object.entries(ACTIVITY_EVENT_LABELS).map(([value, label]) => ({
         value,
         label,
@@ -1342,9 +1605,6 @@ function ActivityLogPanel() {
     [],
   );
 
-  // Initial load on mount. Filter changes go through changeFilter() which
-  // both resets state and kicks the same loader — keeps the effect free
-  // of synchronous setState calls (react-hooks/set-state-in-effect).
   useEffect(() => {
     let cancelled = false;
     async function initial() {
@@ -1457,16 +1717,17 @@ function ActivityLogPanel() {
   }
 
   return (
-    <div>
+    <div className="space-y-4">
+      {/* Category Filter */}
       <div className="flex items-center gap-3">
-        <label htmlFor="activity-filter" className="text-xs font-semibold text-neutral-500">
-          Filter:
+        <label htmlFor="activity-filter" className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+          Filter Event:
         </label>
         <select
           id="activity-filter"
           value={filter}
           onChange={(e) => changeFilter(e.target.value)}
-          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+          className="rounded-xl border border-[#ececea] bg-white px-3.5 py-2 text-xs font-bold text-[#131312] focus:border-[#1f6f5c] focus:outline-none"
         >
           {filterOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -1477,15 +1738,15 @@ function ActivityLogPanel() {
       </div>
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-700 font-medium">
+        <div className="rounded-2xl border border-red-200 bg-[#fdf0ef] p-4 text-xs font-semibold text-[#a32a22]">
           {error}
-        </p>
+        </div>
       )}
 
-      <ul className="mt-6 space-y-2">
+      <ul className="space-y-2.5">
         {entries.length === 0 && !loading && (
-          <li className="rounded-2xl border border-dashed border-neutral-300 bg-white p-6 text-center text-sm text-neutral-500">
-            No activity yet.
+          <li className="rounded-3xl border border-dashed border-[#ececea] bg-white p-8 text-center text-xs text-[#8a847d]">
+            No activity log events found for this filter.
           </li>
         )}
         {entries.map((entry) => {
@@ -1494,55 +1755,58 @@ function ActivityLogPanel() {
           return (
             <li
               key={entry.id}
-              className="rounded-xl border border-neutral-200 bg-white"
+              className="vc-fade-up overflow-hidden rounded-2xl border border-[#ececea] bg-white shadow-xs transition hover:border-[#d8d4cc]"
             >
               <button
                 type="button"
                 aria-expanded={expanded}
                 onClick={() => setExpandedId(expanded ? null : entry.id)}
-                className="flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left transition hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+                className="flex w-full items-start gap-3.5 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
               >
-                <span className="mt-0.5 inline-block rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-medium text-neutral-700">
+                <span className="mt-0.5 rounded-full bg-[#f3f1ec] px-2.5 py-0.5 text-[11px] font-bold text-[#4f4b46]">
                   {label}
                 </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm text-neutral-900 truncate">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold text-[#131312] truncate">
                     {entry.description}
                   </span>
-                  <span className="block text-xs text-neutral-500 mt-0.5">
+                  <span className="mt-0.5 block text-[11px] text-[#8a847d]">
                     {entry.createdAt.toDate().toLocaleString()}
                   </span>
                 </span>
                 <span
                   aria-hidden="true"
                   className={
-                    'flex-shrink-0 text-neutral-400 transition mt-1 ' +
-                    (expanded ? 'rotate-180' : '')
+                    'flex-shrink-0 text-xs font-bold text-[#8a847d] transition mt-1 ' +
+                    (expanded ? 'rotate-180 text-[#131312]' : '')
                   }
                 >
-                  ▾
+                  ▼
                 </span>
               </button>
+
               {expanded && (
-                <div className="border-t border-neutral-100 px-4 py-3 text-xs text-neutral-600 space-y-1">
+                <div className="border-t border-[#f3f1ec] bg-[#fafaf8] p-4 text-xs text-[#4f4b46] space-y-1.5">
                   <p>
-                    <span className="font-medium text-neutral-800">Event type: </span>
-                    {label}
+                    <span className="text-[#8a847d]">User UID: </span>
+                    <span className="font-mono text-[#131312]">{entry.userId}</span>
                   </p>
                   {entry.taskId && (
                     <p>
-                      <span className="font-medium text-neutral-800">Task: </span>
+                      <span className="text-[#8a847d]">Associated Task: </span>
                       <Link
                         to={`/tasks/${entry.taskId}`}
-                        className="text-neutral-900 underline hover:text-neutral-700 font-medium"
+                        className="font-semibold text-[#1f6f5c] underline hover:text-[#185845]"
                       >
-                        Open task
+                        Inspect Task {entry.taskId} →
                       </Link>
                     </p>
                   )}
                   <p>
-                    <span className="font-medium text-neutral-800">Recorded: </span>
-                    {entry.createdAt.toDate().toLocaleString()}
+                    <span className="text-[#8a847d]">Exact Timestamp: </span>
+                    <span className="font-mono text-[#131312]">
+                      {entry.createdAt.toDate().toISOString()}
+                    </span>
                   </p>
                 </div>
               )}
@@ -1552,14 +1816,14 @@ function ActivityLogPanel() {
       </ul>
 
       {hasMore && (
-        <div className="mt-6 flex justify-center">
+        <div className="flex justify-center pt-3">
           <button
             type="button"
             onClick={() => void loadMore()}
             disabled={loading}
-            className="rounded-full border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-50"
+            className="rounded-full border border-[#ececea] bg-white px-6 py-2.5 text-xs font-bold text-[#4f4b46] shadow-xs hover:bg-[#fafaf8] transition disabled:opacity-50"
           >
-            {loading ? 'Loading…' : 'Load more'}
+            {loading ? 'Loading more…' : 'Load more activity'}
           </button>
         </div>
       )}
