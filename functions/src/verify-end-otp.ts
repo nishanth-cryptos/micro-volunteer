@@ -90,8 +90,6 @@ export const verifyEndOtp = onCall(
         );
       }
 
-
-
       tx.update(taskRef, {
         status: 'completed',
         completedAt: FieldValue.serverTimestamp(),
@@ -104,7 +102,8 @@ export const verifyEndOtp = onCall(
     let taskTitle = 'a task';
     try {
       const t = await taskRef.get();
-      taskTitle = (t.data() as { title?: string } | undefined)?.title?.trim() || 'a task';
+      taskTitle =
+        (t.data() as { title?: string } | undefined)?.title?.trim() || 'a task';
     } catch {
       /* keep fallback */
     }
@@ -118,7 +117,11 @@ export const verifyEndOtp = onCall(
 
     // Chat system message (M7) — best-effort, never blocks the response.
     try {
-      await appendSystemMessage(db, taskId, 'Task completed — thanks for helping out!');
+      await appendSystemMessage(
+        db,
+        taskId,
+        'Task completed — thanks for helping out!',
+      );
     } catch (err) {
       logger.warn('Failed to append completion system message (non-fatal)', {
         taskId,

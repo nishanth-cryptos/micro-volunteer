@@ -13,12 +13,19 @@ import type { CanonicalRoute } from '../lib/trail-service/types';
 
 export function YourRoutesPage() {
   const authState = useAuthState();
-  const user = authState.status === 'ready' || authState.status === 'incomplete' ? authState.user : null;
+  const user =
+    authState.status === 'ready' || authState.status === 'incomplete'
+      ? authState.user
+      : null;
   const navigate = useNavigate();
 
-  const [consent, setConsent] = useState(() => (user ? getLocalTrailConsent(user.uid) : false));
+  const [consent, setConsent] = useState(() =>
+    user ? getLocalTrailConsent(user.uid) : false,
+  );
   const [routes, setRoutes] = useState<CanonicalRoute[]>([]);
-  const [loading, setLoading] = useState(() => (user ? getLocalTrailConsent(user.uid) : false));
+  const [loading, setLoading] = useState(() =>
+    user ? getLocalTrailConsent(user.uid) : false,
+  );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,14 +62,20 @@ export function YourRoutesPage() {
       await setTrailConsent(user.uid, enabled);
       setConsent(enabled);
       if (enabled) {
-        setStatusMessage('Commute trail mining enabled. Your routes will be inferred locally.');
+        setStatusMessage(
+          'Commute trail mining enabled. Your routes will be inferred locally.',
+        );
         await loadRoutes(user.uid);
       } else {
         setRoutes([]);
-        setStatusMessage('Trail consent revoked. All stored commute routes and trip data wiped.');
+        setStatusMessage(
+          'Trail consent revoked. All stored commute routes and trip data wiped.',
+        );
       }
     } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : 'Could not update consent.');
+      setStatusMessage(
+        err instanceof Error ? err.message : 'Could not update consent.',
+      );
     }
   }
 
@@ -79,7 +92,11 @@ export function YourRoutesPage() {
 
   async function handleWipeAll() {
     if (!user) return;
-    if (!confirm('Are you sure you want to delete all inferred commute routes and trip logs?')) {
+    if (
+      !confirm(
+        'Are you sure you want to delete all inferred commute routes and trip logs?',
+      )
+    ) {
       return;
     }
     try {
@@ -111,8 +128,18 @@ export function YourRoutesPage() {
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[#ececea] bg-white text-[#131312] transition hover:bg-[#f3f1ec]"
               aria-label="Back to Dashboard"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2}>
-                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+              >
+                <path
+                  d="M19 12H5M12 19l-7-7 7-7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </Link>
             <div className="flex items-center gap-2">
@@ -132,7 +159,10 @@ export function YourRoutesPage() {
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 space-y-8">
         {statusMessage && (
-          <div role="status" className="rounded-2xl border border-[#1f6f5c]/20 bg-[#e3efe9]/50 p-4 text-sm font-medium text-[#1f6f5c]">
+          <div
+            role="status"
+            className="rounded-2xl border border-[#1f6f5c]/20 bg-[#e3efe9]/50 p-4 text-sm font-medium text-[#1f6f5c]"
+          >
             {statusMessage}
           </div>
         )}
@@ -143,21 +173,38 @@ export function YourRoutesPage() {
             Commute Trail Privacy & Controls
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#4f4b46]">
-            Hey Padosi uses on-device trail mining to detect recurring commute routes. When you leave on a route, we pre-warm nearby micro-volunteering tasks that fit into your available trip time budget.
+            Hey Padosi uses on-device trail mining to detect recurring commute
+            routes. When you leave on a route, we pre-warm nearby
+            micro-volunteering tasks that fit into your available trip time
+            budget.
           </p>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-[#ececea] bg-[#fafaf8] p-4">
-              <div className="text-xs font-bold text-[#1f6f5c] uppercase">On-Device Processing</div>
-              <div className="mt-1 text-xs text-[#4f4b46]">Raw GPS pings stay on your device. Only derived route summaries sync.</div>
+              <div className="text-xs font-bold text-[#1f6f5c] uppercase">
+                On-Device Processing
+              </div>
+              <div className="mt-1 text-xs text-[#4f4b46]">
+                Raw GPS pings stay on your device. Only derived route summaries
+                sync.
+              </div>
             </div>
             <div className="rounded-xl border border-[#ececea] bg-[#fafaf8] p-4">
-              <div className="text-xs font-bold text-[#1f6f5c] uppercase">Customer Shield</div>
-              <div className="mt-1 text-xs text-[#4f4b46]">Task posters only see "ETA X min". Your live position is never shared.</div>
+              <div className="text-xs font-bold text-[#1f6f5c] uppercase">
+                Customer Shield
+              </div>
+              <div className="mt-1 text-xs text-[#4f4b46]">
+                Task posters only see "ETA X min". Your live position is never
+                shared.
+              </div>
             </div>
             <div className="rounded-xl border border-[#ececea] bg-[#fafaf8] p-4">
-              <div className="text-xs font-bold text-[#1f6f5c] uppercase">Self-Serve Erasure</div>
-              <div className="mt-1 text-xs text-[#4f4b46]">Delete any route or wipe all stored trails at any time.</div>
+              <div className="text-xs font-bold text-[#1f6f5c] uppercase">
+                Self-Serve Erasure
+              </div>
+              <div className="mt-1 text-xs text-[#4f4b46]">
+                Delete any route or wipe all stored trails at any time.
+              </div>
             </div>
           </div>
 
@@ -168,10 +215,14 @@ export function YourRoutesPage() {
                 Enable Commute Trail Matching
               </div>
               <div className="text-xs text-[#8a847d]">
-                Allow TrailService to infer recurring routes for corridor task matching.
+                Allow TrailService to infer recurring routes for corridor task
+                matching.
               </div>
             </div>
-            <label aria-label="Toggle commute trail matching" className="relative inline-flex cursor-pointer items-center">
+            <label
+              aria-label="Toggle commute trail matching"
+              className="relative inline-flex cursor-pointer items-center"
+            >
               <input
                 type="checkbox"
                 checked={consent}
@@ -202,7 +253,8 @@ export function YourRoutesPage() {
 
           {!consent ? (
             <div className="rounded-[20px] border border-[#ececea] bg-white p-8 text-center text-sm text-[#8a847d]">
-              Trail matching is currently disabled. Toggle the switch above to enable route inference.
+              Trail matching is currently disabled. Toggle the switch above to
+              enable route inference.
             </div>
           ) : loading ? (
             <div className="rounded-[20px] border border-[#ececea] bg-white p-8 text-center text-sm text-[#8a847d]">
@@ -210,14 +262,17 @@ export function YourRoutesPage() {
             </div>
           ) : routes.length === 0 ? (
             <div className="rounded-[20px] border border-[#ececea] bg-white p-8 text-center text-sm text-[#8a847d]">
-              No canonical routes detected yet. Complete 3+ trips along the same path to automatically build a route!
+              No canonical routes detected yet. Complete 3+ trips along the same
+              path to automatically build a route!
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {routes.map((route) => {
                 const depTime = formatMinutesToTime(route.departureMeanMinutes);
                 const days = route.dayOfWeekMask
-                  .map((d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d])
+                  .map(
+                    (d) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d],
+                  )
                   .join(', ');
 
                 return (
@@ -237,13 +292,22 @@ export function YourRoutesPage() {
 
                       <div className="mt-3 space-y-1.5 text-xs text-[#4f4b46]">
                         <div>
-                          <strong className="text-[#131312]">Departure Window:</strong> ~{depTime} (±{route.departureStdDevMinutes}m)
+                          <strong className="text-[#131312]">
+                            Departure Window:
+                          </strong>{' '}
+                          ~{depTime} (±{route.departureStdDevMinutes}m)
                         </div>
                         <div>
-                          <strong className="text-[#131312]">Est. Duration:</strong> ~{route.durationMeanMinutes} mins
+                          <strong className="text-[#131312]">
+                            Est. Duration:
+                          </strong>{' '}
+                          ~{route.durationMeanMinutes} mins
                         </div>
                         <div>
-                          <strong className="text-[#131312]">Active Days:</strong> {days}
+                          <strong className="text-[#131312]">
+                            Active Days:
+                          </strong>{' '}
+                          {days}
                         </div>
                         <div className="font-mono text-[11px] text-[#8a847d]">
                           H3 Cells: {route.h3Path.length} cells in corridor

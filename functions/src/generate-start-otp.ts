@@ -11,12 +11,7 @@ import { Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { writeAuditEvent } from './audit';
-import {
-  OTP_TTL_MS,
-  generateOtpCode,
-  generateSalt,
-  hashOtp,
-} from './otp';
+import { OTP_TTL_MS, generateOtpCode, generateSalt, hashOtp } from './otp';
 
 if (getApps().length === 0) {
   initializeApp();

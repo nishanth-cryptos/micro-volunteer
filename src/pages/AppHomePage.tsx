@@ -132,8 +132,12 @@ function AdminHomeScreen({ name }: { name: string }) {
             onClick={() => void navigate('/admin')}
             className="mt-6 block w-full rounded-2xl border border-neutral-200 bg-white px-5 py-4 text-left text-sm text-neutral-700 transition hover:border-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
           >
-            You have <span className="font-semibold text-neutral-900">{pendingCount}</span>{' '}
-            pending {pendingCount === 1 ? 'report' : 'reports'} waiting for review.
+            You have{' '}
+            <span className="font-semibold text-neutral-900">
+              {pendingCount}
+            </span>{' '}
+            pending {pendingCount === 1 ? 'report' : 'reports'} waiting for
+            review.
           </button>
         )}
 

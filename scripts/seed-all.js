@@ -13,11 +13,17 @@ console.log('====================================================\n');
 
 try {
   console.log('[1/2] Seeding Admin accounts (admin@example.org)...');
-  execSync('node scripts/seed-admin.js', { cwd: projectRoot, stdio: 'inherit' });
+  execSync('node scripts/seed-admin.js', {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
   console.log('✅ Admin accounts seeded.\n');
 
   console.log('[2/2] Seeding Users (volunteers, customers, dual-role)...');
-  execSync('node scripts/seed-users.js', { cwd: projectRoot, stdio: 'inherit' });
+  execSync('node scripts/seed-users.js', {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
   console.log('✅ Test users seeded.\n');
 
   console.log('----------------------------------------------------');

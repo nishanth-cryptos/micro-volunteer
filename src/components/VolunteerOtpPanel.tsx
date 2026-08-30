@@ -38,7 +38,9 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
       setCode('');
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Incorrect verification code. Please check and try again.',
+        err instanceof Error
+          ? err.message
+          : 'Incorrect verification code. Please check and try again.',
       );
     } finally {
       setBusy(false);
@@ -46,7 +48,9 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
   }
 
   const isStart = phase === 'start';
-  const phaseTitle = isStart ? 'Start Verification Code' : 'Completion Verification Code';
+  const phaseTitle = isStart
+    ? 'Start Verification Code'
+    : 'Completion Verification Code';
   const helpText = isStart
     ? 'Ask the customer to show you their 6-digit Start Code when you arrive. Entering it officially starts the task.'
     : 'Ask the customer for their 6-digit Completion Code once the task is finished to confirm and complete the mission.';
@@ -56,7 +60,16 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
     <section className="vc-fade-up mt-8 rounded-3xl border border-[#ececea] bg-white p-7 shadow-xs">
       <div className="flex items-center gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
@@ -65,9 +78,7 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
           <h2 className="text-base font-bold text-[#131312]">
             Enter {phaseTitle}
           </h2>
-          <p className="mt-0.5 text-xs text-[#4f4b46]">
-            {helpText}
-          </p>
+          <p className="mt-0.5 text-xs text-[#4f4b46]">{helpText}</p>
         </div>
       </div>
 
@@ -97,7 +108,11 @@ export function VolunteerOtpPanel({ taskId, phase }: Props) {
         </div>
 
         {error && (
-          <p id={errorId} role="alert" className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs text-red-700">
+          <p
+            id={errorId}
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs text-red-700"
+          >
             {error}
           </p>
         )}

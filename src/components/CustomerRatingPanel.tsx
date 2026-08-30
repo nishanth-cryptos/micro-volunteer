@@ -29,7 +29,10 @@ interface Props {
   volunteerName?: string;
 }
 
-export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }: Props) {
+export function CustomerRatingPanel({
+  taskId,
+  volunteerName = 'your volunteer',
+}: Props) {
   const [rating, setRating] = useState<number | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -61,7 +64,8 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
         { taskId: string }
       >(functions(), 'submitCustomerRating');
 
-      const tagText = selectedTags.length > 0 ? `[${selectedTags.join(', ')}] ` : '';
+      const tagText =
+        selectedTags.length > 0 ? `[${selectedTags.join(', ')}] ` : '';
       const fullComment = `${tagText}${comment.trim()}`.trim();
 
       const payload: { taskId: string; rating: number; comment?: string } = {
@@ -84,7 +88,16 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
     return (
       <section className="vc-fade-up mt-8 rounded-3xl border border-[#e3efe9] bg-white p-7 text-center shadow-xs">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <path d="M20 6L9 17l-5-5" />
           </svg>
         </div>
@@ -111,7 +124,8 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
             How was your experience with {volunteerName}?
           </h2>
           <p className="mt-0.5 text-xs text-[#4f4b46]">
-            Your rating recognizes great neighbours and maintains neighbourhood trust.
+            Your rating recognizes great neighbours and maintains neighbourhood
+            trust.
           </p>
         </div>
       </div>
@@ -123,7 +137,8 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
           className="flex items-center gap-2"
         >
           {[1, 2, 3, 4, 5].map((n) => {
-            const isFilled = activeDisplayRating !== null && n <= activeDisplayRating;
+            const isFilled =
+              activeDisplayRating !== null && n <= activeDisplayRating;
             return (
               <button
                 key={n}
@@ -148,7 +163,9 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
         </div>
 
         <p className="mt-3 text-xs font-semibold text-[#131312] min-h-[18px]">
-          {activeDisplayRating ? SENTIMENT_LABELS[activeDisplayRating] : 'Select a rating'}
+          {activeDisplayRating
+            ? SENTIMENT_LABELS[activeDisplayRating]
+            : 'Select a rating'}
         </p>
       </div>
 
@@ -185,7 +202,8 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
           htmlFor={commentId}
           className="block text-xs font-semibold text-[#131312]"
         >
-          Add a note <span className="font-normal text-[#8a847d]">(optional)</span>
+          Add a note{' '}
+          <span className="font-normal text-[#8a847d]">(optional)</span>
         </label>
         <textarea
           id={commentId}
@@ -202,7 +220,11 @@ export function CustomerRatingPanel({ taskId, volunteerName = 'your volunteer' }
       </div>
 
       {error && (
-        <p id={errorId} role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+        <p
+          id={errorId}
+          role="alert"
+          className="mt-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700"
+        >
           {error}
         </p>
       )}

@@ -11,11 +11,7 @@
 //   - Set `nearingExpiry: true` before 24h auto-expiry.
 
 import { getApps, initializeApp } from 'firebase-admin/app';
-import {
-  FieldValue,
-  getFirestore,
-  Timestamp,
-} from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { rankForTask, type TaskDoc } from './scoring';
@@ -94,7 +90,8 @@ export function computeNudgeUpdate(
 
   const expiresAtMs = task.expiresAt?.toMillis();
   const isNearExpiry =
-    typeof expiresAtMs === 'number' && nowMs >= expiresAtMs - PRE_EXPIRY_LEAD_MS;
+    typeof expiresAtMs === 'number' &&
+    nowMs >= expiresAtMs - PRE_EXPIRY_LEAD_MS;
   const effectiveStage = nextStage ?? currentStage;
   const shouldSetNearingExpiry =
     isNearExpiry && !task.nearingExpiry && effectiveStage === 3;
@@ -154,7 +151,6 @@ export function computeNextCheckAt(
   return Timestamp.fromMillis(soonestMs);
 }
 
-
 export const periodicRedispatchOffers = onSchedule(
   { region: REGION, schedule: 'every 1 minutes' },
   async () => {
@@ -196,7 +192,10 @@ export const periodicRedispatchOffers = onSchedule(
     for (const taskDoc of taskDocs) {
       const task = taskDoc.data() as SearchingTask;
       const createdAtMs = task.createdAt?.toMillis();
-      if (typeof createdAtMs === 'number' && now - createdAtMs < INITIAL_GRACE_MS) {
+      if (
+        typeof createdAtMs === 'number' &&
+        now - createdAtMs < INITIAL_GRACE_MS
+      ) {
         continue;
       }
       const lastMs = task.lastRedispatchAt?.toMillis() ?? createdAtMs ?? 0;
@@ -244,7 +243,6 @@ export const periodicRedispatchOffers = onSchedule(
       if (radiusBumped) {
         taskUpdate.searchRadiusM = nextRadius;
       }
-
 
       if (nudgeUpdate) {
         if (nudgeUpdate.nextNudgeStage) {

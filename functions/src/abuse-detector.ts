@@ -1,7 +1,11 @@
 // Shared abuse detection helper for cancellation and deletion flows.
 // Governed by section 6 of implementation spec.
 
-import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  Timestamp,
+  type Firestore,
+} from 'firebase-admin/firestore';
 import { appendActivityLog, safeDisplayName } from './activity-log';
 
 export const VIOLATION_WINDOW_DAYS = 7;
@@ -29,7 +33,8 @@ export async function recordViolationAndCheckAbuse(
   });
 
   // 2. Query count within rolling window
-  const windowStartMs = Date.now() - VIOLATION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const windowStartMs =
+    Date.now() - VIOLATION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   const windowStart = Timestamp.fromMillis(windowStartMs);
 
   const violationsSnap = await userRef
@@ -57,7 +62,8 @@ export async function recordViolationAndCheckAbuse(
     warningStrikeCount?: number;
   };
 
-  const isBanned = userData.accountStatus === 'banned' || userData.banned === true;
+  const isBanned =
+    userData.accountStatus === 'banned' || userData.banned === true;
   const isSuspended = userData.accountStatus === 'suspended';
   if (isBanned || isSuspended) {
     return { frozen: false, suspended: isSuspended };
@@ -88,7 +94,8 @@ export async function recordViolationAndCheckAbuse(
   const suspendedUntil = Timestamp.fromMillis(
     Date.now() + 3 * 24 * 60 * 60 * 1000,
   );
-  const reasonText = 'Repeated cancellation/deletion policy violations after warning.';
+  const reasonText =
+    'Repeated cancellation/deletion policy violations after warning.';
 
   const batch = db.batch();
 

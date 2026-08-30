@@ -27,8 +27,18 @@ const CHOICES: RoleOption[] = [
     subtitle:
       'Lend a hand when you have free time, and ask for help when you need a hand. The full community experience.',
     icon: ({ className }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+      <svg
+        className={className}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+        />
       </svg>
     ),
   },
@@ -38,8 +48,18 @@ const CHOICES: RoleOption[] = [
     subtitle:
       'Receive proximity notifications when nearby neighbours need assistance matching your skills and schedule.',
     icon: ({ className }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      <svg
+        className={className}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+        />
       </svg>
     ),
   },
@@ -49,8 +69,18 @@ const CHOICES: RoleOption[] = [
     subtitle:
       'Post everyday small tasks (watering plants, moving groceries, tech help) and match with verified nearby volunteers.',
     icon: ({ className }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      <svg
+        className={className}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+        />
       </svg>
     ),
   },
@@ -114,7 +144,8 @@ export default function RolePage() {
             How would you like to participate?
           </h1>
           <p className="mt-2 text-sm text-[#4f4b46]">
-            Choose your primary role. You can update or switch this anytime from your account settings.
+            Choose your primary role. You can update or switch this anytime from
+            your account settings.
           </p>
         </div>
 
@@ -150,7 +181,14 @@ export default function RolePage() {
                   className="row-span-2 mt-1 h-5 w-5 border-[#ececea] text-[#1f6f5c] focus:ring-[#1f6f5c]"
                 />
                 <span className="flex items-center gap-2 text-base font-bold text-[#131312]">
-                  <span className={'grid h-7 w-7 place-items-center rounded-lg ' + (isSelected ? 'bg-[#e3efe9] text-[#1f6f5c]' : 'bg-[#f3f1ec] text-[#4f4b46]')}>
+                  <span
+                    className={
+                      'grid h-7 w-7 place-items-center rounded-lg ' +
+                      (isSelected
+                        ? 'bg-[#e3efe9] text-[#1f6f5c]'
+                        : 'bg-[#f3f1ec] text-[#4f4b46]')
+                    }
+                  >
                     <Icon className="h-4 w-4" />
                   </span>
                   {c.title}

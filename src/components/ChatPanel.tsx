@@ -64,7 +64,9 @@ interface ChatPanelProps {
 const PREVIEW_MAX = 120;
 
 function makePreview(text: string): string {
-  return text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX - 1)}…` : text;
+  return text.length > PREVIEW_MAX
+    ? `${text.slice(0, PREVIEW_MAX - 1)}…`
+    : text;
 }
 
 function formatTime(ts: Timestamp | null): string {
@@ -449,7 +451,10 @@ export function ChatPanel({
                 Report submitted. Thank you for helping keep the community safe.
               </div>
             ) : (
-              <form onSubmit={(e) => void submitMessageReport(e)} className="mt-5">
+              <form
+                onSubmit={(e) => void submitMessageReport(e)}
+                className="mt-5"
+              >
                 <div>
                   <label
                     htmlFor="msg-report-reason"
@@ -463,7 +468,9 @@ export function ChatPanel({
                     onChange={(e) => setMsgReason(e.target.value)}
                     className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                   >
-                    <option value="inappropriate">Inappropriate behavior</option>
+                    <option value="inappropriate">
+                      Inappropriate behavior
+                    </option>
                     <option value="safety">Safety concern</option>
                     <option value="fraud">Fraud or scam</option>
                     <option value="other">Other reason</option>
@@ -489,7 +496,10 @@ export function ChatPanel({
                 </div>
 
                 {msgError && (
-                  <p role="alert" className="mt-3 text-sm font-medium text-red-700">
+                  <p
+                    role="alert"
+                    className="mt-3 text-sm font-medium text-red-700"
+                  >
                     {msgError}
                   </p>
                 )}

@@ -160,7 +160,8 @@ export function PhoneAuthForm({ mode }: Props) {
               />
             </div>
             <p id={`${phoneId}-hint`} className="mt-2 text-xs text-[#8a847d]">
-              We&apos;ll send a 6-digit SMS verification code. Standard rates may apply.
+              We&apos;ll send a 6-digit SMS verification code. Standard rates
+              may apply.
             </p>
           </div>
 
@@ -191,7 +192,11 @@ export function PhoneAuthForm({ mode }: Props) {
             disabled={busy || phone.trim().length < 6}
             className="w-full rounded-full bg-[#1f6f5c] px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {busy ? 'Sending code…' : mode === 'signup' ? 'Send verification code' : 'Sign in with OTP'}
+            {busy
+              ? 'Sending code…'
+              : mode === 'signup'
+                ? 'Send verification code'
+                : 'Sign in with OTP'}
           </button>
         </form>
       ) : (
@@ -202,8 +207,18 @@ export function PhoneAuthForm({ mode }: Props) {
         >
           <div className="rounded-2xl border border-[#ececea] bg-white p-5 text-center shadow-sm">
             <div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#e3efe9] text-[#1f6f5c]">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+                />
               </svg>
             </div>
             <label
@@ -213,7 +228,10 @@ export function PhoneAuthForm({ mode }: Props) {
               Enter 6-digit code
             </label>
             <p className="mt-1 text-xs text-[#8a847d]">
-              Sent to <span className="font-semibold text-[#131312]">{phone.trim()}</span>
+              Sent to{' '}
+              <span className="font-semibold text-[#131312]">
+                {phone.trim()}
+              </span>
             </p>
 
             <div className="mt-4">

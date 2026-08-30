@@ -2,8 +2,6 @@ import { test, expect } from '@playwright/test';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
-
-
 import { HttpsError } from 'firebase-functions/v2/https';
 
 import { acceptOffer } from '../functions/src/accept-offer';
@@ -22,23 +20,38 @@ if (getApps().length === 0) {
 const db = getFirestore();
 
 async function seedUser(uid: string, data: Record<string, unknown> = {}) {
-  await db.collection('users').doc(uid).set({
-    displayName: `User ${uid}`,
-    accountStatus: 'active',
-    roles: ['customer', 'volunteer'],
-    skills: ['gardening', 'buy-groceries'],
-    points: 0,
-    verifiedTaskCount: 0,
-    verifiedHours: 0,
-    trustScore: 50,
-    availableNow: true,
-    lastKnownLocation: { lat: 13.0202, lng: 77.6815, h3Cell: '89618926487ffff' },
-    ...data,
-  });
+  await db
+    .collection('users')
+    .doc(uid)
+    .set({
+      displayName: `User ${uid}`,
+      accountStatus: 'active',
+      roles: ['customer', 'volunteer'],
+      skills: ['gardening', 'buy-groceries'],
+      points: 0,
+      verifiedTaskCount: 0,
+      verifiedHours: 0,
+      trustScore: 50,
+      availableNow: true,
+      lastKnownLocation: {
+        lat: 13.0202,
+        lng: 77.6815,
+        h3Cell: '89618926487ffff',
+      },
+      ...data,
+    });
 }
 
 test.beforeEach(async () => {
-  const collections = ['tasks', 'users', 'chats', 'reports', 'blocks', 'adminActions', 'activityLog'];
+  const collections = [
+    'tasks',
+    'users',
+    'chats',
+    'reports',
+    'blocks',
+    'adminActions',
+    'activityLog',
+  ];
   for (const colName of collections) {
     const snap = await db.collection(colName).get();
     const batch = db.batch();
@@ -70,7 +83,10 @@ test('Journey 1: Customer to Completion Full Lifecycle', async ({ page }) => {
     status: 'searching',
   });
 
-  await taskRef.collection('offers').doc('vol-j1').set({ volunteerId: 'vol-j1', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-j1')
+    .set({ volunteerId: 'vol-j1', state: 'offered' });
 
   // 2. Volunteer accepts offer
   await acceptOffer.run({ auth: { uid: 'vol-j1' }, data: { taskId } } as any);
@@ -88,10 +104,16 @@ test('Journey 1: Customer to Completion Full Lifecycle', async ({ page }) => {
   expect(chatSnap.data()?.participants).toEqual(['cust-j1', 'vol-j1']);
 
   // 4. Start OTP generated & verified -> in_progress
-  const startOtpRes = await generateStartOtp.run({ auth: { uid: 'cust-j1' }, data: { taskId } } as any);
+  const startOtpRes = await generateStartOtp.run({
+    auth: { uid: 'cust-j1' },
+    data: { taskId },
+  } as any);
   expect(startOtpRes.code).toMatch(/^\d{6}$/);
 
-  const verifyStartRes = await verifyStartOtp.run({ auth: { uid: 'vol-j1' }, data: { taskId, code: startOtpRes.code } } as any);
+  const verifyStartRes = await verifyStartOtp.run({
+    auth: { uid: 'vol-j1' },
+    data: { taskId, code: startOtpRes.code },
+  } as any);
   expect(verifyStartRes.status).toBe('in_progress');
 
   // 5. End OTP generated & verified -> completed
@@ -104,7 +126,10 @@ test('Journey 1: Customer to Completion Full Lifecycle', async ({ page }) => {
     endOtpExpiresAt: Timestamp.fromMillis(Date.now() + 600000),
   });
 
-  const verifyEndRes = await verifyEndOtp.run({ auth: { uid: 'vol-j1' }, data: { taskId, code: endCode } } as any);
+  const verifyEndRes = await verifyEndOtp.run({
+    auth: { uid: 'vol-j1' },
+    data: { taskId, code: endCode },
+  } as any);
   expect(verifyEndRes.status).toBe('completed');
 
   snap = await taskRef.get();
@@ -131,8 +156,14 @@ test('Journey 2: Concurrent Offer Acceptance Race Protection', async () => {
     status: 'searching',
   });
 
-  await taskRef.collection('offers').doc('vol-A-j2').set({ volunteerId: 'vol-A-j2', state: 'offered' });
-  await taskRef.collection('offers').doc('vol-B-j2').set({ volunteerId: 'vol-B-j2', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-A-j2')
+    .set({ volunteerId: 'vol-A-j2', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-B-j2')
+    .set({ volunteerId: 'vol-B-j2', state: 'offered' });
 
   // Attempt simultaneous acceptance from Vol A and Vol B
   const results = await Promise.allSettled([
@@ -159,7 +190,12 @@ test('Journey 3: Report Submission & Admin Moderation Flow', async () => {
   // Admin suspends target user for inappropriate behavior
   const modRes = await applyModerationAction.run({
     auth: { uid: 'admin-j3' },
-    data: { userId: 'target-j3', action: 'suspend', durationDays: 7, reason: 'Policy violation' },
+    data: {
+      userId: 'target-j3',
+      action: 'suspend',
+      durationDays: 7,
+      reason: 'Policy violation',
+    },
   } as any);
 
   expect(modRes.success).toBe(true);
@@ -176,7 +212,10 @@ test('Journey 3: Report Submission & Admin Moderation Flow', async () => {
   });
 
   await expect(
-    generateStartOtp.run({ auth: { uid: 'target-j3' }, data: { taskId } } as any),
+    generateStartOtp.run({
+      auth: { uid: 'target-j3' },
+      data: { taskId },
+    } as any),
   ).rejects.toThrow();
 });
 
@@ -202,7 +241,12 @@ test('Journey 4: Reassignment Lifecycle (Vol A Suspended -> Task Reverted -> Vol
   // Admin suspends Vol A -> task automatically reverts to searching
   await applyModerationAction.run({
     auth: { uid: 'admin-j4' },
-    data: { userId: 'vol-A-j4', action: 'suspend', durationDays: 3, reason: 'Missed appointment' },
+    data: {
+      userId: 'vol-A-j4',
+      action: 'suspend',
+      durationDays: 3,
+      reason: 'Missed appointment',
+    },
   } as any);
 
   let snap = await taskRef.get();
@@ -211,7 +255,10 @@ test('Journey 4: Reassignment Lifecycle (Vol A Suspended -> Task Reverted -> Vol
   expect(snap.data()?.startOtpHash).toBeUndefined();
 
   // Vol B accepts reassigned task
-  await taskRef.collection('offers').doc('vol-B-j4').set({ volunteerId: 'vol-B-j4', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-B-j4')
+    .set({ volunteerId: 'vol-B-j4', state: 'offered' });
   await acceptOffer.run({ auth: { uid: 'vol-B-j4' }, data: { taskId } } as any);
 
   snap = await taskRef.get();
@@ -239,6 +286,9 @@ test('Resilience: Duplicate request idempotency and invalid state error handling
 
   // Attempting to cancel an already completed task throws failed-precondition error cleanly
   await expect(
-    cancelAcceptedTask.run({ auth: { uid: 'vol-r1' }, data: { taskId, reason: 'accidental_accept' } } as any),
+    cancelAcceptedTask.run({
+      auth: { uid: 'vol-r1' },
+      data: { taskId, reason: 'accidental_accept' },
+    } as any),
   ).rejects.toThrow();
 });

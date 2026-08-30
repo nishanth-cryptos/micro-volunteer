@@ -31,7 +31,6 @@ import {
   type AppCheck,
 } from 'firebase/app-check';
 
-
 const FUNCTIONS_REGION = 'asia-south1';
 const EMULATOR_HOST = '127.0.0.1';
 const EMULATOR_PORTS = {
@@ -145,7 +144,6 @@ export function appCheck(): AppCheck | null {
   } catch {
     return null;
   }
-
 }
 
 export function functions(): Functions {
@@ -157,4 +155,3 @@ export function functions(): Functions {
   cachedFunctions = instance;
   return instance;
 }
-

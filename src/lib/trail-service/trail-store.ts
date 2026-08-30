@@ -24,7 +24,9 @@ function verifyVolunteerOwnership(volunteerId: string): void {
     throw new Error('TrailService: Unauthorized - User must be signed in');
   }
   if (currentUser.uid !== volunteerId) {
-    throw new Error('TrailService: Forbidden - Cannot access another user\'s trail data');
+    throw new Error(
+      "TrailService: Forbidden - Cannot access another user's trail data",
+    );
   }
 }
 
@@ -82,7 +84,10 @@ export async function getCanonicalRoutes(
     const snap = await getDocs(routesRef);
     return snap.docs.map((d) => d.data() as CanonicalRoute);
   } catch (err) {
-    console.warn('TrailService: Failed to fetch canonical routes from Firestore', err);
+    console.warn(
+      'TrailService: Failed to fetch canonical routes from Firestore',
+      err,
+    );
     return [];
   }
 }

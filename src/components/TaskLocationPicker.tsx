@@ -10,7 +10,15 @@
 
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
-import { Circle, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import {
+  Circle,
+  MapContainer,
+  Marker,
+  TileLayer,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import type { LeafletEvent, Marker as LMarker } from 'leaflet';
 import L from 'leaflet';
 import { latLngToCell } from 'h3-js';
@@ -41,9 +49,7 @@ export interface LatLng {
 }
 
 interface Props {
-  onLocationChange: (
-    loc: LatLng & { h3Cell: string },
-  ) => void;
+  onLocationChange: (loc: LatLng & { h3Cell: string }) => void;
 }
 
 export function TaskLocationPicker({ onLocationChange }: Props) {
@@ -52,20 +58,20 @@ export function TaskLocationPicker({ onLocationChange }: Props) {
   const [isChoosing, setIsChoosing] = useState(false);
   const [placeName, setPlaceName] = useState<string | null>(null);
 
-interface NominatimAddress {
-  suburb?: string;
-  neighbourhood?: string;
-  residential?: string;
-  city_district?: string;
-  town?: string;
-  city?: string;
-}
+  interface NominatimAddress {
+    suburb?: string;
+    neighbourhood?: string;
+    residential?: string;
+    city_district?: string;
+    town?: string;
+    city?: string;
+  }
 
-interface NominatimResponse {
-  name?: string;
-  display_name?: string;
-  address?: NominatimAddress;
-}
+  interface NominatimResponse {
+    name?: string;
+    display_name?: string;
+    address?: NominatimAddress;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -177,9 +183,13 @@ interface NominatimResponse {
         <p className="m-0">
           Drag the pin to the exact meeting point.{' '}
           <span className="font-semibold text-[#131312]">
-            {placeName ? `${placeName} ` : ''}({position.lat.toFixed(4)}, {position.lng.toFixed(4)})
+            {placeName ? `${placeName} ` : ''}({position.lat.toFixed(4)},{' '}
+            {position.lng.toFixed(4)})
           </span>{' '}
-          · <span className="font-semibold text-[#1f6f5c]">2.5 km coverage preview</span>
+          ·{' '}
+          <span className="font-semibold text-[#1f6f5c]">
+            2.5 km coverage preview
+          </span>
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -213,7 +223,10 @@ interface NominatimResponse {
               if (!('geolocation' in navigator)) return;
               navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                  setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                  setPosition({
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                  });
                 },
                 () => {},
                 { timeout: 8000 },
@@ -350,7 +363,10 @@ function DraggablePin({
     >
       <Tooltip direction="top" offset={[0, -20]} opacity={1} permanent>
         <span className="font-sans text-xs font-semibold text-[#131312]">
-          📍 {placeName ? placeName : `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`}
+          📍{' '}
+          {placeName
+            ? placeName
+            : `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`}
         </span>
       </Tooltip>
     </Marker>

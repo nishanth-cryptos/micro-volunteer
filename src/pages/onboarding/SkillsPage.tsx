@@ -74,7 +74,8 @@ export default function SkillsPage() {
             What can you help with?
           </h1>
           <p className="mt-2 text-sm text-[#4f4b46]">
-            Your skills help us send you relevant tasks nearby. You can select up to {MAX_SKILLS} and change them anytime.
+            Your skills help us send you relevant tasks nearby. You can select
+            up to {MAX_SKILLS} and change them anytime.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#ececea] bg-white px-3.5 py-1 text-xs font-semibold text-[#131312] shadow-sm">
             <span
@@ -111,12 +112,25 @@ export default function SkillsPage() {
               >
                 {isSelected && (
                   <span className="absolute top-2.5 right-2.5 grid h-5 w-5 place-items-center rounded-full bg-[#1f6f5c] text-white shadow-xs">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    <svg
+                      className="h-3 w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </span>
                 )}
-                <SkillIcon skillKey={s.key} className="h-10 w-10 sm:h-12 sm:w-12" />
+                <SkillIcon
+                  skillKey={s.key}
+                  className="h-10 w-10 sm:h-12 sm:w-12"
+                />
                 <span className="text-xs font-semibold leading-tight text-[#131312] sm:text-sm">
                   {s.label}
                 </span>

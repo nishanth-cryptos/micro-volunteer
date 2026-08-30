@@ -28,24 +28,35 @@ const ADMINS = [
     password: 'admin123',
     displayName: 'Admin User',
     bio: 'System administrator.',
-    lat: 13.0205, lng: 77.6816, // ~30 m NE of test centre
-    trustScore: 100, idVerified: true,
-    verifiedTaskCount: 20, verifiedHours: 40, points: 200,
+    lat: 13.0205,
+    lng: 77.6816, // ~30 m NE of test centre
+    trustScore: 100,
+    idVerified: true,
+    verifiedTaskCount: 20,
+    verifiedHours: 40,
+    points: 200,
   },
   {
     email: 'admin2@example.org',
     password: 'admin123',
     displayName: 'Mod Two',
     bio: 'Secondary moderator.',
-    lat: 13.0215, lng: 77.6811, // ~150 m N of test centre
-    trustScore: 90, idVerified: true,
-    verifiedTaskCount: 12, verifiedHours: 18, points: 120,
+    lat: 13.0215,
+    lng: 77.6811, // ~150 m N of test centre
+    trustScore: 90,
+    idVerified: true,
+    verifiedTaskCount: 12,
+    verifiedHours: 18,
+    points: 120,
   },
 ];
 
 // Static skill seed for admin docs (so they can also act as volunteers).
 const ADMIN_SKILLS = [
-  'read-text', 'phone-help', 'online-search', 'book-appointment',
+  'read-text',
+  'phone-help',
+  'online-search',
+  'book-appointment',
 ];
 
 // ---------------------------------------------------------------------------
@@ -64,7 +75,8 @@ async function upsertUser(email, password, displayName) {
     console.log(`  ✓ Created  ${email}  (${record.uid})`);
     return record.uid;
   } catch (err) {
-    const code = err && typeof err === 'object' && 'code' in err ? err.code : '';
+    const code =
+      err && typeof err === 'object' && 'code' in err ? err.code : '';
     if (code === 'auth/email-already-exists') {
       const existing = await auth.getUserByEmail(email);
       // Keep the seed idempotent: force password + displayName back to the
@@ -89,36 +101,39 @@ async function seedAdminProfile(a) {
     );
   }
 
-  await db.collection('users').doc(uid).set({
-    displayName: a.displayName,
-    photoURL: `users/${uid}/photo`,
-    bio: a.bio,
-    email: a.email,
-    roles: ['admin', 'volunteer', 'customer'],
-    isAdmin: true,
-    skills: ADMIN_SKILLS,
-    lastKnownLocation: {
-      lat: a.lat,
-      lng: a.lng,
-      h3Cell,
-      updatedAt: new Date(),
-    },
-    availableNow: false, // admins start offline; toggle on in UI if needed
-    availabilityUpdatedAt: new Date(),
-    idVerified: a.idVerified,
-    trustScore: a.trustScore,
-    verifiedTaskCount: a.verifiedTaskCount,
-    verifiedHours: a.verifiedHours,
-    points: a.points,
-    skillPoints,
-    openReportsCount: 0,
-    warningsCount: 0,
-    banned: false,
-    accountStatus: 'active',
-    consent: { tcVersion: 'v1-DRAFT', acceptedAt: new Date() },
-    createdAt: new Date(),
-    lastSeenAt: new Date(),
-  });
+  await db
+    .collection('users')
+    .doc(uid)
+    .set({
+      displayName: a.displayName,
+      photoURL: `users/${uid}/photo`,
+      bio: a.bio,
+      email: a.email,
+      roles: ['admin', 'volunteer', 'customer'],
+      isAdmin: true,
+      skills: ADMIN_SKILLS,
+      lastKnownLocation: {
+        lat: a.lat,
+        lng: a.lng,
+        h3Cell,
+        updatedAt: new Date(),
+      },
+      availableNow: false, // admins start offline; toggle on in UI if needed
+      availabilityUpdatedAt: new Date(),
+      idVerified: a.idVerified,
+      trustScore: a.trustScore,
+      verifiedTaskCount: a.verifiedTaskCount,
+      verifiedHours: a.verifiedHours,
+      points: a.points,
+      skillPoints,
+      openReportsCount: 0,
+      warningsCount: 0,
+      banned: false,
+      accountStatus: 'active',
+      consent: { tcVersion: 'v1-DRAFT', acceptedAt: new Date() },
+      createdAt: new Date(),
+      lastSeenAt: new Date(),
+    });
 
   console.log(
     `  ✓ Firestore  ${a.displayName.padEnd(10)} roles=[admin, volunteer, customer]  isAdmin=true`,

@@ -137,7 +137,8 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#f3f1ec] pt-4">
         <p className="text-xs text-[#8a847d]">
-          🛡️ Protects you by ensuring tasks only start/finish with your direct confirmation.
+          🛡️ Protects you by ensuring tasks only start/finish with your direct
+          confirmation.
         </p>
         <button
           type="button"

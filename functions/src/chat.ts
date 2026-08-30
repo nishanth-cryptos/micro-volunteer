@@ -12,7 +12,6 @@
 
 const PREVIEW_MAX = 120;
 
-
 function preview(text: string): string {
   const t = text.trim();
   return t.length > PREVIEW_MAX ? `${t.slice(0, PREVIEW_MAX - 1)}…` : t;
@@ -81,5 +80,3 @@ export async function appendSystemMessage(
     lastMessagePreview: preview(text),
   });
 }
-
-

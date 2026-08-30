@@ -122,7 +122,9 @@ export const acceptOffer = onCall(
     let taskTitle = 'a task';
     try {
       const taskSnap = await taskRef.get();
-      const t = taskSnap.exists ? (taskSnap.data() as { title?: string }) : null;
+      const t = taskSnap.exists
+        ? (taskSnap.data() as { title?: string })
+        : null;
       taskTitle = t?.title?.trim() || 'a task';
     } catch {
       /* keep fallback */
@@ -140,8 +142,9 @@ export const acceptOffer = onCall(
     // also re-keys the chat to the new volunteer if the task was reassigned.
     try {
       const taskSnap = await taskRef.get();
-      const customerId = (taskSnap.data() as { customerId?: string } | undefined)
-        ?.customerId;
+      const customerId = (
+        taskSnap.data() as { customerId?: string } | undefined
+      )?.customerId;
       if (customerId) {
         await ensureChatForTask(db, taskId, customerId, volunteerId);
         await appendSystemMessage(

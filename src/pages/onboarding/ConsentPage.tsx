@@ -43,7 +43,9 @@ export default function ConsentPage() {
       if (user.phoneNumber) data.phoneNumber = user.phoneNumber;
       if (user.email) data.email = user.email;
 
-      const savePromise = setDoc(doc(db(), 'users', user.uid), data, { merge: true });
+      const savePromise = setDoc(doc(db(), 'users', user.uid), data, {
+        merge: true,
+      });
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(
           () =>
@@ -87,7 +89,8 @@ export default function ConsentPage() {
             Community Guidelines &amp; Terms
           </h1>
           <p className="mt-2 text-sm text-[#4f4b46]">
-            Hey Padosi is built on mutual respect and neighbourly safety. Please review our core principles before continuing.
+            Hey Padosi is built on mutual respect and neighbourly safety. Please
+            review our core principles before continuing.
           </p>
         </div>
 
@@ -95,14 +98,29 @@ export default function ConsentPage() {
           <div className="p-6 sm:p-7">
             <div className="flex items-start gap-3.5">
               <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#e3efe9] text-[#1f6f5c]">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-[#131312]">1. Safe, Low-Risk Neighbourhood Tasks</h2>
+                <h2 className="text-sm font-bold text-[#131312]">
+                  1. Safe, Low-Risk Neighbourhood Tasks
+                </h2>
                 <p className="mt-1 text-sm leading-relaxed text-[#4f4b46]">
-                  This platform is designed for safe everyday assistance (e.g. plant watering, tech setup, carrying groceries). Never accept or perform a task that feels unsafe or violates local regulations.
+                  This platform is designed for safe everyday assistance (e.g.
+                  plant watering, tech setup, carrying groceries). Never accept
+                  or perform a task that feels unsafe or violates local
+                  regulations.
                 </p>
               </div>
             </div>
@@ -111,14 +129,28 @@ export default function ConsentPage() {
           <div className="p-6 sm:p-7">
             <div className="flex items-start gap-3.5">
               <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#e3efe9] text-[#1f6f5c]">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-[#131312]">2. Identity &amp; Verification</h2>
+                <h2 className="text-sm font-bold text-[#131312]">
+                  2. Identity &amp; Verification
+                </h2>
                 <p className="mt-1 text-sm leading-relaxed text-[#4f4b46]">
-                  To protect community members, users provide real names and profile photos. Medium-risk tasks require ID verification for added safety.
+                  To protect community members, users provide real names and
+                  profile photos. Medium-risk tasks require ID verification for
+                  added safety.
                 </p>
               </div>
             </div>
@@ -127,14 +159,28 @@ export default function ConsentPage() {
           <div className="p-6 sm:p-7">
             <div className="flex items-start gap-3.5">
               <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#e3efe9] text-[#1f6f5c]">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-[#131312]">3. Privacy &amp; Local Location Use</h2>
+                <h2 className="text-sm font-bold text-[#131312]">
+                  3. Privacy &amp; Local Location Use
+                </h2>
                 <p className="mt-1 text-sm leading-relaxed text-[#4f4b46]">
-                  Your location is used solely to match you with nearby tasks and volunteers within your area. We never sell your personal data to third parties.
+                  Your location is used solely to match you with nearby tasks
+                  and volunteers within your area. We never sell your personal
+                  data to third parties.
                 </p>
               </div>
             </div>
@@ -143,21 +189,36 @@ export default function ConsentPage() {
           <div className="p-6 sm:p-7">
             <div className="flex items-start gap-3.5">
               <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#e3efe9] text-[#1f6f5c]">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
                 </svg>
               </div>
               <div>
-                <h2 className="text-sm font-bold text-[#131312]">4. Community Trust &amp; Moderation</h2>
+                <h2 className="text-sm font-bold text-[#131312]">
+                  4. Community Trust &amp; Moderation
+                </h2>
                 <p className="mt-1 text-sm leading-relaxed text-[#4f4b46]">
-                  Any harassment, unsafe conduct, or misuse will result in instant reporting, strike warnings, suspension, or permanent account bans.
+                  Any harassment, unsafe conduct, or misuse will result in
+                  instant reporting, strike warnings, suspension, or permanent
+                  account bans.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="bg-[#fafaf8] p-4 text-center text-xs text-[#8a847d] rounded-b-3xl">
-            Agreement Version: <span className="font-mono font-semibold">{TC_VERSION}</span>
+            Agreement Version:{' '}
+            <span className="font-mono font-semibold">{TC_VERSION}</span>
           </div>
         </section>
 
@@ -175,7 +236,8 @@ export default function ConsentPage() {
               className="mt-0.5 h-5 w-5 rounded border-[#ececea] text-[#1f6f5c] focus:ring-[#1f6f5c]"
             />
             <span className="text-sm font-medium text-[#131312]">
-              I have read and agree to follow the Hey Padosi Community Guidelines and Terms of Service.
+              I have read and agree to follow the Hey Padosi Community
+              Guidelines and Terms of Service.
             </span>
           </label>
         </div>
@@ -208,7 +270,9 @@ export default function ConsentPage() {
           disabled={!checked || busy}
           className="mt-6 w-full rounded-full bg-[#1f6f5c] px-6 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-[#185845] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {busy ? 'Recording acceptance…' : 'Accept & Continue to Role Selection →'}
+          {busy
+            ? 'Recording acceptance…'
+            : 'Accept & Continue to Role Selection →'}
         </button>
       </main>
     </div>

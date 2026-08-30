@@ -22,7 +22,11 @@ test('Deterministic block ID format: userA_userB (where userA < userB)', () => {
   const blockId2 = `${userA2}_${userB2}`;
 
   assert.equal(blockId2, 'user_alpha_user_zebra');
-  assert.equal(blockId1, blockId2, 'Block IDs should be identical regardless of who initiates');
+  assert.equal(
+    blockId1,
+    blockId2,
+    'Block IDs should be identical regardless of who initiates',
+  );
 });
 
 test('Unblock authorization: caller must equal blockedBy field on block doc', () => {
@@ -36,5 +40,9 @@ test('Unblock authorization: caller must equal blockedBy field on block doc', ()
   const callerUnauthorized = blockDoc.blockedBy === 'user_zebra';
 
   assert.equal(callerAuthorized, true, 'User who initiated block can unblock');
-  assert.equal(callerUnauthorized, false, 'Other user cannot unblock a block placed on them');
+  assert.equal(
+    callerUnauthorized,
+    false,
+    'Other user cannot unblock a block placed on them',
+  );
 });

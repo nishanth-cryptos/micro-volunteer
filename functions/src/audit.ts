@@ -28,14 +28,10 @@ export async function writeAuditEvent(
   payload: Record<string, unknown> = {},
 ): Promise<void> {
   const db = getFirestore();
-  await db
-    .collection('tasks')
-    .doc(taskId)
-    .collection('events')
-    .add({
-      type,
-      actorUid,
-      payload,
-      at: FieldValue.serverTimestamp(),
-    });
+  await db.collection('tasks').doc(taskId).collection('events').add({
+    type,
+    actorUid,
+    payload,
+    at: FieldValue.serverTimestamp(),
+  });
 }

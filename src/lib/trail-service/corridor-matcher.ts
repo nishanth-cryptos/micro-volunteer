@@ -45,7 +45,12 @@ export function computeAddedDetourSeconds(
   let minDistM = Infinity;
 
   if (routeCenter) {
-    minDistM = haversineM(routeCenter.lat, routeCenter.lng, taskLoc.lat, taskLoc.lng);
+    minDistM = haversineM(
+      routeCenter.lat,
+      routeCenter.lng,
+      taskLoc.lat,
+      taskLoc.lng,
+    );
   } else {
     // Default fallback estimate for detour
     minDistM = 600; // 600 meters ~ 2.4 min detour
@@ -86,9 +91,7 @@ export function matchTasksInCorridor(
     }
 
     // 3. Compute added detour time
-    const addedDetourSeconds = computeAddedDetourSeconds(
-      task.location,
-    );
+    const addedDetourSeconds = computeAddedDetourSeconds(task.location);
     const taskDurationSeconds = (task.estimatedDurationMinutes ?? 15) * 60;
     const totalImpactSeconds = taskDurationSeconds + addedDetourSeconds;
 
@@ -104,8 +107,8 @@ export function matchTasksInCorridor(
     const detourScore = Math.max(0, 1 - addedDetourSeconds / 900); // 15 min max detour
     const skillScore =
       task.requiredSkills.length > 0
-        ? task.requiredSkills.filter((s) => volunteerSkills.includes(s)).length /
-          task.requiredSkills.length
+        ? task.requiredSkills.filter((s) => volunteerSkills.includes(s))
+            .length / task.requiredSkills.length
         : 1;
 
     const rankScore = 0.5 * detourScore + 0.5 * skillScore;

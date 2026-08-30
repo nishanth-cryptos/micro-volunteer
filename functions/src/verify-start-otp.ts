@@ -69,11 +69,7 @@ export const verifyStartOtp = onCall(
           'This task is not waiting on a start code.',
         );
       }
-      if (
-        !task.startOtpHash
-        || !task.startOtpSalt
-        || !task.startOtpExpiresAt
-      ) {
+      if (!task.startOtpHash || !task.startOtpSalt || !task.startOtpExpiresAt) {
         throw new HttpsError(
           'failed-precondition',
           'Ask the customer to generate a fresh start code.',
@@ -107,7 +103,8 @@ export const verifyStartOtp = onCall(
     let taskTitle = 'a task';
     try {
       const t = await taskRef.get();
-      taskTitle = (t.data() as { title?: string } | undefined)?.title?.trim() || 'a task';
+      taskTitle =
+        (t.data() as { title?: string } | undefined)?.title?.trim() || 'a task';
     } catch {
       /* keep fallback */
     }
@@ -121,7 +118,11 @@ export const verifyStartOtp = onCall(
 
     // Chat system message (M7) — best-effort, never blocks the response.
     try {
-      await appendSystemMessage(db, taskId, 'Task started — the start code was verified.');
+      await appendSystemMessage(
+        db,
+        taskId,
+        'Task started — the start code was verified.',
+      );
     } catch (err) {
       logger.warn('Failed to append start system message (non-fatal)', {
         taskId,

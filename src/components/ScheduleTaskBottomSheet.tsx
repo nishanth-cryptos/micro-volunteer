@@ -28,8 +28,6 @@ export function ScheduleTaskBottomSheet({
   const minMs = nowMs + 30 * 60 * 1000;
   const maxMs = nowMs + 7 * 24 * 60 * 60 * 1000;
 
-
-
   const toLocalIso = (ms: number) => {
     const d = new Date(ms);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -38,7 +36,6 @@ export function ScheduleTaskBottomSheet({
 
   const minIso = toLocalIso(minMs);
   const maxIso = toLocalIso(maxMs);
-
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,11 +64,7 @@ export function ScheduleTaskBottomSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4 animate-in fade-in duration-200">
-      <div
-        className="fixed inset-0"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
 
       <div className="relative w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-2xl transition-all sm:rounded-3xl animate-in slide-in-from-bottom duration-300">
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-neutral-200 sm:hidden" />

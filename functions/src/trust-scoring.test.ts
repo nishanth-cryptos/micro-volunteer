@@ -17,8 +17,8 @@ test('Trust Score: newcomer with zero completed tasks and no ratings gets defaul
 
   // rawScore = 0.35*0 + 0.30*1.0 + 0.15*0 + 0.10*0 - 0 = 0.30
   // trustScore = round(0.30 * 100) = 30
-  assert.equal(result.rawScore, 0.30);
-  assert.equal(result.clampedScore, 0.30);
+  assert.equal(result.rawScore, 0.3);
+  assert.equal(result.clampedScore, 0.3);
   assert.equal(result.trustScore, 30);
 });
 
@@ -52,16 +52,19 @@ test('Trust Score: hour saturation caps contribution at 40 hours', () => {
 test('Trust Score: maxed-out volunteer pegs at score 90 (Trusted threshold 85)', () => {
   const maxed = computeTrustScorePure({
     verifiedTaskCount: 20, // 0.35
-    verifiedHours: 40,     // 0.15
-    idVerified: true,       // 0.10
-    totalRating: 25,        // 5.0 avg -> 0.30
+    verifiedHours: 40, // 0.15
+    idVerified: true, // 0.10
+    totalRating: 25, // 5.0 avg -> 0.30
     ratedCount: 5,
     reportPenalty: 0,
   });
 
   // 0.35 + 0.30 + 0.15 + 0.10 = 0.90 -> 90
   assert.equal(maxed.trustScore, 90);
-  assert.ok(maxed.trustScore >= 85, 'Maxed volunteer must reach Emerald Trusted threshold (>=85)');
+  assert.ok(
+    maxed.trustScore >= 85,
+    'Maxed volunteer must reach Emerald Trusted threshold (>=85)',
+  );
 });
 
 test('Trust Score: rating scaling handles 1-star to 5-star ratings accurately', () => {
@@ -79,13 +82,13 @@ test('Trust Score: rating scaling handles 1-star to 5-star ratings accurately', 
 test('Trust Score: report penalty deduction clamps to minimum floor 30', () => {
   const penalizedNewcomer = computeTrustScorePure({
     verifiedTaskCount: 0,
-    reportPenalty: 0.50, // Penalty larger than raw score 0.30
+    reportPenalty: 0.5, // Penalty larger than raw score 0.30
   });
 
   // rawScore = 0.30 - 0.50 = -0.20
   // clampedScore = max(0.3, -0.20) = 0.30
-  assert.equal(penalizedNewcomer.rawScore, -0.20);
-  assert.equal(penalizedNewcomer.clampedScore, 0.30);
+  assert.equal(penalizedNewcomer.rawScore, -0.2);
+  assert.equal(penalizedNewcomer.clampedScore, 0.3);
   assert.equal(penalizedNewcomer.trustScore, 30);
 });
 

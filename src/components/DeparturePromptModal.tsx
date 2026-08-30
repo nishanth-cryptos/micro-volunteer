@@ -1,7 +1,10 @@
 // Rebranded Departure Prompt Modal — Prompts volunteer on departure signal
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { type CanonicalRoute, type TaskSuggestion } from '../lib/trail-service/types';
+import {
+  type CanonicalRoute,
+  type TaskSuggestion,
+} from '../lib/trail-service/types';
 
 interface Props {
   isOpen: boolean;
@@ -100,7 +103,9 @@ export function DeparturePromptModal({
                   <button
                     key={sug.id}
                     type="button"
-                    onClick={() => setSelectedTaskId(isSelected ? null : sug.taskId)}
+                    onClick={() =>
+                      setSelectedTaskId(isSelected ? null : sug.taskId)
+                    }
                     className={
                       'w-full text-left rounded-xl p-3.5 transition border text-sm flex items-center justify-between ' +
                       (isSelected
@@ -109,7 +114,9 @@ export function DeparturePromptModal({
                     }
                   >
                     <div>
-                      <div className="font-bold text-[#131312]">{sug.title}</div>
+                      <div className="font-bold text-[#131312]">
+                        {sug.title}
+                      </div>
                       <div className="mt-0.5 text-xs text-[#8a847d]">
                         Category: {sug.category}
                       </div>
@@ -129,7 +136,8 @@ export function DeparturePromptModal({
           </div>
         ) : (
           <div className="mt-4 rounded-xl border border-[#ececea] bg-[#fafaf8] p-4 text-center text-xs text-[#8a847d]">
-            No matching tasks along your corridor right now. We&apos;ll notify you if a neighbour posts one!
+            No matching tasks along your corridor right now. We&apos;ll notify
+            you if a neighbour posts one!
           </div>
         )}
 

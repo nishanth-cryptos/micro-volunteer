@@ -66,7 +66,10 @@ export interface RankedVolunteer {
 export function isEligible(uid: string, u: UserDoc, task: TaskDoc): boolean {
   if (uid === task.customerId) return false;
   const isBanned = u.accountStatus === 'banned' || u.banned === true;
-  const isSuspended = u.accountStatus === 'suspended' && u.suspendedUntil && u.suspendedUntil.toMillis() > Date.now();
+  const isSuspended =
+    u.accountStatus === 'suspended' &&
+    u.suspendedUntil &&
+    u.suspendedUntil.toMillis() > Date.now();
   if (isBanned || isSuspended) return false;
   if (!u.roles?.includes('volunteer')) return false;
   if (!u.lastKnownLocation) return false;
@@ -85,14 +88,11 @@ export function isEligible(uid: string, u: UserDoc, task: TaskDoc): boolean {
 }
 
 export function score(u: UserDoc, task: TaskDoc): ScoreBreakdown {
-  const ringDist =
-    u.lastKnownLocation
-      ? gridDistance(task.location.h3Cell, u.lastKnownLocation.h3Cell)
-      : -1;
+  const ringDist = u.lastKnownLocation
+    ? gridDistance(task.location.h3Cell, u.lastKnownLocation.h3Cell)
+    : -1;
   const distance =
-    ringDist >= 0
-      ? Math.max(0, 1 - ringDist / H3_DISTANCE_RING_CEILING)
-      : 0;
+    ringDist >= 0 ? Math.max(0, 1 - ringDist / H3_DISTANCE_RING_CEILING) : 0;
 
   const matched =
     u.skills?.filter((s) => task.requiredSkills.includes(s)).length ?? 0;
@@ -110,11 +110,11 @@ export function score(u: UserDoc, task: TaskDoc): ScoreBreakdown {
   const reportPenalty = Math.min(0.5, reports * 0.1 + warnings * 0.15);
 
   const total =
-    0.30 * distance +
+    0.3 * distance +
     0.25 * skill +
-    0.20 * trust +
+    0.2 * trust +
     0.15 * availability +
-    0.10 * pastCompletion -
+    0.1 * pastCompletion -
     reportPenalty;
 
   return {
@@ -180,15 +180,14 @@ export async function rankForTask(task: TaskDoc): Promise<RankedVolunteer[]> {
   return candidates
     .map(({ uid, doc: u }) => {
       const breakdown = score(u, task);
-      const distM =
-        u.lastKnownLocation
-          ? haversineM(
-              u.lastKnownLocation.lat,
-              u.lastKnownLocation.lng,
-              task.location.lat,
-              task.location.lng,
-            )
-          : Number.NaN;
+      const distM = u.lastKnownLocation
+        ? haversineM(
+            u.lastKnownLocation.lat,
+            u.lastKnownLocation.lng,
+            task.location.lat,
+            task.location.lng,
+          )
+        : Number.NaN;
       return {
         uid,
         displayName: u.displayName ?? '',

@@ -13,7 +13,6 @@ import {
 } from '@firebase/rules-unit-testing';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
-
 const PROJECT_ID = 'micro---volunteer';
 let testEnv: RulesTestEnvironment;
 
@@ -131,7 +130,6 @@ test('Users Security: owner can update profile fields but cannot modify server-l
       accountStatus: 'banned', // not in allowed update keys
     }),
   );
-
 });
 
 test('Users Security: non-owner and unauthenticated users cannot read/update other user profiles', async () => {
@@ -147,7 +145,9 @@ test('Users Security: non-owner and unauthenticated users cannot read/update oth
 
   await assertFails(getDoc(doc(unauthedDb, 'users/user-secret')));
   await assertFails(getDoc(doc(strangerDb, 'users/user-secret')));
-  await assertFails(updateDoc(doc(strangerDb, 'users/user-secret'), { displayName: 'Hacked' }));
+  await assertFails(
+    updateDoc(doc(strangerDb, 'users/user-secret'), { displayName: 'Hacked' }),
+  );
 });
 
 test('Users Security: admin user can read any user profile', async () => {
@@ -179,7 +179,10 @@ test('Tasks Security: customer can create task with valid schema', async () => {
       title: 'Water plants in park',
       category: 'gardening',
       requiredSkills: ['buy-groceries'],
-      description: { meetingPoint: 'Park Main Gate', whatToBring: 'Watering can' },
+      description: {
+        meetingPoint: 'Park Main Gate',
+        whatToBring: 'Watering can',
+      },
       location: { lat: 13.0202, lng: 77.6815, h3Cell: '89618926487ffff' },
       riskLevel: 'low',
       estimatedMinutes: 30,
@@ -203,8 +206,14 @@ test('Tasks Security: client direct update and delete of tasks are strictly DENI
   const volunteerDb = testEnv.authenticatedContext('volunteer-1').firestore();
 
   // Attempting to change status or assigned volunteer directly
-  await assertFails(updateDoc(doc(customerDb, 'tasks/task-102'), { status: 'completed' }));
-  await assertFails(updateDoc(doc(volunteerDb, 'tasks/task-102'), { acceptedVolunteerId: 'volunteer-1' }));
+  await assertFails(
+    updateDoc(doc(customerDb, 'tasks/task-102'), { status: 'completed' }),
+  );
+  await assertFails(
+    updateDoc(doc(volunteerDb, 'tasks/task-102'), {
+      acceptedVolunteerId: 'volunteer-1',
+    }),
+  );
   await assertFails(deleteDoc(doc(customerDb, 'tasks/task-102')));
 });
 
@@ -220,7 +229,9 @@ test('Tasks Security: read access allowed only to customer, assigned volunteer, 
   });
 
   const ownerDb = testEnv.authenticatedContext('customer-owner').firestore();
-  const assignedVolDb = testEnv.authenticatedContext('assigned-vol').firestore();
+  const assignedVolDb = testEnv
+    .authenticatedContext('assigned-vol')
+    .firestore();
   const strangerDb = testEnv.authenticatedContext('unrelated-vol').firestore();
   const adminDb = testEnv.authenticatedContext('admin-1').firestore();
 
@@ -310,7 +321,9 @@ test('Offers Security: customer can read offers under their own task', async () 
 
 test('Events Security: client writes to task events are DENIED', async () => {
   await testEnv.withSecurityRulesDisabled(async (adminContext) => {
-    await setDoc(doc(adminContext.firestore(), 'tasks/task-300'), { customerId: 'customer-1' });
+    await setDoc(doc(adminContext.firestore(), 'tasks/task-300'), {
+      customerId: 'customer-1',
+    });
   });
 
   const volDb = testEnv.authenticatedContext('volunteer-1').firestore();
@@ -433,7 +446,9 @@ test('Chat Messages Security: participant can send non-system message; messages 
   );
 
   // Message update or delete DENIED
-  await assertFails(updateDoc(doc(volDb, 'chats/chat-100/messages/msg-1'), { text: 'Edited' }));
+  await assertFails(
+    updateDoc(doc(volDb, 'chats/chat-100/messages/msg-1'), { text: 'Edited' }),
+  );
   await assertFails(deleteDoc(doc(volDb, 'chats/chat-100/messages/msg-1')));
 });
 

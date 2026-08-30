@@ -4,11 +4,7 @@
 // which automatically triggers dispatchOffers (onDocumentWritten) to match volunteers.
 
 import { getApps, initializeApp } from 'firebase-admin/app';
-import {
-  FieldValue,
-  getFirestore,
-  Timestamp,
-} from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 

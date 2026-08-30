@@ -28,22 +28,33 @@ const db = getFirestore();
 
 // Helper to seed standard user docs
 async function seedUser(uid: string, data: Record<string, unknown> = {}) {
-  await db.collection('users').doc(uid).set({
-    displayName: `User ${uid}`,
-    accountStatus: 'active',
-    roles: ['customer', 'volunteer'],
-    skills: ['gardening', 'buy-groceries'],
-    points: 0,
-    verifiedTaskCount: 0,
-    verifiedHours: 0,
-    trustScore: 50,
-    ...data,
-  });
+  await db
+    .collection('users')
+    .doc(uid)
+    .set({
+      displayName: `User ${uid}`,
+      accountStatus: 'active',
+      roles: ['customer', 'volunteer'],
+      skills: ['gardening', 'buy-groceries'],
+      points: 0,
+      verifiedTaskCount: 0,
+      verifiedHours: 0,
+      trustScore: 50,
+      ...data,
+    });
 }
 
 beforeEach(async () => {
   // Clear Firestore collections used in tests
-  const collections = ['tasks', 'users', 'chats', 'reports', 'blocks', 'adminActions', 'activityLog'];
+  const collections = [
+    'tasks',
+    'users',
+    'chats',
+    'reports',
+    'blocks',
+    'adminActions',
+    'activityLog',
+  ];
   for (const colName of collections) {
     const snap = await db.collection(colName).get();
     const batch = db.batch();
@@ -72,7 +83,11 @@ test('Batch 3 Authorization: callables reject unauthenticated invocations', asyn
   );
 
   await assert.rejects(
-    async () => verifyStartOtp.run({ auth: undefined, data: { taskId: 't1', code: '123456' } } as any),
+    async () =>
+      verifyStartOtp.run({
+        auth: undefined,
+        data: { taskId: 't1', code: '123456' },
+      } as any),
     (err: HttpsError) => err.code === 'unauthenticated',
   );
 
@@ -82,7 +97,11 @@ test('Batch 3 Authorization: callables reject unauthenticated invocations', asyn
   );
 
   await assert.rejects(
-    async () => verifyEndOtp.run({ auth: undefined, data: { taskId: 't1', code: '123456' } } as any),
+    async () =>
+      verifyEndOtp.run({
+        auth: undefined,
+        data: { taskId: 't1', code: '123456' },
+      } as any),
     (err: HttpsError) => err.code === 'unauthenticated',
   );
 });
@@ -96,17 +115,26 @@ test('Batch 3 Input Validation: callables reject missing/malformed payload data'
   );
 
   await assert.rejects(
-    async () => verifyStartOtp.run({ auth: { uid: 'u1' }, data: { taskId: 't1', code: 'bad-code' } } as any),
+    async () =>
+      verifyStartOtp.run({
+        auth: { uid: 'u1' },
+        data: { taskId: 't1', code: 'bad-code' },
+      } as any),
     (err: HttpsError) => err.code === 'invalid-argument',
   );
 
   await assert.rejects(
-    async () => reportUser.run({ auth: { uid: 'u1' }, data: { reportedUid: 'u1' } } as any),
+    async () =>
+      reportUser.run({
+        auth: { uid: 'u1' },
+        data: { reportedUid: 'u1' },
+      } as any),
     (err: HttpsError) => err.code === 'invalid-argument', // cannot report self
   );
 
   await assert.rejects(
-    async () => blockUser.run({ auth: { uid: 'u1' }, data: { targetUid: 'u1' } } as any),
+    async () =>
+      blockUser.run({ auth: { uid: 'u1' }, data: { targetUid: 'u1' } } as any),
     (err: HttpsError) => err.code === 'invalid-argument', // cannot block self
   );
 });
@@ -119,16 +147,25 @@ test('Batch 3 Active Status Enforcer: suspended or banned users are rejected', a
     customerId: 'cust-1',
     status: 'searching',
   });
-  await db.collection('tasks').doc('task-search').collection('offers').doc('banned-vol').set({
-    volunteerId: 'banned-vol',
-    state: 'offered',
-  });
+  await db
+    .collection('tasks')
+    .doc('task-search')
+    .collection('offers')
+    .doc('banned-vol')
+    .set({
+      volunteerId: 'banned-vol',
+      state: 'offered',
+    });
 
-  const reqBanned = { auth: { uid: 'banned-vol' }, data: { taskId: 'task-search' } } as any;
+  const reqBanned = {
+    auth: { uid: 'banned-vol' },
+    data: { taskId: 'task-search' },
+  } as any;
 
   await assert.rejects(
     async () => acceptOffer.run(reqBanned),
-    (err: HttpsError) => err.code === 'permission-denied' && err.message.includes('banned'),
+    (err: HttpsError) =>
+      err.code === 'permission-denied' && err.message.includes('banned'),
   );
 });
 
@@ -143,13 +180,21 @@ test('Batch 3 Task Ownership & Role Verification', async () => {
 
   // Stranger tries to generate Start OTP for cust-owner's task
   await assert.rejects(
-    async () => generateStartOtp.run({ auth: { uid: 'stranger' }, data: { taskId: 'task-own' } } as any),
+    async () =>
+      generateStartOtp.run({
+        auth: { uid: 'stranger' },
+        data: { taskId: 'task-own' },
+      } as any),
     (err: HttpsError) => err.code === 'permission-denied',
   );
 
   // Admin moderation action by non-admin user
   await assert.rejects(
-    async () => applyModerationAction.run({ auth: { uid: 'stranger' }, data: { targetUid: 'cust-owner', action: 'ban' } } as any),
+    async () =>
+      applyModerationAction.run({
+        auth: { uid: 'stranger' },
+        data: { targetUid: 'cust-owner', action: 'ban' },
+      } as any),
     (err: HttpsError) => err.code === 'permission-denied',
   );
 });
@@ -166,13 +211,21 @@ test('Batch 3 Customer Rating & Cancel Accepted Task Authorization', async () =>
 
   // Stranger rating completed task denied
   await assert.rejects(
-    async () => submitCustomerRating.run({ auth: { uid: 'vol-rate' }, data: { taskId: 'task-completed', rating: 5 } } as any),
+    async () =>
+      submitCustomerRating.run({
+        auth: { uid: 'vol-rate' },
+        data: { taskId: 'task-completed', rating: 5 },
+      } as any),
     (err: HttpsError) => err.code === 'permission-denied',
   );
 
   // Invalid rating value (< 1 or > 5) rejected
   await assert.rejects(
-    async () => submitCustomerRating.run({ auth: { uid: 'cust-rate' }, data: { taskId: 'task-completed', rating: 10 } } as any),
+    async () =>
+      submitCustomerRating.run({
+        auth: { uid: 'cust-rate' },
+        data: { taskId: 'task-completed', rating: 10 },
+      } as any),
     (err: HttpsError) => err.code === 'invalid-argument',
   );
 
@@ -185,7 +238,11 @@ test('Batch 3 Customer Rating & Cancel Accepted Task Authorization', async () =>
 
   // Stranger trying to cancel accepted task denied
   await assert.rejects(
-    async () => cancelAcceptedTask.run({ auth: { uid: 'cust-rate' }, data: { taskId: 'task-accepted-cancel', reason: 'accidental_accept' } } as any),
+    async () =>
+      cancelAcceptedTask.run({
+        auth: { uid: 'cust-rate' },
+        data: { taskId: 'task-accepted-cancel', reason: 'accidental_accept' },
+      } as any),
     (err: HttpsError) => err.code === 'permission-denied',
   );
 
@@ -220,7 +277,10 @@ test('Batch 4 Lifecycle: valid transitions flow (searching -> accepted -> in_pro
   });
 
   // 1. searching -> accepted (via acceptOffer)
-  const acceptRes = await acceptOffer.run({ auth: { uid: 'vol-sm' }, data: { taskId: 'task-sm-1' } } as any);
+  const acceptRes = await acceptOffer.run({
+    auth: { uid: 'vol-sm' },
+    data: { taskId: 'task-sm-1' },
+  } as any);
   assert.equal(acceptRes.taskId, 'task-sm-1');
 
   let snap = await taskRef.get();
@@ -228,7 +288,10 @@ test('Batch 4 Lifecycle: valid transitions flow (searching -> accepted -> in_pro
   assert.equal(snap.data()?.acceptedVolunteerId, 'vol-sm');
 
   // 2. Customer generates Start OTP
-  const startOtpRes = await generateStartOtp.run({ auth: { uid: 'cust-sm' }, data: { taskId: 'task-sm-1' } } as any);
+  const startOtpRes = await generateStartOtp.run({
+    auth: { uid: 'cust-sm' },
+    data: { taskId: 'task-sm-1' },
+  } as any);
   assert.match(startOtpRes.code, /^\d{6}$/);
 
   // 3. accepted -> in_progress (via verifyStartOtp)
@@ -275,23 +338,34 @@ test('Batch 4 Lifecycle: invalid transition attempts are rejected with failed-pr
 
   // Attempt searching -> in_progress directly (must fail)
   await assert.rejects(
-    async () => verifyStartOtp.run({ auth: { uid: 'vol-inv' }, data: { taskId: 'task-inv-1', code: '123456' } } as any),
+    async () =>
+      verifyStartOtp.run({
+        auth: { uid: 'vol-inv' },
+        data: { taskId: 'task-inv-1', code: '123456' },
+      } as any),
     (err: HttpsError) => err.code === 'failed-precondition',
   );
 
   // Attempt searching -> completed directly (must fail)
   await assert.rejects(
-    async () => verifyEndOtp.run({ auth: { uid: 'vol-inv' }, data: { taskId: 'task-inv-1', code: '123456' } } as any),
+    async () =>
+      verifyEndOtp.run({
+        auth: { uid: 'vol-inv' },
+        data: { taskId: 'task-inv-1', code: '123456' },
+      } as any),
     (err: HttpsError) => err.code === 'failed-precondition',
   );
 
   // Attempt deleteTask on in_progress task (must fail with failed-precondition)
   await taskRef.update({ status: 'in_progress' });
   await assert.rejects(
-    async () => deleteTask.run({ auth: { uid: 'cust-inv' }, data: { taskId: 'task-inv-1', reason: 'no_longer_needed' } } as any),
+    async () =>
+      deleteTask.run({
+        auth: { uid: 'cust-inv' },
+        data: { taskId: 'task-inv-1', reason: 'no_longer_needed' },
+      } as any),
     (err: HttpsError) => err.code === 'failed-precondition',
   );
-
 });
 
 // ==================================================================
@@ -310,8 +384,14 @@ test('Batch 4 Concurrency: concurrent offer acceptance guarantees exactly one wi
     title: 'Park cleanup',
     status: 'searching',
   });
-  await taskRef.collection('offers').doc('vol-A').set({ volunteerId: 'vol-A', state: 'offered' });
-  await taskRef.collection('offers').doc('vol-B').set({ volunteerId: 'vol-B', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-A')
+    .set({ volunteerId: 'vol-A', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-B')
+    .set({ volunteerId: 'vol-B', state: 'offered' });
 
   // Fire concurrent acceptOffer calls for vol-A and vol-B
   const results = await Promise.allSettled([
@@ -322,7 +402,11 @@ test('Batch 4 Concurrency: concurrent offer acceptance guarantees exactly one wi
   const fulfilled = results.filter((r) => r.status === 'fulfilled');
   const rejected = results.filter((r) => r.status === 'rejected');
 
-  assert.equal(fulfilled.length, 1, 'Exactly one volunteer accept must succeed');
+  assert.equal(
+    fulfilled.length,
+    1,
+    'Exactly one volunteer accept must succeed',
+  );
   assert.equal(rejected.length, 1, 'Losing volunteer accept must be rejected');
 
   const taskSnap = await taskRef.get();
@@ -368,15 +452,29 @@ test('Batch 4 Concurrency: concurrent Start OTP verification executes transition
 
   // Fire concurrent verifyStartOtp calls
   const results = await Promise.allSettled([
-    verifyStartOtp.run({ auth: { uid: 'vol-otp' }, data: { taskId, code } } as any),
-    verifyStartOtp.run({ auth: { uid: 'vol-otp' }, data: { taskId, code } } as any),
+    verifyStartOtp.run({
+      auth: { uid: 'vol-otp' },
+      data: { taskId, code },
+    } as any),
+    verifyStartOtp.run({
+      auth: { uid: 'vol-otp' },
+      data: { taskId, code },
+    } as any),
   ]);
 
   const fulfilled = results.filter((r) => r.status === 'fulfilled');
   const rejected = results.filter((r) => r.status === 'rejected');
 
-  assert.equal(fulfilled.length, 1, 'Exactly one start OTP verification succeeds');
-  assert.equal(rejected.length, 1, 'Second OTP verification is rejected cleanly');
+  assert.equal(
+    fulfilled.length,
+    1,
+    'Exactly one start OTP verification succeeds',
+  );
+  assert.equal(
+    rejected.length,
+    1,
+    'Second OTP verification is rejected cleanly',
+  );
 
   const taskSnap = await taskRef.get();
   assert.equal(taskSnap.data()?.status, 'in_progress');
@@ -410,14 +508,24 @@ test('Batch 4 Concurrency: concurrent End OTP verification completes task once w
 
   // Fire concurrent verifyEndOtp calls
   const results = await Promise.allSettled([
-    verifyEndOtp.run({ auth: { uid: 'vol-end' }, data: { taskId, code } } as any),
-    verifyEndOtp.run({ auth: { uid: 'vol-end' }, data: { taskId, code } } as any),
+    verifyEndOtp.run({
+      auth: { uid: 'vol-end' },
+      data: { taskId, code },
+    } as any),
+    verifyEndOtp.run({
+      auth: { uid: 'vol-end' },
+      data: { taskId, code },
+    } as any),
   ]);
 
   const fulfilled = results.filter((r) => r.status === 'fulfilled');
   const rejected = results.filter((r) => r.status === 'rejected');
 
-  assert.equal(fulfilled.length, 1, 'Exactly one end OTP verification succeeds');
+  assert.equal(
+    fulfilled.length,
+    1,
+    'Exactly one end OTP verification succeeds',
+  );
   assert.equal(rejected.length, 1, 'Replay end OTP verification is rejected');
 
   const taskSnap = await taskRef.get();

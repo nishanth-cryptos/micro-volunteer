@@ -25,23 +25,38 @@ const db = getFirestore();
 
 // Helper to seed user docs with lastKnownLocation
 async function seedUser(uid: string, data: Record<string, unknown> = {}) {
-  await db.collection('users').doc(uid).set({
-    displayName: `User ${uid}`,
-    accountStatus: 'active',
-    roles: ['customer', 'volunteer'],
-    skills: ['gardening', 'buy-groceries'],
-    points: 0,
-    verifiedTaskCount: 0,
-    verifiedHours: 0,
-    trustScore: 50,
-    availableNow: true,
-    lastKnownLocation: { lat: 13.0202, lng: 77.6815, h3Cell: '89618926487ffff' },
-    ...data,
-  });
+  await db
+    .collection('users')
+    .doc(uid)
+    .set({
+      displayName: `User ${uid}`,
+      accountStatus: 'active',
+      roles: ['customer', 'volunteer'],
+      skills: ['gardening', 'buy-groceries'],
+      points: 0,
+      verifiedTaskCount: 0,
+      verifiedHours: 0,
+      trustScore: 50,
+      availableNow: true,
+      lastKnownLocation: {
+        lat: 13.0202,
+        lng: 77.6815,
+        h3Cell: '89618926487ffff',
+      },
+      ...data,
+    });
 }
 
 beforeEach(async () => {
-  const collections = ['tasks', 'users', 'chats', 'reports', 'blocks', 'adminActions', 'activityLog'];
+  const collections = [
+    'tasks',
+    'users',
+    'chats',
+    'reports',
+    'blocks',
+    'adminActions',
+    'activityLog',
+  ];
   for (const colName of collections) {
     const snap = await db.collection(colName).get();
     const batch = db.batch();
@@ -80,17 +95,22 @@ test('Batch 5 OTP Security: Plaintext code return, hash storage, and failure mod
   // Inspect Firestore task document: plaintext is NOT stored
   const snap = await taskRef.get();
   const taskData = snap.data();
-  assert.equal(taskData?.startOtpCode, undefined, 'Plaintext code MUST NOT be stored in Firestore');
+  assert.equal(
+    taskData?.startOtpCode,
+    undefined,
+    'Plaintext code MUST NOT be stored in Firestore',
+  );
   assert.ok(taskData?.startOtpHash, 'SHA-256 hash must be stored');
   assert.ok(taskData?.startOtpSalt, 'Salt must be stored');
   assert.ok(taskData?.startOtpExpiresAt, 'Expiration timestamp must be stored');
 
   // 2. Volunteer tries invalid / wrong code -> fails
   await assert.rejects(
-    async () => verifyStartOtp.run({
-      auth: { uid: 'vol-otp-sec' },
-      data: { taskId, code: '000000' },
-    } as any),
+    async () =>
+      verifyStartOtp.run({
+        auth: { uid: 'vol-otp-sec' },
+        data: { taskId, code: '000000' },
+      } as any),
     (err: HttpsError) => err.code === 'invalid-argument',
   );
 
@@ -100,11 +120,13 @@ test('Batch 5 OTP Security: Plaintext code return, hash storage, and failure mod
   });
 
   await assert.rejects(
-    async () => verifyStartOtp.run({
-      auth: { uid: 'vol-otp-sec' },
-      data: { taskId, code: genRes.code },
-    } as any),
-    (err: HttpsError) => err.code === 'failed-precondition' && err.message.includes('expired'),
+    async () =>
+      verifyStartOtp.run({
+        auth: { uid: 'vol-otp-sec' },
+        data: { taskId, code: genRes.code },
+      } as any),
+    (err: HttpsError) =>
+      err.code === 'failed-precondition' && err.message.includes('expired'),
   );
 
   // 4. Fresh code verification succeeds and clears OTP material
@@ -121,15 +143,24 @@ test('Batch 5 OTP Security: Plaintext code return, hash storage, and failure mod
   assert.equal(verifyRes.status, 'in_progress');
 
   const afterSnap = await taskRef.get();
-  assert.equal(afterSnap.data()?.startOtpHash, undefined, 'Successful verification clears startOtpHash');
-  assert.equal(afterSnap.data()?.startOtpSalt, undefined, 'Successful verification clears startOtpSalt');
+  assert.equal(
+    afterSnap.data()?.startOtpHash,
+    undefined,
+    'Successful verification clears startOtpHash',
+  );
+  assert.equal(
+    afterSnap.data()?.startOtpSalt,
+    undefined,
+    'Successful verification clears startOtpSalt',
+  );
 
   // 5. Replay attempt fails
   await assert.rejects(
-    async () => verifyStartOtp.run({
-      auth: { uid: 'vol-otp-sec' },
-      data: { taskId, code: freshGen.code },
-    } as any),
+    async () =>
+      verifyStartOtp.run({
+        auth: { uid: 'vol-otp-sec' },
+        data: { taskId, code: freshGen.code },
+      } as any),
     (err: HttpsError) => err.code === 'failed-precondition',
   );
 });
@@ -165,16 +196,26 @@ test('Batch 5 OTP Security: Material clearance on task cancellation / reassignme
 
   assert.equal(data?.status, 'searching');
   assert.equal(data?.acceptedVolunteerId, undefined);
-  assert.equal(data?.startOtpHash, undefined, 'Reassignment clears startOtpHash');
-  assert.equal(data?.startOtpSalt, undefined, 'Reassignment clears startOtpSalt');
+  assert.equal(
+    data?.startOtpHash,
+    undefined,
+    'Reassignment clears startOtpHash',
+  );
+  assert.equal(
+    data?.startOtpSalt,
+    undefined,
+    'Reassignment clears startOtpSalt',
+  );
 
   // Old volunteer cannot complete or verify code after cancellation
   await assert.rejects(
-    async () => verifyStartOtp.run({
-      auth: { uid: 'vol-old' },
-      data: { taskId, code },
-    } as any),
-    (err: HttpsError) => err.code === 'permission-denied' || err.code === 'failed-precondition',
+    async () =>
+      verifyStartOtp.run({
+        auth: { uid: 'vol-old' },
+        data: { taskId, code },
+      } as any),
+    (err: HttpsError) =>
+      err.code === 'permission-denied' || err.code === 'failed-precondition',
   );
 });
 
@@ -185,26 +226,34 @@ test('Batch 5 OTP Security: Material clearance on task cancellation / reassignme
 test('Batch 6 Matching: Distance, Radius, Skills, and Status Eligibility Boundaries', async () => {
   // Seed customer location in Indiranagar, Bangalore
   await seedUser('cust-match', {
-    lastKnownLocation: { lat: 12.9784, lng: 77.6408, h3Cell: '89618926487ffff' },
+    lastKnownLocation: {
+      lat: 12.9784,
+      lng: 77.6408,
+      h3Cell: '89618926487ffff',
+    },
   });
 
   // Volunteer A: Inside radius (500m away), has skill 'gardening'
   await seedUser('vol-near', {
-    lastKnownLocation: { lat: 12.9800, lng: 77.6410, h3Cell: '89618926487ffff' },
+    lastKnownLocation: { lat: 12.98, lng: 77.641, h3Cell: '89618926487ffff' },
     skills: ['gardening'],
     availableNow: true,
   });
 
   // Volunteer B: Outside radius (15km away)
   await seedUser('vol-far', {
-    lastKnownLocation: { lat: 13.1000, lng: 77.7500, h3Cell: '89618926400ffff' },
+    lastKnownLocation: { lat: 13.1, lng: 77.75, h3Cell: '89618926400ffff' },
     skills: ['gardening'],
     availableNow: true,
   });
 
   // Volunteer C: Banned volunteer inside radius
   await seedUser('vol-banned', {
-    lastKnownLocation: { lat: 12.9785, lng: 77.6409, h3Cell: '89618926487ffff' },
+    lastKnownLocation: {
+      lat: 12.9785,
+      lng: 77.6409,
+      h3Cell: '89618926487ffff',
+    },
     skills: ['gardening'],
     availableNow: true,
     accountStatus: 'banned',
@@ -225,10 +274,22 @@ test('Batch 6 Matching: Distance, Radius, Skills, and Status Eligibility Boundar
   const ranked = await rankForTask(taskDoc);
   const rankedUids = ranked.map((r) => r.uid);
 
-  assert.ok(rankedUids.includes('vol-near'), 'Near volunteer with matching skill is included');
-  assert.ok(!rankedUids.includes('vol-far'), 'Far volunteer outside search radius is excluded');
-  assert.ok(!rankedUids.includes('vol-banned'), 'Banned volunteer is strictly excluded');
-  assert.ok(!rankedUids.includes('cust-match'), 'Customer cannot be candidate for their own task');
+  assert.ok(
+    rankedUids.includes('vol-near'),
+    'Near volunteer with matching skill is included',
+  );
+  assert.ok(
+    !rankedUids.includes('vol-far'),
+    'Far volunteer outside search radius is excluded',
+  );
+  assert.ok(
+    !rankedUids.includes('vol-banned'),
+    'Banned volunteer is strictly excluded',
+  );
+  assert.ok(
+    !rankedUids.includes('cust-match'),
+    'Customer cannot be candidate for their own task',
+  );
 });
 
 test('Batch 6 Matching: Mutual block filtering in both directions', async () => {
@@ -265,8 +326,14 @@ test('Batch 6 Matching: Mutual block filtering in both directions', async () => 
   const ranked = await rankForTask(taskDoc);
   const rankedUids = ranked.map((r) => r.uid);
 
-  assert.ok(!rankedUids.includes('vol-blocked-by-cust'), 'Volunteer blocked by customer is excluded');
-  assert.ok(!rankedUids.includes('vol-blocking-cust'), 'Volunteer who blocked customer is excluded');
+  assert.ok(
+    !rankedUids.includes('vol-blocked-by-cust'),
+    'Volunteer blocked by customer is excluded',
+  );
+  assert.ok(
+    !rankedUids.includes('vol-blocking-cust'),
+    'Volunteer who blocked customer is excluded',
+  );
 });
 
 // ==================================================================
@@ -292,11 +359,20 @@ test('Batch 7 Reassignment Lifecycle: 15-Step complete scenario (Vol A -> Reassi
     status: 'searching',
   });
 
-  await taskRef.collection('offers').doc('vol-A-e2e').set({ volunteerId: 'vol-A-e2e', state: 'offered' });
-  await taskRef.collection('offers').doc('vol-B-e2e').set({ volunteerId: 'vol-B-e2e', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-A-e2e')
+    .set({ volunteerId: 'vol-A-e2e', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-B-e2e')
+    .set({ volunteerId: 'vol-B-e2e', state: 'offered' });
 
   // 2. Vol A accepts task
-  await acceptOffer.run({ auth: { uid: 'vol-A-e2e' }, data: { taskId } } as any);
+  await acceptOffer.run({
+    auth: { uid: 'vol-A-e2e' },
+    data: { taskId },
+  } as any);
 
   // 3. Verify Chat created for [cust-e2e, vol-A-e2e]
   let chatSnap = await db.collection('chats').doc(taskId).get();
@@ -312,8 +388,14 @@ test('Batch 7 Reassignment Lifecycle: 15-Step complete scenario (Vol A -> Reassi
   });
 
   // 5. Task starts via Start OTP
-  const startOtpRes = await generateStartOtp.run({ auth: { uid: 'cust-e2e' }, data: { taskId } } as any);
-  await verifyStartOtp.run({ auth: { uid: 'vol-A-e2e' }, data: { taskId, code: startOtpRes.code } } as any);
+  const startOtpRes = await generateStartOtp.run({
+    auth: { uid: 'cust-e2e' },
+    data: { taskId },
+  } as any);
+  await verifyStartOtp.run({
+    auth: { uid: 'vol-A-e2e' },
+    data: { taskId, code: startOtpRes.code },
+  } as any);
 
   let snap = await taskRef.get();
   assert.equal(snap.data()?.status, 'in_progress');
@@ -321,18 +403,37 @@ test('Batch 7 Reassignment Lifecycle: 15-Step complete scenario (Vol A -> Reassi
   // 6 & 7. Vol A is suspended by Admin & task reassigned back to searching
   await applyModerationAction.run({
     auth: { uid: 'admin-1' },
-    data: { userId: 'vol-A-e2e', action: 'suspend', durationDays: 3, reason: 'No-show' },
+    data: {
+      userId: 'vol-A-e2e',
+      action: 'suspend',
+      durationDays: 3,
+      reason: 'No-show',
+    },
   } as any);
 
   snap = await taskRef.get();
-  assert.equal(snap.data()?.status, 'searching', 'Moderation suspension reverts task status to searching');
-  assert.equal(snap.data()?.acceptedVolunteerId, undefined, 'Moderation suspension clears acceptedVolunteerId');
+  assert.equal(
+    snap.data()?.status,
+    'searching',
+    'Moderation suspension reverts task status to searching',
+  );
+  assert.equal(
+    snap.data()?.acceptedVolunteerId,
+    undefined,
+    'Moderation suspension clears acceptedVolunteerId',
+  );
 
   // Re-seed offer for Vol B
-  await taskRef.collection('offers').doc('vol-B-e2e').set({ volunteerId: 'vol-B-e2e', state: 'offered' });
+  await taskRef
+    .collection('offers')
+    .doc('vol-B-e2e')
+    .set({ volunteerId: 'vol-B-e2e', state: 'offered' });
 
   // 8. Vol B accepts reassigned task
-  await acceptOffer.run({ auth: { uid: 'vol-B-e2e' }, data: { taskId } } as any);
+  await acceptOffer.run({
+    auth: { uid: 'vol-B-e2e' },
+    data: { taskId },
+  } as any);
 
   snap = await taskRef.get();
   assert.equal(snap.data()?.status, 'accepted');
@@ -345,13 +446,29 @@ test('Batch 7 Reassignment Lifecycle: 15-Step complete scenario (Vol A -> Reassi
   assert.deepEqual(chatSnap.data()?.participants, ['cust-e2e', 'vol-B-e2e']);
 
   // Verify old messages from Vol A were purged during re-keying
-  const msgSnap = await db.collection('chats').doc(taskId).collection('messages').get();
-  const volAMessages = msgSnap.docs.filter((d) => d.data().senderUid === 'vol-A-e2e');
-  assert.equal(volAMessages.length, 0, 'Vol A stale messages purged on chat re-key');
+  const msgSnap = await db
+    .collection('chats')
+    .doc(taskId)
+    .collection('messages')
+    .get();
+  const volAMessages = msgSnap.docs.filter(
+    (d) => d.data().senderUid === 'vol-A-e2e',
+  );
+  assert.equal(
+    volAMessages.length,
+    0,
+    'Vol A stale messages purged on chat re-key',
+  );
 
   // 10. Vol B completes task
-  const newStartOtp = await generateStartOtp.run({ auth: { uid: 'cust-e2e' }, data: { taskId } } as any);
-  await verifyStartOtp.run({ auth: { uid: 'vol-B-e2e' }, data: { taskId, code: newStartOtp.code } } as any);
+  const newStartOtp = await generateStartOtp.run({
+    auth: { uid: 'cust-e2e' },
+    data: { taskId },
+  } as any);
+  await verifyStartOtp.run({
+    auth: { uid: 'vol-B-e2e' },
+    data: { taskId, code: newStartOtp.code },
+  } as any);
 
   // Generate and verify End OTP for Vol B
   const salt = generateSalt();
@@ -363,7 +480,10 @@ test('Batch 7 Reassignment Lifecycle: 15-Step complete scenario (Vol A -> Reassi
     endOtpExpiresAt: Timestamp.fromMillis(Date.now() + 600000),
   });
 
-  const endVerifyRes = await verifyEndOtp.run({ auth: { uid: 'vol-B-e2e' }, data: { taskId, code: endCode } } as any);
+  const endVerifyRes = await verifyEndOtp.run({
+    auth: { uid: 'vol-B-e2e' },
+    data: { taskId, code: endCode },
+  } as any);
   assert.equal(endVerifyRes.status, 'completed');
 
   snap = await taskRef.get();

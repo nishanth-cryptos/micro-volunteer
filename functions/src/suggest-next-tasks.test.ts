@@ -22,13 +22,21 @@ test('Dual-role check (§6.2): excludes task where customerId === volunteerUid',
     roles: ['volunteer'],
     skills: ['errands'],
     availableNow: true,
-    lastKnownLocation: { lat: 12.9716, lng: 77.5946, h3Cell: '8928308280fffff' },
+    lastKnownLocation: {
+      lat: 12.9716,
+      lng: 77.5946,
+      h3Cell: '8928308280fffff',
+    },
     idVerified: true,
     accountStatus: 'active',
   };
 
   const eligible = isEligible(volunteerUid, volunteerDoc, task);
-  assert.equal(eligible, false, 'Volunteer should not be eligible for their own task');
+  assert.equal(
+    eligible,
+    false,
+    'Volunteer should not be eligible for their own task',
+  );
 });
 
 test('Block filtering (§6.4): excludes candidate tasks when customer is in blocked set', () => {
@@ -64,14 +72,24 @@ test('Block filtering (§6.4): excludes candidate tasks when customer is in bloc
     roles: ['volunteer'],
     skills: ['errands'],
     availableNow: true,
-    lastKnownLocation: { lat: 12.9716, lng: 77.5946, h3Cell: '8928308280fffff' },
+    lastKnownLocation: {
+      lat: 12.9716,
+      lng: 77.5946,
+      h3Cell: '8928308280fffff',
+    },
     idVerified: true,
     accountStatus: 'active',
   };
 
   // Check normal eligibility first
-  assert.equal(isEligible(volunteerUid, volunteerDoc, taskFromBlockedCustomer), true);
-  assert.equal(isEligible(volunteerUid, volunteerDoc, taskFromNormalCustomer), true);
+  assert.equal(
+    isEligible(volunteerUid, volunteerDoc, taskFromBlockedCustomer),
+    true,
+  );
+  assert.equal(
+    isEligible(volunteerUid, volunteerDoc, taskFromNormalCustomer),
+    true,
+  );
 
   // Apply block-filtering logic
   const candidateTasks = [taskFromBlockedCustomer, taskFromNormalCustomer];
@@ -108,7 +126,11 @@ test('Scoring (§3): candidate tasks scored consistently using shared scoring.ts
     roles: ['volunteer'],
     skills: ['errands', 'tech_help'],
     availableNow: true,
-    lastKnownLocation: { lat: 12.9716, lng: 77.5946, h3Cell: '8928308280fffff' },
+    lastKnownLocation: {
+      lat: 12.9716,
+      lng: 77.5946,
+      h3Cell: '8928308280fffff',
+    },
     trustScore: 80,
     verifiedTaskCount: 5,
     openReportsCount: 0,

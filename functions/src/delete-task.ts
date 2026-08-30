@@ -46,10 +46,7 @@ export const deleteTask = onCall(
       throw new HttpsError('invalid-argument', 'taskId is required.');
     }
     if (typeof reason !== 'string' || !VALID_REASONS.includes(reason)) {
-      throw new HttpsError(
-        'invalid-argument',
-        'valid reason is required.',
-      );
+      throw new HttpsError('invalid-argument', 'valid reason is required.');
     }
 
     const customerUid = request.auth.uid;
@@ -90,7 +87,6 @@ export const deleteTask = onCall(
             : `Cannot delete task in status '${task.status ?? 'unknown'}'.`,
         );
       }
-
 
       wasAccepted = task.status === 'accepted';
 

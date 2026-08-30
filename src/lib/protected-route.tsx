@@ -14,7 +14,6 @@ import { httpsCallable } from 'firebase/functions';
 import { useAuthState, type AuthState } from './auth-context';
 import { auth, functions } from './firebase';
 
-
 export type RequiredStep = 'consent' | 'role' | 'profile' | 'skills' | 'ready';
 
 interface ProtectedRouteProps {
@@ -58,12 +57,17 @@ function pathForStep(step: RequiredStep): string {
   return '/app';
 }
 
-export function ProtectedRoute({ children, requires, requiresAdmin }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requires,
+  requiresAdmin,
+}: ProtectedRouteProps) {
   const state = useAuthState();
   const step = currentStep(state);
   const [now] = useState(() => Date.now());
 
-  if (state.status === 'error') return <DatabaseErrorScreen error={state.error} />;
+  if (state.status === 'error')
+    return <DatabaseErrorScreen error={state.error} />;
   if (step === 'loading') return <FullScreenSpinner />;
   if (step === 'signed-out') return <Navigate to="/login" replace />;
 
@@ -96,7 +100,6 @@ export function ProtectedRoute({ children, requires, requiresAdmin }: ProtectedR
       return <FrozenScreen />;
     }
   }
-
 
   // Admin check
   if (requiresAdmin) {
@@ -137,7 +140,8 @@ function BannedScreen({ reason }: { reason?: string | undefined }) {
           Account Permanently Banned
         </h2>
         <p className="mt-2 text-sm text-neutral-600">
-          Your account has been deactivated for violating our safety guidelines and terms of service.
+          Your account has been deactivated for violating our safety guidelines
+          and terms of service.
         </p>
         {reason && (
           <div className="mt-4 rounded-lg bg-neutral-50 p-4 text-left text-sm text-neutral-700">
@@ -147,9 +151,13 @@ function BannedScreen({ reason }: { reason?: string | undefined }) {
         )}
         <div className="mt-6 text-xs text-neutral-500">
           If you believe this was an error, contact support at{' '}
-          <a href="mailto:support@example.org" className="text-neutral-900 underline">
+          <a
+            href="mailto:support@example.org"
+            className="text-neutral-900 underline"
+          >
             support@example.org
-          </a>.
+          </a>
+          .
         </div>
         <button
           type="button"
@@ -163,7 +171,13 @@ function BannedScreen({ reason }: { reason?: string | undefined }) {
   );
 }
 
-function SuspendedScreen({ until, reason }: { until: Timestamp; reason?: string | undefined }) {
+function SuspendedScreen({
+  until,
+  reason,
+}: {
+  until: Timestamp;
+  reason?: string | undefined;
+}) {
   async function handleSignOut() {
     await signOut(auth());
   }
@@ -202,7 +216,11 @@ function SuspendedScreen({ until, reason }: { until: Timestamp; reason?: string 
           Account Suspended
         </h2>
         <p className="mt-2 text-sm text-neutral-600">
-          Your account is temporarily suspended until <span className="font-semibold text-neutral-900">{dateStr} at {timeStr}</span>.
+          Your account is temporarily suspended until{' '}
+          <span className="font-semibold text-neutral-900">
+            {dateStr} at {timeStr}
+          </span>
+          .
         </p>
         {reason && (
           <div className="mt-4 rounded-lg bg-neutral-50 p-4 text-left text-sm text-neutral-700">
@@ -212,9 +230,13 @@ function SuspendedScreen({ until, reason }: { until: Timestamp; reason?: string 
         )}
         <div className="mt-6 text-xs text-neutral-500">
           If you have questions, please reach out to{' '}
-          <a href="mailto:support@example.org" className="text-neutral-900 underline">
+          <a
+            href="mailto:support@example.org"
+            className="text-neutral-900 underline"
+          >
             support@example.org
-          </a>.
+          </a>
+          .
         </div>
         <button
           type="button"
@@ -277,7 +299,10 @@ function FrozenScreen() {
           Account Notice
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-          We noticed some unusual activity on your account. Whether this happened by accident or on purpose, please make sure to follow community guidelines going forward. Further repeated activity like this may result in your account being locked.
+          We noticed some unusual activity on your account. Whether this
+          happened by accident or on purpose, please make sure to follow
+          community guidelines going forward. Further repeated activity like
+          this may result in your account being locked.
         </p>
 
         {error && (
@@ -310,7 +335,6 @@ function FrozenScreen() {
     </div>
   );
 }
-
 
 function FullScreenSpinner() {
   return (

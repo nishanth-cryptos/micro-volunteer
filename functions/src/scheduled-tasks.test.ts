@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { validateScheduledTime } from './update-scheduled-task';
 
-
 // 1. Min Lead Time & Max Horizon Validation Tests (§6.2, §7)
 test('validateScheduledTime: enforces 30-min min lead time and 7-day max horizon', () => {
   const nowMs = 1700000000000;
@@ -128,6 +127,10 @@ test('M11 Scheduled Task Deletion: accumulates customer_task_delete violation to
   assert.equal(warningFrozen, false);
 
   recordDeletionViolation('scheduled');
-  assert.equal(warningFrozen, true, 'Freeze warning must trigger on 3rd scheduled task deletion');
+  assert.equal(
+    warningFrozen,
+    true,
+    'Freeze warning must trigger on 3rd scheduled task deletion',
+  );
   assert.equal(strikeCount, 1);
 });

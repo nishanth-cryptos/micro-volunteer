@@ -19,7 +19,9 @@ export function KarmaToast({ points, message, onClose }: Props) {
 
   useEffect(() => {
     // Detect prefers-reduced-motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
 
     // Trigger entry transition shortly after mounting
     const enterTimeout = setTimeout(() => {
@@ -110,7 +112,9 @@ export function KarmaToast({ points, message, onClose }: Props) {
             <div>
               <p className="text-sm font-semibold">Task Completed!</p>
               <p className="mt-0.5 text-xs text-neutral-400">
-                You earned <span className="font-semibold text-amber-400">{points}</span> karma points!
+                You earned{' '}
+                <span className="font-semibold text-amber-400">{points}</span>{' '}
+                karma points!
               </p>
             </div>
           </>

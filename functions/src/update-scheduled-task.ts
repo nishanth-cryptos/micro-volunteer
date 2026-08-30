@@ -18,8 +18,7 @@ export function validateScheduledTime(
   scheduledForMs: number,
   nowMs: number,
 ): { valid: boolean; error?: string } {
-  const minTimeMs =
-    nowMs + SCHEDULING_CONFIG.minLeadTimeMinutes * 60 * 1000;
+  const minTimeMs = nowMs + SCHEDULING_CONFIG.minLeadTimeMinutes * 60 * 1000;
   const maxTimeMs =
     nowMs + SCHEDULING_CONFIG.maxHorizonDays * 24 * 60 * 60 * 1000;
 

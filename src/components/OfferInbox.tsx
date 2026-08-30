@@ -102,9 +102,7 @@ export function OfferInbox({ uid }: Props) {
       // onSnapshot will drop the row once state flips off 'offered'.
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not accept this offer.',
+        err instanceof Error ? err.message : 'Could not accept this offer.',
       );
     } finally {
       markBusy(taskId, false);
@@ -122,9 +120,7 @@ export function OfferInbox({ uid }: Props) {
       await fn({ taskId });
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not reject this offer.',
+        err instanceof Error ? err.message : 'Could not reject this offer.',
       );
     } finally {
       markBusy(taskId, false);
@@ -223,4 +219,3 @@ function formatFreshness(ts: Timestamp | null): string {
   if (hours < 24) return `posted ${String(hours)}h ago`;
   return `posted ${String(Math.floor(hours / 24))}d ago`;
 }
-

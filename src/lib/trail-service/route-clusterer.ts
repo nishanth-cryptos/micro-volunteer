@@ -6,7 +6,10 @@ import {
   type Trip,
 } from './types';
 
-export function calculateH3OverlapRatio(pathA: string[], pathB: string[]): number {
+export function calculateH3OverlapRatio(
+  pathA: string[],
+  pathB: string[],
+): number {
   if (pathA.length === 0 || pathB.length === 0) return 0;
   const setA = new Set(pathA);
   const setB = new Set(pathB);
@@ -46,7 +49,10 @@ export function clusterTripsToCanonicalRoutes(
       let matchedCluster = false;
       for (const cluster of clusters) {
         const representativePath = cluster[0]?.h3Path ?? [];
-        const overlap = calculateH3OverlapRatio(trip.h3Path, representativePath);
+        const overlap = calculateH3OverlapRatio(
+          trip.h3Path,
+          representativePath,
+        );
         if (overlap >= 0.65) {
           cluster.push(trip);
           matchedCluster = true;

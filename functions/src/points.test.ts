@@ -36,18 +36,38 @@ test('Points: duration bonus caps at MAX_DURATION_BONUS (+8 pts) for long tasks 
   const res240 = calculatePointsAwardPure({ estimatedMinutes: 240 }); // 4 hours
 
   assert.equal(res120.durationBonus, 8, '120 mins -> max 8 bonus');
-  assert.equal(res120.volunteerPointsAwarded, 18, 'Max volunteer points = 10 + 8 = 18');
+  assert.equal(
+    res120.volunteerPointsAwarded,
+    18,
+    'Max volunteer points = 10 + 8 = 18',
+  );
 
   assert.equal(res240.durationBonus, 8, '240 mins -> capped at 8 bonus');
-  assert.equal(res240.volunteerPointsAwarded, 18, 'Max volunteer points capped at 18');
+  assert.equal(
+    res240.volunteerPointsAwarded,
+    18,
+    'Max volunteer points capped at 18',
+  );
 });
 
 test('Points: customer receives 2 points if role includes volunteer, 0 if customer-only', () => {
-  const pureCustomer = calculatePointsAwardPure({ customerRoles: ['customer'] });
-  const dualRoleCustomer = calculatePointsAwardPure({ customerRoles: ['customer', 'volunteer'] });
+  const pureCustomer = calculatePointsAwardPure({
+    customerRoles: ['customer'],
+  });
+  const dualRoleCustomer = calculatePointsAwardPure({
+    customerRoles: ['customer', 'volunteer'],
+  });
 
-  assert.equal(pureCustomer.customerPointsAwarded, 0, 'Customer-only gets 0 points');
-  assert.equal(dualRoleCustomer.customerPointsAwarded, 2, 'Dual-role customer gets 2 points');
+  assert.equal(
+    pureCustomer.customerPointsAwarded,
+    0,
+    'Customer-only gets 0 points',
+  );
+  assert.equal(
+    dualRoleCustomer.customerPointsAwarded,
+    2,
+    'Dual-role customer gets 2 points',
+  );
 });
 
 test('Points: verified hours increment equals estimatedMinutes / 60', () => {

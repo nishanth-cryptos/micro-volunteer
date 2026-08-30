@@ -39,7 +39,11 @@ export function readableAuthError(err: unknown): string {
     case 'auth/captcha-check-failed':
       return 'Security verification could not be completed. Please refresh and try again.';
     default:
-      if (err instanceof Error && err.message && !err.message.startsWith('Firebase:')) {
+      if (
+        err instanceof Error &&
+        err.message &&
+        !err.message.startsWith('Firebase:')
+      ) {
         return err.message;
       }
       return 'We could not complete your request. Please try again or switch sign-in methods.';

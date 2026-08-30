@@ -26,5 +26,3 @@ export { deleteTask } from './delete-task';
 export { unfreezeAccount } from './unfreeze-account';
 export { activateScheduledTasks } from './activate-scheduled-tasks';
 export { updateScheduledTask } from './update-scheduled-task';
-
-

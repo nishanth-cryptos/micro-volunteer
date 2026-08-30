@@ -13,7 +13,10 @@ if (existsSync(parentJdkDir)) {
     for (const entry of entries) {
       const homePath = join(parentJdkDir, entry);
       const javaBin = join(homePath, 'bin');
-      if (existsSync(join(javaBin, 'java.exe')) || existsSync(join(javaBin, 'java'))) {
+      if (
+        existsSync(join(javaBin, 'java.exe')) ||
+        existsSync(join(javaBin, 'java'))
+      ) {
         jdk21Bin = javaBin;
         jdk21Home = homePath;
         break;
@@ -27,7 +30,8 @@ if (existsSync(parentJdkDir)) {
 const env = { ...process.env };
 
 // Handle Windows case-insensitive PATH variable (Path vs PATH)
-const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
+const pathKey =
+  Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
 const existingPath = env[pathKey] || '';
 const nodeBin = dirname(process.execPath);
 
@@ -41,14 +45,27 @@ const localFirebaseCmd = resolve('./node_modules/.bin/firebase.cmd');
 const localFirebase = resolve('./node_modules/.bin/firebase');
 
 let binToRun = 'npx';
-let binArgs = ['firebase', 'emulators:start', '--import=./emulator-data', '--export-on-exit=./emulator-data'];
+let binArgs = [
+  'firebase',
+  'emulators:start',
+  '--import=./emulator-data',
+  '--export-on-exit=./emulator-data',
+];
 
 if (process.platform === 'win32' && existsSync(localFirebaseCmd)) {
   binToRun = localFirebaseCmd;
-  binArgs = ['emulators:start', '--import=./emulator-data', '--export-on-exit=./emulator-data'];
+  binArgs = [
+    'emulators:start',
+    '--import=./emulator-data',
+    '--export-on-exit=./emulator-data',
+  ];
 } else if (existsSync(localFirebase)) {
   binToRun = localFirebase;
-  binArgs = ['emulators:start', '--import=./emulator-data', '--export-on-exit=./emulator-data'];
+  binArgs = [
+    'emulators:start',
+    '--import=./emulator-data',
+    '--export-on-exit=./emulator-data',
+  ];
 }
 
 const child = spawn(binToRun, binArgs, {

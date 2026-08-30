@@ -46,10 +46,7 @@ export const cancelAcceptedTask = onCall(
       throw new HttpsError('invalid-argument', 'taskId is required.');
     }
     if (typeof reason !== 'string' || !VALID_REASONS.includes(reason)) {
-      throw new HttpsError(
-        'invalid-argument',
-        'valid reason is required.',
-      );
+      throw new HttpsError('invalid-argument', 'valid reason is required.');
     }
 
     const volunteerUid = request.auth.uid;

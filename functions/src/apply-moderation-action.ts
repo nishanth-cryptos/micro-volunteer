@@ -118,7 +118,8 @@ export const applyModerationAction = onCall(
 
     // If suspending or banning, check for and handle active task reassignments
     if (action === 'suspend' || action === 'ban') {
-      const activeTasksSnap = await db.collection('tasks')
+      const activeTasksSnap = await db
+        .collection('tasks')
         .where('acceptedVolunteerId', '==', userId)
         .where('status', 'in', ['accepted', 'in_progress'])
         .get();
@@ -195,7 +196,8 @@ export const applyModerationAction = onCall(
     // additional handling is needed for those here.
     const wasBanned = userSnap.data()?.accountStatus === 'banned';
     if (action === 'dismiss' && wasBanned) {
-      const orphanSnap = await db.collection('tasks')
+      const orphanSnap = await db
+        .collection('tasks')
         .where('customerId', '==', userId)
         .where('status', 'in', ['searching', 'accepted', 'in_progress'])
         .get();
@@ -203,9 +205,7 @@ export const applyModerationAction = onCall(
       // a single atomic write — partial failure would leave debris, but
       // for a small per-user fan-out (typically <10 docs) the simplicity
       // win outweighs the cost of building a manual cascading batch.
-      await Promise.all(
-        orphanSnap.docs.map((d) => db.recursiveDelete(d.ref)),
-      );
+      await Promise.all(orphanSnap.docs.map((d) => db.recursiveDelete(d.ref)));
     }
 
     // Recompute trust score for volunteer targets

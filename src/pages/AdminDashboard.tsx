@@ -82,8 +82,14 @@ export default function AdminDashboard() {
   // Load stats
   useEffect(() => {
     const usersQ = query(collection(db(), 'users'));
-    const completedTasksQ = query(collection(db(), 'tasks'), where('status', '==', 'completed'));
-    const openReportsQ = query(collection(db(), 'reports'), where('status', '==', 'pending'));
+    const completedTasksQ = query(
+      collection(db(), 'tasks'),
+      where('status', '==', 'completed'),
+    );
+    const openReportsQ = query(
+      collection(db(), 'reports'),
+      where('status', '==', 'pending'),
+    );
 
     let unsubUsers = () => {};
     let unsubTasks = () => {};
@@ -119,7 +125,9 @@ export default function AdminDashboard() {
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3.5">
             <Logo size="md" />
-            <span className="hidden sm:inline-block text-[#ececea] font-light">|</span>
+            <span className="hidden sm:inline-block text-[#ececea] font-light">
+              |
+            </span>
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-bold text-[#1f6f5c]">
                 🛡️ Safety &amp; Moderation
@@ -314,7 +322,9 @@ function PendingReportsPanel() {
 
   // Moderation modal state
   const [selectedReport, setSelectedReport] = useState<ReportDoc | null>(null);
-  const [modAction, setModAction] = useState<'warn' | 'suspend' | 'ban' | 'dismiss'>('warn');
+  const [modAction, setModAction] = useState<
+    'warn' | 'suspend' | 'ban' | 'dismiss'
+  >('warn');
   const [reason, setReason] = useState('');
   const [durationDays, setDurationDays] = useState(3);
 
@@ -341,7 +351,10 @@ function PendingReportsPanel() {
       q,
       (snap) => {
         setReports(
-          snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ReportDoc, 'id'>) })),
+          snap.docs.map((d) => ({
+            id: d.id,
+            ...(d.data() as Omit<ReportDoc, 'id'>),
+          })),
         );
         setLoading(false);
       },
@@ -373,7 +386,9 @@ function PendingReportsPanel() {
       unresolved.map(async (uid) => {
         try {
           const snap = await getDoc(doc(db(), 'users', uid));
-          const data = snap.exists() ? (snap.data() as { displayName?: string }) : null;
+          const data = snap.exists()
+            ? (snap.data() as { displayName?: string })
+            : null;
           return [uid, data?.displayName ?? null] as const;
         } catch {
           return [uid, null] as const;
@@ -422,7 +437,10 @@ function PendingReportsPanel() {
           if (!r) continue;
           const [taskId, data] = r;
           next[taskId] = data.acceptedVolunteerId
-            ? { customerId: data.customerId, acceptedVolunteerId: data.acceptedVolunteerId }
+            ? {
+                customerId: data.customerId,
+                acceptedVolunteerId: data.acceptedVolunteerId,
+              }
             : { customerId: data.customerId };
         }
         return next;
@@ -484,7 +502,11 @@ function PendingReportsPanel() {
       setSelectedReport(null);
       setReason('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not apply moderation action.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not apply moderation action.',
+      );
     } finally {
       setBusyReportId(null);
     }
@@ -519,7 +541,13 @@ function PendingReportsPanel() {
       ) : reports.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-[#ececea] bg-white p-10 text-center shadow-xs">
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e3efe9] text-[#1f6f5c]">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
@@ -527,7 +555,8 @@ function PendingReportsPanel() {
             No reports need your attention
           </h3>
           <p className="mx-auto mt-1 max-w-sm text-xs text-[#8a847d]">
-            Everything is clear. All submitted reports have been reviewed and resolved.
+            Everything is clear. All submitted reports have been reviewed and
+            resolved.
           </p>
         </div>
       ) : (
@@ -583,102 +612,122 @@ function PendingReportsPanel() {
                 </button>
 
                 {/* Expanded Details */}
-                {expanded && (() => {
-                  const t = taskMap[report.taskId];
-                  const customerName = t ? userNames[t.customerId] ?? '…' : undefined;
-                  const volunteerUid = t?.acceptedVolunteerId;
-                  const volunteerName = volunteerUid ? userNames[volunteerUid] ?? '…' : undefined;
-                  return (
-                    <div className="border-t border-[#f3f1ec] bg-[#fafaf8]/50 p-6 space-y-4">
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
-                          Incident Description
-                        </div>
-                        <p className="mt-1 rounded-2xl border border-[#ececea] bg-white p-4 text-xs leading-relaxed text-[#131312]">
-                          {report.details || 'No additional details provided in report.'}
-                        </p>
-                      </div>
-
-                      {/* Task & Involved Parties Grid */}
-                      <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#ececea] bg-white p-4 text-xs sm:grid-cols-2">
-                        {t && (
-                          <div>
-                            <span className="text-[#8a847d]">Customer: </span>
-                            <span className="font-semibold text-[#131312]">{customerName}</span>
-                          </div>
-                        )}
-                        {volunteerUid && (
-                          <div>
-                            <span className="text-[#8a847d]">Volunteer: </span>
-                            <span className="font-semibold text-[#131312]">{volunteerName}</span>
-                          </div>
-                        )}
+                {expanded &&
+                  (() => {
+                    const t = taskMap[report.taskId];
+                    const customerName = t
+                      ? (userNames[t.customerId] ?? '…')
+                      : undefined;
+                    const volunteerUid = t?.acceptedVolunteerId;
+                    const volunteerName = volunteerUid
+                      ? (userNames[volunteerUid] ?? '…')
+                      : undefined;
+                    return (
+                      <div className="border-t border-[#f3f1ec] bg-[#fafaf8]/50 p-6 space-y-4">
                         <div>
-                          <span className="text-[#8a847d]">Task Reference: </span>
-                          <Link
-                            to={`/tasks/${report.taskId}`}
-                            className="font-semibold text-[#1f6f5c] underline underline-offset-2 hover:text-[#185845]"
+                          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+                            Incident Description
+                          </div>
+                          <p className="mt-1 rounded-2xl border border-[#ececea] bg-white p-4 text-xs leading-relaxed text-[#131312]">
+                            {report.details ||
+                              'No additional details provided in report.'}
+                          </p>
+                        </div>
+
+                        {/* Task & Involved Parties Grid */}
+                        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-[#ececea] bg-white p-4 text-xs sm:grid-cols-2">
+                          {t && (
+                            <div>
+                              <span className="text-[#8a847d]">Customer: </span>
+                              <span className="font-semibold text-[#131312]">
+                                {customerName}
+                              </span>
+                            </div>
+                          )}
+                          {volunteerUid && (
+                            <div>
+                              <span className="text-[#8a847d]">
+                                Volunteer:{' '}
+                              </span>
+                              <span className="font-semibold text-[#131312]">
+                                {volunteerName}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-[#8a847d]">
+                              Task Reference:{' '}
+                            </span>
+                            <Link
+                              to={`/tasks/${report.taskId}`}
+                              className="font-semibold text-[#1f6f5c] underline underline-offset-2 hover:text-[#185845]"
+                            >
+                              Open Task {report.taskId} →
+                            </Link>
+                          </div>
+                          <div>
+                            <span className="text-[#8a847d]">Report ID: </span>
+                            <span className="font-mono text-[#4f4b46]">
+                              {report.id}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Toolbar */}
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                          <span className="text-xs font-bold text-[#4f4b46] mr-1">
+                            Moderation Action:
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setModAction('warn');
+                              setReason('');
+                            }}
+                            className="rounded-full bg-[#131312] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 transition focus:outline-none"
                           >
-                            Open Task {report.taskId} →
-                          </Link>
-                        </div>
-                        <div>
-                          <span className="text-[#8a847d]">Report ID: </span>
-                          <span className="font-mono text-[#4f4b46]">{report.id}</span>
+                            Issue Warning
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setModAction('suspend');
+                              setReason('');
+                            }}
+                            className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 transition focus:outline-none"
+                          >
+                            Suspend Account
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setModAction('ban');
+                              setReason('');
+                            }}
+                            className="rounded-full bg-red-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-800 transition focus:outline-none"
+                          >
+                            Permanent Ban
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setModAction('dismiss');
+                              setReason(
+                                'Reviewed and dismissed without penalty.',
+                              );
+                            }}
+                            className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-xs font-semibold text-[#4f4b46] hover:bg-[#ececea] transition focus:outline-none"
+                          >
+                            Dismiss Report
+                          </button>
                         </div>
                       </div>
-
-                      {/* Action Toolbar */}
-                      <div className="flex flex-wrap items-center gap-2 pt-2">
-                        <span className="text-xs font-bold text-[#4f4b46] mr-1">Moderation Action:</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedReport(report);
-                            setModAction('warn');
-                            setReason('');
-                          }}
-                          className="rounded-full bg-[#131312] px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 transition focus:outline-none"
-                        >
-                          Issue Warning
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedReport(report);
-                            setModAction('suspend');
-                            setReason('');
-                          }}
-                          className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 transition focus:outline-none"
-                        >
-                          Suspend Account
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedReport(report);
-                            setModAction('ban');
-                            setReason('');
-                          }}
-                          className="rounded-full bg-red-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-800 transition focus:outline-none"
-                        >
-                          Permanent Ban
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedReport(report);
-                            setModAction('dismiss');
-                            setReason('Reviewed and dismissed without penalty.');
-                          }}
-                          className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-xs font-semibold text-[#4f4b46] hover:bg-[#ececea] transition focus:outline-none"
-                        >
-                          Dismiss Report
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
               </div>
             );
           })}
@@ -720,13 +769,21 @@ function PendingReportsPanel() {
               <strong className="text-[#131312] font-bold">
                 {userNames[selectedReport.reportedUid] ?? 'User'}
               </strong>{' '}
-              <span className="font-mono text-[#8a847d]">({selectedReport.reportedUid})</span>
+              <span className="font-mono text-[#8a847d]">
+                ({selectedReport.reportedUid})
+              </span>
             </div>
 
-            <form onSubmit={(e) => void handleModerationSubmit(e)} className="mt-5 space-y-4">
+            <form
+              onSubmit={(e) => void handleModerationSubmit(e)}
+              className="mt-5 space-y-4"
+            >
               {modAction === 'suspend' && (
                 <div>
-                  <label htmlFor="modal-duration" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                  <label
+                    htmlFor="modal-duration"
+                    className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                  >
                     Suspension Duration
                   </label>
                   <select
@@ -744,7 +801,10 @@ function PendingReportsPanel() {
               )}
 
               <div>
-                <label htmlFor="modal-reason" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                <label
+                  htmlFor="modal-reason"
+                  className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                >
                   Administrative Reason (Stored in permanent audit log)
                 </label>
                 <textarea
@@ -756,11 +816,12 @@ function PendingReportsPanel() {
                   placeholder="State the clear, policy-based reason for this moderation action..."
                   className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-3 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
                 />
-                {reason.length > 0 && reason.trim().length < REASON_MIN_LENGTH && (
-                  <p className="mt-1 text-xs text-red-700">
-                    Reason must be at least {REASON_MIN_LENGTH} characters.
-                  </p>
-                )}
+                {reason.length > 0 &&
+                  reason.trim().length < REASON_MIN_LENGTH && (
+                    <p className="mt-1 text-xs text-red-700">
+                      Reason must be at least {REASON_MIN_LENGTH} characters.
+                    </p>
+                  )}
               </div>
 
               {/* Consequence Callout Box */}
@@ -788,7 +849,10 @@ function PendingReportsPanel() {
               </div>
 
               {error && (
-                <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <p
+                  role="alert"
+                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800"
+                >
                   {error}
                 </p>
               )}
@@ -804,7 +868,10 @@ function PendingReportsPanel() {
                 </button>
                 <button
                   type="submit"
-                  disabled={busyReportId !== null || reason.trim().length < REASON_MIN_LENGTH}
+                  disabled={
+                    busyReportId !== null ||
+                    reason.trim().length < REASON_MIN_LENGTH
+                  }
                   className={
                     'rounded-full px-6 py-2.5 text-xs font-semibold text-white shadow-sm transition disabled:opacity-50 ' +
                     (modAction === 'ban'
@@ -844,7 +911,9 @@ function UserLookupPanel() {
   const [error, setError] = useState<string | null>(null);
 
   // Moderation modal state
-  const [modAction, setModAction] = useState<'warn' | 'suspend' | 'ban' | 'dismiss'>('warn');
+  const [modAction, setModAction] = useState<
+    'warn' | 'suspend' | 'ban' | 'dismiss'
+  >('warn');
   const [reason, setReason] = useState('');
   const [durationDays, setDurationDays] = useState(3);
   const [busy, setBusy] = useState(false);
@@ -852,10 +921,14 @@ function UserLookupPanel() {
 
   // Reactivation dialog modal state
   const [reactivateModalOpen, setReactivateModalOpen] = useState(false);
-  const [reactivateReason, setReactivateReason] = useState('Account reinstated by administrator.');
+  const [reactivateReason, setReactivateReason] = useState(
+    'Account reinstated by administrator.',
+  );
   const [revoking, setRevoking] = useState(false);
 
-  const [adminNames, setAdminNames] = useState<Record<string, string | null>>({});
+  const [adminNames, setAdminNames] = useState<Record<string, string | null>>(
+    {},
+  );
 
   useEffect(() => {
     if (!actionSuccess) return;
@@ -877,7 +950,9 @@ function UserLookupPanel() {
       unresolved.map(async (uid) => {
         try {
           const snap = await getDoc(doc(db(), 'users', uid));
-          const data = snap.exists() ? (snap.data() as { displayName?: string }) : null;
+          const data = snap.exists()
+            ? (snap.data() as { displayName?: string })
+            : null;
           return [uid, data?.displayName ?? null] as const;
         } catch {
           return [uid, null] as const;
@@ -913,7 +988,10 @@ function UserLookupPanel() {
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
-        setUser({ uid: userSnap.id, ...(userSnap.data() as Omit<UserSummary, 'uid'>) });
+        setUser({
+          uid: userSnap.id,
+          ...(userSnap.data() as Omit<UserSummary, 'uid'>),
+        });
         const logsQ = query(
           collection(db(), 'users', uid, 'moderationLog'),
           orderBy('timestamp', 'desc'),
@@ -935,7 +1013,10 @@ function UserLookupPanel() {
         if (!nameSnap.empty) {
           const firstDoc = nameSnap.docs[0];
           if (firstDoc) {
-            setUser({ uid: firstDoc.id, ...(firstDoc.data() as Omit<UserSummary, 'uid'>) });
+            setUser({
+              uid: firstDoc.id,
+              ...(firstDoc.data() as Omit<UserSummary, 'uid'>),
+            });
             const logsQ = query(
               collection(db(), 'users', firstDoc.id, 'moderationLog'),
               orderBy('timestamp', 'desc'),
@@ -1001,7 +1082,10 @@ function UserLookupPanel() {
       // Reload user
       const userSnap = await getDoc(doc(db(), 'users', user.uid));
       if (userSnap.exists()) {
-        setUser({ uid: userSnap.id, ...(userSnap.data() as Omit<UserSummary, 'uid'>) });
+        setUser({
+          uid: userSnap.id,
+          ...(userSnap.data() as Omit<UserSummary, 'uid'>),
+        });
       }
       const logsQ = query(
         collection(db(), 'users', user.uid, 'moderationLog'),
@@ -1015,7 +1099,11 @@ function UserLookupPanel() {
         })),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not apply moderation action.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not apply moderation action.',
+      );
     } finally {
       setBusy(false);
     }
@@ -1048,7 +1136,10 @@ function UserLookupPanel() {
 
       const userSnap = await getDoc(doc(db(), 'users', user.uid));
       if (userSnap.exists()) {
-        setUser({ uid: userSnap.id, ...(userSnap.data() as Omit<UserSummary, 'uid'>) });
+        setUser({
+          uid: userSnap.id,
+          ...(userSnap.data() as Omit<UserSummary, 'uid'>),
+        });
       }
       const logsQ = query(
         collection(db(), 'users', user.uid, 'moderationLog'),
@@ -1062,7 +1153,9 @@ function UserLookupPanel() {
         })),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not reactivate account.');
+      setError(
+        err instanceof Error ? err.message : 'Could not reactivate account.',
+      );
     } finally {
       setRevoking(false);
     }
@@ -1071,7 +1164,10 @@ function UserLookupPanel() {
   return (
     <div className="space-y-6">
       {/* Search Bar */}
-      <form onSubmit={(e) => void handleSearch(e)} className="flex max-w-xl gap-2.5">
+      <form
+        onSubmit={(e) => void handleSearch(e)}
+        className="flex max-w-xl gap-2.5"
+      >
         <input
           type="text"
           value={searchQuery}
@@ -1116,9 +1212,12 @@ function UserLookupPanel() {
                     <h3 className="text-xl font-bold tracking-tight text-[#131312]">
                       {user.displayName ?? 'Unnamed User'}
                     </h3>
-                    <p className="mt-0.5 font-mono text-[11px] text-[#8a847d]">{user.uid}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-[#8a847d]">
+                      {user.uid}
+                    </p>
                     <p className="mt-1 text-xs text-[#4f4b46]">
-                      {user.phoneNumber || 'No phone'} {user.email ? `· ${user.email}` : ''}
+                      {user.phoneNumber || 'No phone'}{' '}
+                      {user.email ? `· ${user.email}` : ''}
                     </p>
                   </div>
                 </div>
@@ -1144,10 +1243,13 @@ function UserLookupPanel() {
               {user.accountStatus && user.accountStatus !== 'active' && (
                 <div className="mt-4 flex items-center justify-between rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs">
                   <div>
-                    <span className="font-bold text-[#131312]">Account is restricted.</span>{' '}
+                    <span className="font-bold text-[#131312]">
+                      Account is restricted.
+                    </span>{' '}
                     {user.suspendedUntil && (
                       <span className="text-[#8a847d]">
-                        Suspended until {user.suspendedUntil.toDate().toLocaleString()}
+                        Suspended until{' '}
+                        {user.suspendedUntil.toDate().toLocaleString()}
                       </span>
                     )}
                   </div>
@@ -1211,7 +1313,8 @@ function UserLookupPanel() {
 
               {modLogs.length === 0 ? (
                 <p className="mt-4 text-xs text-[#8a847d]">
-                  No prior moderation actions or penalties recorded for this user.
+                  No prior moderation actions or penalties recorded for this
+                  user.
                 </p>
               ) : (
                 <ul className="mt-4 divide-y divide-[#f3f1ec]">
@@ -1240,7 +1343,8 @@ function UserLookupPanel() {
                         Reason: {log.reason}
                       </p>
                       <p className="text-[11px] text-[#8a847d]">
-                        Admin: {adminNames[log.adminId] || log.adminId || 'Admin'}
+                        Admin:{' '}
+                        {adminNames[log.adminId] || log.adminId || 'Admin'}
                       </p>
                     </li>
                   ))}
@@ -1252,16 +1356,26 @@ function UserLookupPanel() {
           {/* Quick Action Panel (1 col) */}
           <div>
             <section className="sticky top-24 rounded-3xl border border-[#ececea] bg-white p-6 shadow-xs space-y-4">
-              <h3 className="text-base font-bold text-[#131312]">Apply Moderation</h3>
-              <form onSubmit={(e) => void handleModerationSubmit(e)} className="space-y-4">
+              <h3 className="text-base font-bold text-[#131312]">
+                Apply Moderation
+              </h3>
+              <form
+                onSubmit={(e) => void handleModerationSubmit(e)}
+                className="space-y-4"
+              >
                 <div>
-                  <label htmlFor="user-mod-action" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                  <label
+                    htmlFor="user-mod-action"
+                    className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                  >
                     Action
                   </label>
                   <select
                     id="user-mod-action"
                     value={modAction}
-                    onChange={(e) => setModAction(e.target.value as typeof modAction)}
+                    onChange={(e) =>
+                      setModAction(e.target.value as typeof modAction)
+                    }
                     className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs font-bold text-[#131312] focus:border-[#1f6f5c] focus:outline-none"
                   >
                     <option value="warn">Issue Policy Warning</option>
@@ -1273,7 +1387,10 @@ function UserLookupPanel() {
 
                 {modAction === 'suspend' && (
                   <div>
-                    <label htmlFor="user-suspend-duration" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                    <label
+                      htmlFor="user-suspend-duration"
+                      className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                    >
                       Duration
                     </label>
                     <select
@@ -1291,7 +1408,10 @@ function UserLookupPanel() {
                 )}
 
                 <div>
-                  <label htmlFor="user-mod-reason" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                  <label
+                    htmlFor="user-mod-reason"
+                    className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                  >
                     Reason
                   </label>
                   <textarea
@@ -1303,11 +1423,12 @@ function UserLookupPanel() {
                     placeholder="Enter policy reason for moderation..."
                     className="w-full rounded-xl border border-[#ececea] bg-[#fafaf8] px-3.5 py-2.5 text-xs text-[#131312] placeholder-[#8a847d] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
                   />
-                  {reason.length > 0 && reason.trim().length < REASON_MIN_LENGTH && (
-                    <p className="mt-1 text-xs text-red-700">
-                      Reason must be at least {REASON_MIN_LENGTH} characters.
-                    </p>
-                  )}
+                  {reason.length > 0 &&
+                    reason.trim().length < REASON_MIN_LENGTH && (
+                      <p className="mt-1 text-xs text-red-700">
+                        Reason must be at least {REASON_MIN_LENGTH} characters.
+                      </p>
+                    )}
                 </div>
 
                 <button
@@ -1331,12 +1452,19 @@ function UserLookupPanel() {
               Reactivate User Account
             </h3>
             <p className="mt-1 text-xs text-[#4f4b46]">
-              Reinstate account privileges for <strong className="text-[#131312]">{user?.displayName}</strong>.
+              Reinstate account privileges for{' '}
+              <strong className="text-[#131312]">{user?.displayName}</strong>.
             </p>
 
-            <form onSubmit={(e) => void handleReactivateCommit(e)} className="mt-4 space-y-4">
+            <form
+              onSubmit={(e) => void handleReactivateCommit(e)}
+              className="mt-4 space-y-4"
+            >
               <div>
-                <label htmlFor="reactivate-reason-input" className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5">
+                <label
+                  htmlFor="reactivate-reason-input"
+                  className="block text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
+                >
                   Administrative Reinstatement Reason
                 </label>
                 <textarea
@@ -1361,7 +1489,10 @@ function UserLookupPanel() {
                 </button>
                 <button
                   type="submit"
-                  disabled={revoking || reactivateReason.trim().length < REASON_MIN_LENGTH}
+                  disabled={
+                    revoking ||
+                    reactivateReason.trim().length < REASON_MIN_LENGTH
+                  }
                   className="rounded-full bg-emerald-700 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 transition disabled:opacity-50"
                 >
                   {revoking ? 'Reinstating…' : 'Reactivate Account'}
@@ -1432,7 +1563,11 @@ function TaskAuditPanel() {
         })),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error searching task audit events.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Error searching task audit events.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1440,8 +1575,12 @@ function TaskAuditPanel() {
 
   function actorLabel(actorUid: string): string {
     if (actorUid === 'system') return 'System';
-    if (taskActors?.customerId && actorUid === taskActors.customerId) return 'Customer';
-    if (taskActors?.acceptedVolunteerId && actorUid === taskActors.acceptedVolunteerId) {
+    if (taskActors?.customerId && actorUid === taskActors.customerId)
+      return 'Customer';
+    if (
+      taskActors?.acceptedVolunteerId &&
+      actorUid === taskActors.acceptedVolunteerId
+    ) {
       return 'Volunteer';
     }
     return 'Admin';
@@ -1450,7 +1589,10 @@ function TaskAuditPanel() {
   return (
     <div className="space-y-6">
       {/* Search Bar */}
-      <form onSubmit={(e) => void handleAuditSearch(e)} className="flex max-w-xl gap-2.5">
+      <form
+        onSubmit={(e) => void handleAuditSearch(e)}
+        className="flex max-w-xl gap-2.5"
+      >
         <input
           type="text"
           value={taskIdInput}
@@ -1481,7 +1623,9 @@ function TaskAuditPanel() {
               <h3 className="text-base font-bold text-[#131312]">
                 Task Lifecycle Timeline
               </h3>
-              <p className="mt-0.5 font-mono text-xs text-[#8a847d]">Task ID: {taskIdInput.trim()}</p>
+              <p className="mt-0.5 font-mono text-xs text-[#8a847d]">
+                Task ID: {taskIdInput.trim()}
+              </p>
             </div>
             <Link
               to={`/tasks/${taskIdInput.trim()}`}
@@ -1503,7 +1647,9 @@ function TaskAuditPanel() {
                   <button
                     type="button"
                     aria-expanded={expanded}
-                    onClick={() => setExpandedEventId(expanded ? null : event.id)}
+                    onClick={() =>
+                      setExpandedEventId(expanded ? null : event.id)
+                    }
                     className="flex w-full items-center gap-3.5 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
                   >
                     <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full bg-[#1f6f5c] text-xs font-bold text-white">
@@ -1538,18 +1684,21 @@ function TaskAuditPanel() {
                       <p className="text-[#4f4b46]">
                         Triggered by:{' '}
                         <strong className="text-[#131312]">{actor}</strong>{' '}
-                        <span className="font-mono text-[11px] text-[#8a847d]">({event.actorUid})</span>
+                        <span className="font-mono text-[11px] text-[#8a847d]">
+                          ({event.actorUid})
+                        </span>
                       </p>
-                      {event.payload && Object.keys(event.payload).length > 0 && (
-                        <div>
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-[#8a847d]">
-                            Event Payload Metadata
-                          </span>
-                          <pre className="mt-1.5 overflow-x-auto rounded-xl bg-[#fafaf8] border border-[#ececea] p-3 font-mono text-[11px] text-[#131312]">
-                            {JSON.stringify(event.payload, null, 2)}
-                          </pre>
-                        </div>
-                      )}
+                      {event.payload &&
+                        Object.keys(event.payload).length > 0 && (
+                          <div>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#8a847d]">
+                              Event Payload Metadata
+                            </span>
+                            <pre className="mt-1.5 overflow-x-auto rounded-xl bg-[#fafaf8] border border-[#ececea] p-3 font-mono text-[11px] text-[#131312]">
+                              {JSON.stringify(event.payload, null, 2)}
+                            </pre>
+                          </div>
+                        )}
                     </div>
                   )}
                 </li>
@@ -1627,7 +1776,9 @@ function ActivityLogPanel() {
         setHasMore(snap.size === ACTIVITY_LOG_PAGE_SIZE);
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Could not load activity log.');
+        setError(
+          err instanceof Error ? err.message : 'Could not load activity log.',
+        );
       }
     }
     void initial();
@@ -1664,7 +1815,9 @@ function ActivityLogPanel() {
       setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
       setHasMore(snap.size === ACTIVITY_LOG_PAGE_SIZE);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load activity log.');
+      setError(
+        err instanceof Error ? err.message : 'Could not load activity log.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1710,7 +1863,9 @@ function ActivityLogPanel() {
       setLastDoc(snap.docs[snap.docs.length - 1] ?? lastDoc);
       setHasMore(snap.size === ACTIVITY_LOG_PAGE_SIZE);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load more entries.');
+      setError(
+        err instanceof Error ? err.message : 'Could not load more entries.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1720,7 +1875,10 @@ function ActivityLogPanel() {
     <div className="space-y-4">
       {/* Category Filter */}
       <div className="flex items-center gap-3">
-        <label htmlFor="activity-filter" className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d]">
+        <label
+          htmlFor="activity-filter"
+          className="text-xs font-bold uppercase tracking-[0.08em] text-[#8a847d]"
+        >
           Filter Event:
         </label>
         <select
@@ -1751,7 +1909,8 @@ function ActivityLogPanel() {
         )}
         {entries.map((entry) => {
           const expanded = expandedId === entry.id;
-          const label = ACTIVITY_EVENT_LABELS[entry.eventType] ?? entry.eventType;
+          const label =
+            ACTIVITY_EVENT_LABELS[entry.eventType] ?? entry.eventType;
           return (
             <li
               key={entry.id}
@@ -1789,7 +1948,9 @@ function ActivityLogPanel() {
                 <div className="border-t border-[#f3f1ec] bg-[#fafaf8] p-4 text-xs text-[#4f4b46] space-y-1.5">
                   <p>
                     <span className="text-[#8a847d]">User UID: </span>
-                    <span className="font-mono text-[#131312]">{entry.userId}</span>
+                    <span className="font-mono text-[#131312]">
+                      {entry.userId}
+                    </span>
                   </p>
                   {entry.taskId && (
                     <p>

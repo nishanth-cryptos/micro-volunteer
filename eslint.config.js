@@ -11,13 +11,7 @@ import prettierConfig from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: [
-      'dist',
-      'build',
-      'functions/lib',
-      '.firebase',
-      'node_modules',
-    ],
+    ignores: ['dist', 'build', 'functions/lib', '.firebase', 'node_modules'],
   },
   // Type-aware lint for application source.
   {

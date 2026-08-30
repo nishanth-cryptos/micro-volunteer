@@ -11,7 +11,11 @@
 // accepting via acceptOffer succeeds transactionally.
 
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore, type Timestamp } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  getFirestore,
+  type Timestamp,
+} from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
 import { safeDisplayName } from './activity-log';

@@ -59,7 +59,12 @@ function runCommand(command, args, cwd = projectRoot) {
     });
     child.on('exit', (code) => {
       if (code === 0) resolvePromise();
-      else rejectPromise(new Error(`Command ${command} ${args.join(' ')} failed with code ${code}`));
+      else
+        rejectPromise(
+          new Error(
+            `Command ${command} ${args.join(' ')} failed with code ${code}`,
+          ),
+        );
     });
     child.on('error', rejectPromise);
   });
@@ -74,10 +79,14 @@ async function main() {
   const alreadyRunning = (await checkPort(9099)) && (await checkPort(8080));
 
   if (alreadyRunning) {
-    console.log('[1/4] Firebase Emulators already running on 9099 & 8080. Connecting to active emulators.\n');
+    console.log(
+      '[1/4] Firebase Emulators already running on 9099 & 8080. Connecting to active emulators.\n',
+    );
   } else {
     // 1. Spawn Emulators using start-emulators.js
-    console.log('[1/4] Starting Firebase Emulators (Auth: 9099, Firestore: 8080, Functions: 5001, UI: 4000)...');
+    console.log(
+      '[1/4] Starting Firebase Emulators (Auth: 9099, Firestore: 8080, Functions: 5001, UI: 4000)...',
+    );
     emulatorsProcess = spawn(process.execPath, ['scripts/start-emulators.js'], {
       cwd: projectRoot,
       stdio: 'inherit',
@@ -98,7 +107,12 @@ async function main() {
     try {
       if (emulatorsProcess) {
         if (process.platform === 'win32') {
-          spawn('taskkill', ['/pid', emulatorsProcess.pid.toString(), '/f', '/t']);
+          spawn('taskkill', [
+            '/pid',
+            emulatorsProcess.pid.toString(),
+            '/f',
+            '/t',
+          ]);
         } else {
           emulatorsProcess.kill('SIGINT');
         }
@@ -121,7 +135,9 @@ async function main() {
     await runCommand(process.execPath, ['scripts/seed-admin.js']);
     console.log('✅ Admin accounts seeded.\n');
 
-    console.log('[3/4] Seeding Test Users (Volunteers, Customers, Dual-Role)...');
+    console.log(
+      '[3/4] Seeding Test Users (Volunteers, Customers, Dual-Role)...',
+    );
     await runCommand(process.execPath, ['scripts/seed-users.js']);
     console.log('✅ Test users seeded.\n');
   } catch (err) {
@@ -135,10 +151,18 @@ async function main() {
   console.log('📱 App URL:          http://localhost:5173');
   console.log('🛠️  Firebase UI:     http://localhost:4000');
   console.log('🔑 Test Users (Pre-seeded & Ready):');
-  console.log('   - Customer:       cus@example.com  / cus1@example.com  (Password: pass123)');
-  console.log('   - Volunteer:      vol@example.com  / vol1@example.com  (Password: pass123)');
-  console.log('   - Dual-Role:      both@example.com / both1@example.com (Password: pass123)');
-  console.log('   - Admin:          admin@example.org                    (Password: admin123)');
+  console.log(
+    '   - Customer:       cus@example.com  / cus1@example.com  (Password: pass123)',
+  );
+  console.log(
+    '   - Volunteer:      vol@example.com  / vol1@example.com  (Password: pass123)',
+  );
+  console.log(
+    '   - Dual-Role:      both@example.com / both1@example.com (Password: pass123)',
+  );
+  console.log(
+    '   - Admin:          admin@example.org                    (Password: admin123)',
+  );
   console.log('----------------------------------------------------\n');
 
   const viteBin = resolve('./node_modules/vite/bin/vite.js');

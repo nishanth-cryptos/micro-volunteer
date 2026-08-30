@@ -52,10 +52,10 @@ export function PostCompletionSuggestionCard({ taskId, volunteerUid }: Props) {
     let isMounted = true;
     async function fetchSuggestions() {
       try {
-        const fn = httpsCallable<{ taskId: string }, { tasks: SuggestedTaskData[] }>(
-          functions(),
-          'suggestNextTasks',
-        );
+        const fn = httpsCallable<
+          { taskId: string },
+          { tasks: SuggestedTaskData[] }
+        >(functions(), 'suggestNextTasks');
         const res = await fn({ taskId });
         if (isMounted) {
           setTasks(res.data.tasks || []);

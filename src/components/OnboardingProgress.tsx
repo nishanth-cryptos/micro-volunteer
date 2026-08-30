@@ -31,10 +31,7 @@ export function OnboardingProgress({ current, includeSkills }: Props) {
           const completed = current > step.num;
           const isCurrent = current === step.num;
           return (
-            <li
-              key={step.num}
-              className="flex items-center"
-            >
+            <li key={step.num} className="flex items-center">
               <div className="flex flex-col items-center">
                 <span
                   aria-current={isCurrent ? 'step' : undefined}
@@ -48,8 +45,18 @@ export function OnboardingProgress({ current, includeSkills }: Props) {
                   }
                 >
                   {completed ? (
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   ) : (
                     step.num

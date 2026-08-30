@@ -16,7 +16,10 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-[#fafaf8] text-[#131312]">
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#ececea] bg-[#fafaf8]/90 px-6 backdrop-blur-md sm:px-10">
-        <Link to="/" className="flex items-center gap-2.5 font-bold tracking-tight text-[#131312]">
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 font-bold tracking-tight text-[#131312]"
+        >
           <Logo size="md" />
         </Link>
         <Link

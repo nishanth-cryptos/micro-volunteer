@@ -12,7 +12,6 @@
     "logs": "firebase functions:log",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test --test-concurrency=1 lib/*.test.js"
-
   },
   "engines": {
     "node": "22"

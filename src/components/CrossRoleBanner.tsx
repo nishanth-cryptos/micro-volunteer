@@ -70,7 +70,8 @@ export function CrossRoleBanner({
               <span>
                 You have{' '}
                 <strong className="font-bold text-[#1f6f5c]">
-                  {otherActiveCount} active mission{otherActiveCount > 1 ? 's' : ''}
+                  {otherActiveCount} active mission
+                  {otherActiveCount > 1 ? 's' : ''}
                 </strong>{' '}
                 as a Volunteer.
               </span>
@@ -93,7 +94,10 @@ export function CrossRoleBanner({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-2 text-xs text-emerald-900">
             <div className="flex items-center gap-2 font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-              <span>You are currently marked available to receive volunteer requests.</span>
+              <span>
+                You are currently marked available to receive volunteer
+                requests.
+              </span>
             </div>
             <button
               type="button"
@@ -120,7 +124,8 @@ export function CrossRoleBanner({
               <span>
                 You have{' '}
                 <strong className="font-bold text-[#1f6f5c]">
-                  {otherActiveCount} active request{otherActiveCount > 1 ? 's' : ''}
+                  {otherActiveCount} active request
+                  {otherActiveCount > 1 ? 's' : ''}
                 </strong>{' '}
                 as a Requester.
               </span>

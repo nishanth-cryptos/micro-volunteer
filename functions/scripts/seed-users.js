@@ -22,13 +22,31 @@ const db = getFirestore();
 // All available skills from catalog.json
 // ---------------------------------------------------------------------------
 const ALL_SKILLS = [
-  'read-text', 'translate-text', 'explain-forms', 'fill-forms',
-  'phone-help', 'computer-help', 'online-search', 'book-appointment',
-  'scan-documents', 'upload-documents', 'buy-groceries', 'fetch-medicine',
-  'collect-package', 'drop-items', 'pickup-food', 'carry-bags',
-  'local-errand', 'event-setup', 'registration-help', 'guide-visitors',
-  'queue-support', 'distribute-materials', 'donation-sorting',
-  'food-packing', 'community-cleanup',
+  'read-text',
+  'translate-text',
+  'explain-forms',
+  'fill-forms',
+  'phone-help',
+  'computer-help',
+  'online-search',
+  'book-appointment',
+  'scan-documents',
+  'upload-documents',
+  'buy-groceries',
+  'fetch-medicine',
+  'collect-package',
+  'drop-items',
+  'pickup-food',
+  'carry-bags',
+  'local-errand',
+  'event-setup',
+  'registration-help',
+  'guide-visitors',
+  'queue-support',
+  'distribute-materials',
+  'donation-sorting',
+  'food-packing',
+  'community-cleanup',
 ];
 
 function pickSkills(count) {
@@ -50,27 +68,39 @@ const VOLUNTEERS_ONLY = [
     password: 'pass123',
     displayName: 'Priya',
     bio: 'Here to help.',
-    trustScore: 88, idVerified: true,
-    verifiedTaskCount: 14, verifiedHours: 22, points: 156,
-    lat: 13.0208, lng: 77.6810, // ~80 m NW of test centre
+    trustScore: 88,
+    idVerified: true,
+    verifiedTaskCount: 14,
+    verifiedHours: 22,
+    points: 156,
+    lat: 13.0208,
+    lng: 77.681, // ~80 m NW of test centre
   },
   {
     email: 'vol1@example.com',
     password: 'pass123',
     displayName: 'Ravi',
     bio: 'Weekend helper.',
-    trustScore: 74, idVerified: false,
-    verifiedTaskCount: 6, verifiedHours: 9, points: 72,
-    lat: 13.0195, lng: 77.6832, // ~200 m SE of test centre
+    trustScore: 74,
+    idVerified: false,
+    verifiedTaskCount: 6,
+    verifiedHours: 9,
+    points: 72,
+    lat: 13.0195,
+    lng: 77.6832, // ~200 m SE of test centre
   },
   {
     email: 'vol2@example.com',
     password: 'pass123',
     displayName: 'Arjun',
     bio: 'New volunteer, eager to help.',
-    trustScore: 42, idVerified: false,
-    verifiedTaskCount: 1, verifiedHours: 1, points: 10,
-    lat: 13.0185, lng: 77.6803, // ~250 m SW of test centre
+    trustScore: 42,
+    idVerified: false,
+    verifiedTaskCount: 1,
+    verifiedHours: 1,
+    points: 10,
+    lat: 13.0185,
+    lng: 77.6803, // ~250 m SW of test centre
   },
 ];
 
@@ -80,21 +110,24 @@ const CUSTOMERS_ONLY = [
     password: 'pass123',
     displayName: 'Sunita',
     bio: 'Needs occasional help.',
-    lat: 13.0202, lng: 77.6815, // test centre
+    lat: 13.0202,
+    lng: 77.6815, // test centre
   },
   {
     email: 'cus1@example.com',
     password: 'pass123',
     displayName: 'Deepak',
     bio: 'Busy schedule, appreciate community help.',
-    lat: 13.0212, lng: 77.6796, // ~250 m NW of test centre
+    lat: 13.0212,
+    lng: 77.6796, // ~250 m NW of test centre
   },
   {
     email: 'cus2@example.com',
     password: 'pass123',
     displayName: 'Rekha',
     bio: 'Looking for trusted help in my area.',
-    lat: 13.0220, lng: 77.6841, // ~350 m NE of test centre
+    lat: 13.022,
+    lng: 77.6841, // ~350 m NE of test centre
   },
 ];
 
@@ -104,27 +137,39 @@ const BOTH = [
     password: 'pass123',
     displayName: 'Meena',
     bio: 'Happy to assist nearby. Also posts tasks.',
-    trustScore: 62, idVerified: true,
-    verifiedTaskCount: 3, verifiedHours: 4, points: 38,
-    lat: 13.0218, lng: 77.6823, // ~200 m NE of test centre
+    trustScore: 62,
+    idVerified: true,
+    verifiedTaskCount: 3,
+    verifiedHours: 4,
+    points: 38,
+    lat: 13.0218,
+    lng: 77.6823, // ~200 m NE of test centre
   },
   {
     email: 'both1@example.com',
     password: 'pass123',
     displayName: 'Anil',
     bio: 'Both helps and asks for help in the community.',
-    trustScore: 80, idVerified: true,
-    verifiedTaskCount: 10, verifiedHours: 14, points: 100,
-    lat: 13.0200, lng: 77.6841, // ~280 m E of test centre
+    trustScore: 80,
+    idVerified: true,
+    verifiedTaskCount: 10,
+    verifiedHours: 14,
+    points: 100,
+    lat: 13.02,
+    lng: 77.6841, // ~280 m E of test centre
   },
   {
     email: 'both2@example.com',
     password: 'pass123',
     displayName: 'Kavita',
     bio: 'New to the platform — happy to help when free.',
-    trustScore: 55, idVerified: false,
-    verifiedTaskCount: 2, verifiedHours: 3, points: 25,
-    lat: 13.0180, lng: 77.6831, // ~280 m SE of test centre
+    trustScore: 55,
+    idVerified: false,
+    verifiedTaskCount: 2,
+    verifiedHours: 3,
+    points: 25,
+    lat: 13.018,
+    lng: 77.6831, // ~280 m SE of test centre
   },
 ];
 
@@ -144,7 +189,8 @@ async function upsertUser(email, password, displayName) {
     console.log(`  ✓ Created  ${email}  (${record.uid})`);
     return record.uid;
   } catch (err) {
-    const code = err && typeof err === 'object' && 'code' in err ? err.code : '';
+    const code =
+      err && typeof err === 'object' && 'code' in err ? err.code : '';
     if (code === 'auth/email-already-exists') {
       const existing = await auth.getUserByEmail(email);
       // Re-sync password + displayName so the seed stays idempotent. Without
@@ -174,35 +220,38 @@ async function writeVolunteerProfile(v, roles) {
     );
   }
 
-  await db.collection('users').doc(uid).set({
-    displayName: v.displayName,
-    photoURL: `users/${uid}/photo`,
-    bio: v.bio,
-    email: v.email,
-    roles,
-    skills,
-    lastKnownLocation: {
-      lat: v.lat,
-      lng: v.lng,
-      h3Cell,
-      updatedAt: new Date(),
-    },
-    availableNow: true,
-    availabilityUpdatedAt: new Date(),
-    idVerified: v.idVerified,
-    trustScore: v.trustScore,
-    verifiedTaskCount: v.verifiedTaskCount,
-    verifiedHours: v.verifiedHours,
-    points: v.points,
-    skillPoints,
-    openReportsCount: 0,
-    warningsCount: 0,
-    banned: false,
-    accountStatus: 'active',
-    consent: { tcVersion: 'v1-DRAFT', acceptedAt: new Date() },
-    createdAt: new Date(),
-    lastSeenAt: new Date(),
-  });
+  await db
+    .collection('users')
+    .doc(uid)
+    .set({
+      displayName: v.displayName,
+      photoURL: `users/${uid}/photo`,
+      bio: v.bio,
+      email: v.email,
+      roles,
+      skills,
+      lastKnownLocation: {
+        lat: v.lat,
+        lng: v.lng,
+        h3Cell,
+        updatedAt: new Date(),
+      },
+      availableNow: true,
+      availabilityUpdatedAt: new Date(),
+      idVerified: v.idVerified,
+      trustScore: v.trustScore,
+      verifiedTaskCount: v.verifiedTaskCount,
+      verifiedHours: v.verifiedHours,
+      points: v.points,
+      skillPoints,
+      openReportsCount: 0,
+      warningsCount: 0,
+      banned: false,
+      accountStatus: 'active',
+      consent: { tcVersion: 'v1-DRAFT', acceptedAt: new Date() },
+      createdAt: new Date(),
+      lastSeenAt: new Date(),
+    });
 
   return { uid, skills };
 }
@@ -211,35 +260,38 @@ async function writeCustomerProfile(c) {
   const uid = await upsertUser(c.email, c.password, c.displayName);
   const h3Cell = await latLngToH3(c.lat, c.lng);
 
-  await db.collection('users').doc(uid).set({
-    displayName: c.displayName,
-    photoURL: `users/${uid}/photo`,
-    bio: c.bio,
-    email: c.email,
-    roles: ['customer'],
-    skills: [],
-    lastKnownLocation: {
-      lat: c.lat,
-      lng: c.lng,
-      h3Cell,
-      updatedAt: new Date(),
-    },
-    availableNow: false,
-    availabilityUpdatedAt: new Date(),
-    idVerified: false,
-    trustScore: 30,
-    verifiedTaskCount: 0,
-    verifiedHours: 0,
-    points: 0,
-    skillPoints: {},
-    openReportsCount: 0,
-    warningsCount: 0,
-    banned: false,
-    accountStatus: 'active',
-    consent: { tcVersion: 'v1-DRAFT', acceptedAt: new Date() },
-    createdAt: new Date(),
-    lastSeenAt: new Date(),
-  });
+  await db
+    .collection('users')
+    .doc(uid)
+    .set({
+      displayName: c.displayName,
+      photoURL: `users/${uid}/photo`,
+      bio: c.bio,
+      email: c.email,
+      roles: ['customer'],
+      skills: [],
+      lastKnownLocation: {
+        lat: c.lat,
+        lng: c.lng,
+        h3Cell,
+        updatedAt: new Date(),
+      },
+      availableNow: false,
+      availabilityUpdatedAt: new Date(),
+      idVerified: false,
+      trustScore: 30,
+      verifiedTaskCount: 0,
+      verifiedHours: 0,
+      points: 0,
+      skillPoints: {},
+      openReportsCount: 0,
+      warningsCount: 0,
+      banned: false,
+      accountStatus: 'active',
+      consent: { tcVersion: 'v1-DRAFT', acceptedAt: new Date() },
+      createdAt: new Date(),
+      lastSeenAt: new Date(),
+    });
 
   return { uid };
 }
@@ -269,7 +321,10 @@ async function seedCustomersOnly() {
 async function seedBoth() {
   console.log('\n── Dual role (volunteer + customer) ───────────────────────');
   for (const v of BOTH) {
-    const { skills } = await writeVolunteerProfile(v, ['volunteer', 'customer']);
+    const { skills } = await writeVolunteerProfile(v, [
+      'volunteer',
+      'customer',
+    ]);
     console.log(
       `  ✓ Firestore  ${v.displayName.padEnd(8)} trust=${v.trustScore}  roles=[volunteer, customer]  skills=[${skills.join(', ')}]`,
     );
@@ -291,13 +346,16 @@ async function main() {
   console.log('Credentials  (password: pass123 for all below):');
   console.log('');
   console.log('  Volunteer only');
-  for (const v of VOLUNTEERS_ONLY) console.log(`    ${v.email.padEnd(22)} ${v.displayName}`);
+  for (const v of VOLUNTEERS_ONLY)
+    console.log(`    ${v.email.padEnd(22)} ${v.displayName}`);
   console.log('');
   console.log('  Customer only');
-  for (const c of CUSTOMERS_ONLY) console.log(`    ${c.email.padEnd(22)} ${c.displayName}`);
+  for (const c of CUSTOMERS_ONLY)
+    console.log(`    ${c.email.padEnd(22)} ${c.displayName}`);
   console.log('');
   console.log('  Dual role (volunteer + customer)');
-  for (const v of BOTH) console.log(`    ${v.email.padEnd(22)} ${v.displayName}`);
+  for (const v of BOTH)
+    console.log(`    ${v.email.padEnd(22)} ${v.displayName}`);
   console.log('');
   console.log('  Admins seeded separately — run: npm run seed:admin');
   console.log('════════════════════════════════════════════════════════════\n');

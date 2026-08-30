@@ -1,10 +1,6 @@
 // Module 1 — Stay-point detector & GPS spoofing filter
 import { latLngToCell } from 'h3-js';
-import {
-  TRAIL_CONSTANTS,
-  type LocationPing,
-  type StayPoint,
-} from './types';
+import { TRAIL_CONSTANTS, type LocationPing, type StayPoint } from './types';
 
 export function isGpsPingValid(
   lastPing: LocationPing | null,
@@ -14,8 +10,13 @@ export function isGpsPingValid(
   const timeDeltaSec = (newPing.timestamp - lastPing.timestamp) / 1000;
   if (timeDeltaSec <= 0) return false;
 
-  const distM = haversineM(lastPing.lat, lastPing.lng, newPing.lat, newPing.lng);
-  const speedKmh = (distM / 1000) / (timeDeltaSec / 3600);
+  const distM = haversineM(
+    lastPing.lat,
+    lastPing.lng,
+    newPing.lat,
+    newPing.lng,
+  );
+  const speedKmh = distM / 1000 / (timeDeltaSec / 3600);
 
   // Impossible speed check (> 150 km/h or > 5 km in 10s)
   if (speedKmh > TRAIL_CONSTANTS.GPS_MAX_SPEED_KMH) return false;
@@ -56,12 +57,7 @@ export function detectStayPoints(
       if (!nextPing) break;
       const centerLat = sumLat / count;
       const centerLng = sumLng / count;
-      const dist = haversineM(
-        centerLat,
-        centerLng,
-        nextPing.lat,
-        nextPing.lng,
-      );
+      const dist = haversineM(centerLat, centerLng, nextPing.lat, nextPing.lng);
 
       if (dist <= TRAIL_CONSTANTS.STAY_POINT_RADIUS_M) {
         sumLat += nextPing.lat;

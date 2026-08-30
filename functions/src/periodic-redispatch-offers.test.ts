@@ -4,7 +4,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { computeNudgeUpdate } from './periodic-redispatch-offers';
-import { NUDGE_COPY_BANK, NEARING_EXPIRY_COPY, WAIT_TIER_CONFIG } from './nudge-copy-bank';
+import {
+  NUDGE_COPY_BANK,
+  NEARING_EXPIRY_COPY,
+  WAIT_TIER_CONFIG,
+} from './nudge-copy-bank';
 
 test('WAIT_TIER_CONFIG contains expected thresholds and radiusStepMultipliers', () => {
   assert.deepEqual(WAIT_TIER_CONFIG.fast.nudgeStages, [3, 8, 15]);
@@ -61,7 +65,11 @@ test('Idempotency of nudge-stage writes (§8.4): same stage is not re-triggered'
 
   // At 6 minutes (after 5-min threshold for normal tier), stage 1 should NOT be re-triggered
   const result = computeNudgeUpdate(task, baseTime + 6 * 60 * 1000);
-  assert.equal(result, null, 'Stage 1 should not re-fire when lastNudgeStage === 1');
+  assert.equal(
+    result,
+    null,
+    'Stage 1 should not re-fire when lastNudgeStage === 1',
+  );
 });
 
 test('Legacy task fallback (§8.5): missing expectedWaitTier defaults to normal', () => {

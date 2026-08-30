@@ -58,11 +58,11 @@ export function BlockedUsersList({ uid }: Props) {
         const callerIsA = data.userA === uid;
         const otherUid = callerIsA ? data.userB : data.userA;
         const otherName = callerIsA
-          ? data.userBNameSnapshot ?? ''
-          : data.userANameSnapshot ?? '';
+          ? (data.userBNameSnapshot ?? '')
+          : (data.userANameSnapshot ?? '');
         const otherPhotoPath = callerIsA
-          ? data.userBPhotoSnapshot ?? null
-          : data.userAPhotoSnapshot ?? null;
+          ? (data.userBPhotoSnapshot ?? null)
+          : (data.userAPhotoSnapshot ?? null);
         merged.set(d.id, {
           blockId: d.id,
           otherUid,
@@ -182,7 +182,7 @@ export function BlockedUsersList({ uid }: Props) {
         <ul className="mt-4 space-y-2">
           {rows.map((row) => {
             const resolvedUrl = row.otherPhotoPath
-              ? photoUrls[row.otherPhotoPath] ?? undefined
+              ? (photoUrls[row.otherPhotoPath] ?? undefined)
               : undefined;
             const isBusy = busyBlockIds.has(row.blockId);
 
@@ -221,7 +221,9 @@ export function BlockedUsersList({ uid }: Props) {
                   </span>
                   <button
                     type="button"
-                    onClick={() => void handleUnblock(row.otherUid, row.blockId)}
+                    onClick={() =>
+                      void handleUnblock(row.otherUid, row.blockId)
+                    }
                     disabled={isBusy}
                     className="rounded-full border border-neutral-300 bg-white px-3 py-1 text-xs font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 disabled:opacity-50"
                   >
@@ -242,7 +244,8 @@ function formatWhen(t: Timestamp | null): string {
   const ms = t.toMillis();
   const diff = Date.now() - ms;
   if (diff < 60_000) return 'just blocked';
-  if (diff < 3_600_000) return `blocked ${String(Math.floor(diff / 60_000))} min ago`;
+  if (diff < 3_600_000)
+    return `blocked ${String(Math.floor(diff / 60_000))} min ago`;
   if (diff < 86_400_000)
     return `blocked ${String(Math.floor(diff / 3_600_000))} h ago`;
   return `blocked on ${new Date(ms).toLocaleDateString()}`;

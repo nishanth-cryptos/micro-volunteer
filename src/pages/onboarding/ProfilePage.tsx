@@ -104,7 +104,9 @@ export default function ProfilePage() {
       return setError(`Name must be ${String(MAX_NAME)} characters or fewer.`);
     }
     if (!photoFile) {
-      return setError('Please upload a clear profile photo so neighbours can recognise you.');
+      return setError(
+        'Please upload a clear profile photo so neighbours can recognise you.',
+      );
     }
     if (bio.length > MAX_BIO) {
       return setError(`Bio must be ${String(MAX_BIO)} characters or fewer.`);
@@ -164,7 +166,8 @@ export default function ProfilePage() {
             Set up your profile
           </h1>
           <p className="mt-2 text-sm text-[#4f4b46]">
-            Real identity builds neighbourhood trust. Your photo and name help neighbours recognise you during tasks.
+            Real identity builds neighbourhood trust. Your photo and name help
+            neighbours recognise you during tasks.
           </p>
         </div>
 
@@ -193,11 +196,27 @@ export default function ProfilePage() {
                   />
                 ) : (
                   <div className="flex flex-col items-center text-[#8a847d] group-hover:text-[#1f6f5c]">
-                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <svg
+                      className="h-7 w-7"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.75}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
                     </svg>
-                    <span className="mt-1 text-[10px] font-semibold">Upload</span>
+                    <span className="mt-1 text-[10px] font-semibold">
+                      Upload
+                    </span>
                   </div>
                 )}
               </button>
@@ -208,9 +227,13 @@ export default function ProfilePage() {
                   onClick={() => photoInputRef.current?.click()}
                   className="rounded-full border border-[#ececea] bg-white px-4 py-2 text-xs font-semibold text-[#131312] shadow-sm transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec]"
                 >
-                  {photoFile ? 'Change profile photo' : 'Choose photo from device'}
+                  {photoFile
+                    ? 'Change profile photo'
+                    : 'Choose photo from device'}
                 </button>
-                <p className="text-xs text-[#8a847d]">Supports JPEG, PNG, or WebP (max 2 MB)</p>
+                <p className="text-xs text-[#8a847d]">
+                  Supports JPEG, PNG, or WebP (max 2 MB)
+                </p>
               </div>
 
               <input
@@ -251,7 +274,8 @@ export default function ProfilePage() {
                 htmlFor={bioId}
                 className="block text-sm font-semibold text-[#131312]"
               >
-                About you <span className="font-normal text-[#8a847d]">(optional)</span>
+                About you{' '}
+                <span className="font-normal text-[#8a847d]">(optional)</span>
               </label>
               <span className="text-xs text-[#8a847d]">
                 {bio.length} / {MAX_BIO}
@@ -272,22 +296,36 @@ export default function ProfilePage() {
           <div className="rounded-2xl border border-[#ececea] bg-[#fafaf8] p-5">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded bg-[#e3efe9] text-[#1f6f5c]">
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-bold text-[#131312]">
                     Community / Student / Workplace ID{' '}
-                    <span className="font-normal text-[#8a847d]">(optional)</span>
+                    <span className="font-normal text-[#8a847d]">
+                      (optional)
+                    </span>
                   </h2>
                   <span className="rounded bg-[#ececea] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#4f4b46]">
                     Admin Review
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-[#4f4b46]">
-                  Uploading your institutional ID unlocks medium-risk tasks. Your ID image is stored securely and never shown to other users.
+                  Uploading your institutional ID unlocks medium-risk tasks.
+                  Your ID image is stored securely and never shown to other
+                  users.
                 </p>
 
                 <div className="mt-3 flex items-center gap-3">
@@ -300,8 +338,18 @@ export default function ProfilePage() {
                   </button>
                   {idFile && (
                     <span className="flex items-center gap-1.5 text-xs font-medium text-[#1f6f5c]">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                       ID attached ({idFile.name})
                     </span>

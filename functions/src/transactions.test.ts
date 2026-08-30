@@ -9,14 +9,20 @@ import { createHash, randomBytes } from 'node:crypto';
 test('OTP Hash & Salt Verification: matches correct OTP and rejects wrong OTP', () => {
   const otp = '123456';
   const salt = randomBytes(16).toString('hex');
-  const hash = createHash('sha256').update(otp + salt).digest('hex');
+  const hash = createHash('sha256')
+    .update(otp + salt)
+    .digest('hex');
 
   // Correct OTP
-  const testHashCorrect = createHash('sha256').update(otp + salt).digest('hex');
+  const testHashCorrect = createHash('sha256')
+    .update(otp + salt)
+    .digest('hex');
   assert.equal(testHashCorrect, hash);
 
   // Incorrect OTP
-  const testHashWrong = createHash('sha256').update('654321' + salt).digest('hex');
+  const testHashWrong = createHash('sha256')
+    .update('654321' + salt)
+    .digest('hex');
   assert.notEqual(testHashWrong, hash);
 });
 
@@ -51,13 +57,15 @@ test('OTP Single-Use Invariant: verified OTP status transition prevents replay',
   assert.equal(replayError, 'Task is not in accepted status.');
 });
 
-
 // 2. Offer Accept Race Precondition Check
 test('Offer Accept Race Invariant: single-slot assignment allows only first volunteer', () => {
   let taskStatus: 'searching' | 'accepted' = 'searching';
   let assignedVolunteerId: string | null = null;
 
-  function attemptAccept(volunteerId: string): { success: boolean; error?: string } {
+  function attemptAccept(volunteerId: string): {
+    success: boolean;
+    error?: string;
+  } {
     if (taskStatus !== 'searching') {
       return { success: false, error: 'Task is no longer searching.' };
     }
@@ -75,7 +83,11 @@ test('Offer Accept Race Invariant: single-slot assignment allows only first volu
 
   assert.equal(res2.success, false);
   assert.equal(res2.error, 'Task is no longer searching.');
-  assert.equal(assignedVolunteerId, 'vol-1', 'Second volunteer cannot overwrite accepted assignment');
+  assert.equal(
+    assignedVolunteerId,
+    'vol-1',
+    'Second volunteer cannot overwrite accepted assignment',
+  );
 });
 
 // 3. Points Award Idempotency
@@ -97,8 +109,16 @@ test('Points Award Idempotency: award event prevents duplicate point crediting',
   assert.equal(volunteerPoints, 115);
 
   const duplicateAward = awardPoints('event-task-123', 15);
-  assert.equal(duplicateAward, false, 'Duplicate award execution must be blocked');
-  assert.equal(volunteerPoints, 115, 'Points must not increase on duplicate call');
+  assert.equal(
+    duplicateAward,
+    false,
+    'Duplicate award execution must be blocked',
+  );
+  assert.equal(
+    volunteerPoints,
+    115,
+    'Points must not increase on duplicate call',
+  );
 });
 
 // 4. M11 cancelAcceptedTask Reassignment & Exclusions
@@ -133,12 +153,12 @@ test('M11 cancelAcceptedTask: reverts task to searching, clears volunteer, and e
   // Candidate filtering logic during re-dispatch
   const candidatePool = ['vol-abc', 'vol-xyz'];
   const eligibleCandidates = candidatePool.filter(
-    (uid) => offers[uid]?.state !== 'cancelled' && offers[uid]?.state !== 'rejected',
+    (uid) =>
+      offers[uid]?.state !== 'cancelled' && offers[uid]?.state !== 'rejected',
   );
 
   assert.deepEqual(eligibleCandidates, ['vol-xyz']);
 });
-
 
 // 5. M11 Violation Threshold & Rolling Window Logic
 test('M11 Violation Threshold: Strike 1 freeze at 3 violations, Strike 2+ suspend', () => {
@@ -154,8 +174,18 @@ test('M11 Violation Threshold: Strike 1 freeze at 3 violations, Strike 2+ suspen
   ];
 
   const windowStartMs = now - windowDays * 24 * 60 * 60 * 1000;
-  const activeViolations = violations.filter((v) => v.createdAtMs >= windowStartMs);
+  const activeViolations = violations.filter(
+    (v) => v.createdAtMs >= windowStartMs,
+  );
 
-  assert.equal(activeViolations.length, 3, 'Stale violation outside 7-day window must be excluded');
-  assert.equal(activeViolations.length >= threshold, true, 'Threshold of 3 active violations reached');
+  assert.equal(
+    activeViolations.length,
+    3,
+    'Stale violation outside 7-day window must be excluded',
+  );
+  assert.equal(
+    activeViolations.length >= threshold,
+    true,
+    'Threshold of 3 active violations reached',
+  );
 });

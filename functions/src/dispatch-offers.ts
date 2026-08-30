@@ -40,7 +40,10 @@ export const dispatchOffers = onDocumentWritten(
     // OR
     // 2. Task status transitioned from another state back to 'searching'
     const wasCreatedSearching = !beforeData && afterData.status === 'searching';
-    const transitionedToSearching = beforeData && beforeData.status !== 'searching' && afterData.status === 'searching';
+    const transitionedToSearching =
+      beforeData &&
+      beforeData.status !== 'searching' &&
+      afterData.status === 'searching';
 
     if (!wasCreatedSearching && !transitionedToSearching) {
       return;
@@ -68,7 +71,9 @@ export const dispatchOffers = onDocumentWritten(
 
     // If transitioned back to searching, clear existing offers first
     if (transitionedToSearching) {
-      logger.info('dispatchOffers: clearing existing offers for reassignment', { taskId });
+      logger.info('dispatchOffers: clearing existing offers for reassignment', {
+        taskId,
+      });
       const existingOffers = await offersRef.get();
       if (!existingOffers.empty) {
         const deleteBatch = db.batch();

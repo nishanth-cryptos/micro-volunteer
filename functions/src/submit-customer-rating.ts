@@ -34,10 +34,10 @@ export const submitCustomerRating = onCall(
       throw new HttpsError('invalid-argument', 'taskId is required.');
     }
     if (
-      typeof rating !== 'number'
-      || !Number.isInteger(rating)
-      || rating < 1
-      || rating > 5
+      typeof rating !== 'number' ||
+      !Number.isInteger(rating) ||
+      rating < 1 ||
+      rating > 5
     ) {
       throw new HttpsError('invalid-argument', 'Rating must be 1–5.');
     }

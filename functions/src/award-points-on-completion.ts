@@ -24,13 +24,15 @@ export const awardPointsOnCompletion = onDocumentUpdated(
     }
 
     const beforeData = change.before.data() as { status?: string } | undefined;
-    const afterData = change.after.data() as {
-      status?: string;
-      acceptedVolunteerId?: string;
-      customerId?: string;
-      estimatedMinutes?: number;
-      requiredSkills?: string[];
-    } | undefined;
+    const afterData = change.after.data() as
+      | {
+          status?: string;
+          acceptedVolunteerId?: string;
+          customerId?: string;
+          estimatedMinutes?: number;
+          requiredSkills?: string[];
+        }
+      | undefined;
 
     if (!afterData) {
       logger.info('awardPointsOnCompletion: Task was deleted, skipping points');
@@ -38,7 +40,10 @@ export const awardPointsOnCompletion = onDocumentUpdated(
     }
 
     // Trigger only when task flips to 'completed'
-    if (afterData.status !== 'completed' || beforeData?.status === 'completed') {
+    if (
+      afterData.status !== 'completed' ||
+      beforeData?.status === 'completed'
+    ) {
       return;
     }
 
@@ -49,11 +54,14 @@ export const awardPointsOnCompletion = onDocumentUpdated(
     const requiredSkills = afterData.requiredSkills ?? [];
 
     if (!volunteerId || !customerId) {
-      logger.error('awardPointsOnCompletion: Missing volunteerId or customerId', {
-        taskId,
-        volunteerId,
-        customerId,
-      });
+      logger.error(
+        'awardPointsOnCompletion: Missing volunteerId or customerId',
+        {
+          taskId,
+          volunteerId,
+          customerId,
+        },
+      );
       return;
     }
 
@@ -92,7 +100,9 @@ export const awardPointsOnCompletion = onDocumentUpdated(
       const customerSnap = await transaction.get(customerRef);
 
       if (!volunteerSnap.exists) {
-        logger.error(`awardPointsOnCompletion: Volunteer ${volunteerId} not found`);
+        logger.error(
+          `awardPointsOnCompletion: Volunteer ${volunteerId} not found`,
+        );
         return;
       }
 
@@ -104,8 +114,11 @@ export const awardPointsOnCompletion = onDocumentUpdated(
       });
 
       if (customerSnap.exists) {
-        const customerRoles = customerSnap.data()?.roles as string[] | undefined;
-        const customerIsVolunteer = customerRoles?.includes('volunteer') ?? false;
+        const customerRoles = customerSnap.data()?.roles as
+          | string[]
+          | undefined;
+        const customerIsVolunteer =
+          customerRoles?.includes('volunteer') ?? false;
         if (customerIsVolunteer) {
           transaction.update(customerRef, {
             points: FieldValue.increment(CUSTOMER_POINTS_REWARD),
@@ -150,7 +163,9 @@ export function calculatePointsAwardPure(params: {
   const volunteerPointsAwarded = BASE_VOLUNTEER_POINTS + durationBonus;
 
   const customerIsVolunteer = customerRoles.includes('volunteer');
-  const customerPointsAwarded = customerIsVolunteer ? CUSTOMER_POINTS_REWARD : 0;
+  const customerPointsAwarded = customerIsVolunteer
+    ? CUSTOMER_POINTS_REWARD
+    : 0;
   const verifiedHoursIncrement = estimatedMinutes / 60;
 
   return {
@@ -161,4 +176,3 @@ export function calculatePointsAwardPure(params: {
     skillsCredited: requiredSkills,
   };
 }
-
