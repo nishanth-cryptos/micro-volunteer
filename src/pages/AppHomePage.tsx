@@ -1,6 +1,6 @@
 // Authenticated home — shown after onboarding completes.
-// M2 adds: prominent availability ON/OFF toggle for volunteers.
-// Real dashboard (post tasks, offer inbox) lands in M3 + M5.
+// Seamlessly routes and manages dual-role switching for users who are both
+// Customer and Volunteer.
 
 import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
@@ -8,6 +8,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { useAuthState } from '../lib/auth-context';
+import { useActiveRole } from '../lib/use-active-role';
 import { CustomerDashboard } from '../components/CustomerDashboard';
 import { VolunteerDashboard } from '../components/VolunteerDashboard';
 import { KarmaToast } from '../components/KarmaToast';
@@ -28,21 +29,33 @@ export default function AppHomePage() {
     }
   }, [location]);
 
-  if (state.status !== 'ready') return null;
-  const { user, userDoc } = state;
+  const user = state.status === 'ready' ? state.user : null;
+  const userDoc = state.status === 'ready' ? state.userDoc : null;
+
+  const { activeRole, setActiveRole, isDualRole } = useActiveRole(
+    user?.uid,
+    userDoc,
+  );
+
+  if (state.status !== 'ready' || !user || !userDoc) return null;
   const name = userDoc.displayName ?? 'there';
-  const isCustomer = userDoc.roles?.includes('customer') ?? false;
 
   // Admin home short-circuit.
   if (userDoc.isAdmin === true) {
     return <AdminHomeScreen name={name} />;
   }
 
-  // Customer-facing view
-  if (isCustomer) {
+  // Active Role routing
+  if (activeRole === 'customer') {
     return (
       <>
-        <CustomerDashboard uid={user.uid} userDoc={userDoc} />
+        <CustomerDashboard
+          uid={user.uid}
+          userDoc={userDoc}
+          activeRole={activeRole}
+          onSwitchRole={setActiveRole}
+          isDualRole={isDualRole}
+        />
         {toastMessage && (
           <KarmaToast
             message={toastMessage}
@@ -53,10 +66,15 @@ export default function AppHomePage() {
     );
   }
 
-  // Reimagined Volunteer-facing view matching customer design system
   return (
     <>
-      <VolunteerDashboard uid={user.uid} userDoc={userDoc} />
+      <VolunteerDashboard
+        uid={user.uid}
+        userDoc={userDoc}
+        activeRole={activeRole}
+        onSwitchRole={setActiveRole}
+        isDualRole={isDualRole}
+      />
       {toastMessage && (
         <KarmaToast
           message={toastMessage}

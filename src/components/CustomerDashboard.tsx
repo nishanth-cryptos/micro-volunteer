@@ -43,6 +43,9 @@ import type { UserDoc } from '../lib/auth-context';
 import { BlockedUsersList } from './BlockedUsersList';
 import { ReasonBottomSheet } from './ReasonBottomSheet';
 import { Logo } from './Logo';
+import { RoleSwitcher } from './RoleSwitcher';
+import { CrossRoleBanner } from './CrossRoleBanner';
+import type { ActiveRole } from '../lib/use-active-role';
 
 
 // Leaflet default-icon fix (same pattern as TaskLocationPicker).
@@ -119,9 +122,18 @@ type HistoryFilter = 'all' | 'completed' | 'accepted' | 'blocked';
 interface Props {
   uid: string;
   userDoc: UserDoc;
+  activeRole?: ActiveRole;
+  onSwitchRole?: (role: ActiveRole) => void;
+  isDualRole?: boolean;
 }
 
-export function CustomerDashboard({ uid, userDoc }: Props) {
+export function CustomerDashboard({
+  uid,
+  userDoc,
+  activeRole = 'customer',
+  onSwitchRole = () => {},
+  isDualRole = false,
+}: Props) {
   const navigate = useNavigate();
   const [screen, setScreen] = useState<ScreenKey>('tasks');
   const [rows, setRows] = useState<TaskRow[]>([]);
@@ -293,8 +305,18 @@ export function CustomerDashboard({ uid, userDoc }: Props) {
         email={userDoc.email}
         photoPath={userDoc.photoURL ?? null}
         onSignOut={() => void handleSignOut()}
+        activeRole={activeRole}
+        onSwitchRole={onSwitchRole}
+        isDualRole={isDualRole}
       />
-      <div className="mx-auto max-w-7xl px-8 pt-10 pb-[124px]">
+      <CrossRoleBanner
+        uid={uid}
+        userDoc={userDoc}
+        activeRole={activeRole}
+        isDualRole={isDualRole}
+        onSwitchRole={onSwitchRole}
+      />
+      <div className="mx-auto max-w-7xl px-8 pt-6 pb-[124px]">
         <div key={screen} className="vc-screen-enter">
           {screen === 'tasks' && (
             <TasksScreen
@@ -341,11 +363,17 @@ function TopBar({
   email,
   photoPath,
   onSignOut,
+  activeRole,
+  onSwitchRole,
+  isDualRole,
 }: {
   displayName: string;
   email: string | undefined;
   photoPath: string | null;
   onSignOut: () => void;
+  activeRole: ActiveRole;
+  onSwitchRole: (role: ActiveRole) => void;
+  isDualRole: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -379,19 +407,25 @@ function TopBar({
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#ececea] bg-white px-6 sm:px-7">
-      <div className="flex items-center gap-2.5 font-bold tracking-tight">
+      <div className="flex items-center gap-3 font-bold tracking-tight">
         <Logo size="md" />
       </div>
-      <div className="relative flex items-center gap-3.5 text-[13px] text-[#4f4b46]">
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-label="Account menu"
-          onClick={() => setOpen((o) => !o)}
-          className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900] ring-2 ring-transparent transition hover:ring-[#1f6f5c]/30 focus:outline-none focus-visible:ring-[#1f6f5c]/40"
-        >
+      <div className="flex items-center gap-3">
+        <RoleSwitcher
+          activeRole={activeRole}
+          onSwitchRole={onSwitchRole}
+          isDualRole={isDualRole}
+        />
+        <div className="relative flex items-center text-[13px] text-[#4f4b46]">
+          <button
+            ref={triggerRef}
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-label="Account menu"
+            onClick={() => setOpen((o) => !o)}
+            className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#ffd28a] to-[#f08a4b] text-xs font-bold text-[#5a2900] ring-2 ring-transparent transition hover:ring-[#1f6f5c]/30 focus:outline-none focus-visible:ring-[#1f6f5c]/40"
+          >
           {photoUrl ? (
             <img
               src={photoUrl}
@@ -458,6 +492,7 @@ function TopBar({
             </button>
           </div>
         )}
+        </div>
       </div>
     </header>
   );

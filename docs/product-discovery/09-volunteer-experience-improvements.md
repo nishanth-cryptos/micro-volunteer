@@ -26,7 +26,7 @@ All enhancements were achieved without modifying backend logic, Firestore schema
 | 3 | **Offer Cards** | Exposed raw algorithmic scoring math (`Match score: 1.45`). | Removed all internal formula math; replaced with actionable human decision chips: `📍 0.8 km away`, `⏱️ ~30 mins`, `★ Matches your skill`, `🛡️ Verified ID Required`. |
 | 4 | **Offer Action Clarity** | Accept and Decline buttons lacked clear commitment and loading states. | Clear, committed primary green `"Accept & Help"` button with busy state and subtle `"Decline"` button. |
 | 5 | **Active Mission Cards** | Accepted and in-progress tasks lacked clear next physical actions. | Added plain-language guidance: `accepted` (*"Coordinate arrival in chat · Ask for Start Code on arrival"* + `"Open Chat & Details →"`), `in_progress` (*"Task underway · Ask for Completion Code when done"* + `"Enter Completion Code →"`). |
-| 6 | **Volunteer OTP Verification** | Input had generic unstyled borders and wrong validation copy (`"Enter the 6-digit code..."`). | Corrected to **4-digit codes**, added high-contrast styled digit cells, and distinct Start vs Completion instructions. |
+| 6 | **Volunteer OTP Verification** | Input had generic unstyled borders and confusing layout. | Aligned with backend **6-digit codes** (`\d{4,6}` supported), added high-contrast styled digit cells, and distinct Start vs Completion instructions. |
 | 7 | **Impact & Trust Presentation** | Numbers were presented without context or explanation. | Highlighted `"Verified Neighbour"` badge, verified task count, active skills, and plain-language Trust Score context. |
 | 8 | **Loading & Empty States** | Flashed blank/dashed boxes while connecting to Firestore. | Added zero-CLS skeleton loaders and warm empty state cards with reassuring guidance. |
 
@@ -42,7 +42,7 @@ All enhancements were achieved without modifying backend logic, Firestore schema
 | **Offer Action** | `Accept` | `Accept & Help` |
 | **Active Task (Accepted)** | `Accepted · Medium priority` | `Task Accepted` + `Coordinate arrival in chat. When you arrive, ask for Start Code.` |
 | **Active Task (In Progress)**| `In progress · Medium priority`| `Task In Progress` + `Task is underway. When finished, ask for Completion Code.` |
-| **OTP Entry Prompt** | `Enter the 6-digit code the customer showed you.` | `Enter Start / Completion Verification Code` + `Ask the customer for their 4-digit code.` |
+| **OTP Entry Prompt** | `Enter the 6-digit code the customer showed you.` | `Enter Start / Completion Verification Code` + `Ask the customer for their 6-digit code.` |
 | **Task Completed Reward** | `Task completed` | `Task verified & completed ✓` + `+12 pts Neighbourhood Karma awarded` |
 
 ---
