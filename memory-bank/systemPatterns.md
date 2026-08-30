@@ -367,7 +367,7 @@ Users holding both `customer` and `volunteer` roles have a unified account with 
   - `70–89`: High Community Trust
   - `40–69`: Building Trust
   - `< 40`: Community Member
-- **Accessible Trust Explainer (`HowTrustWorksModal`)**: Explains the 3 pillars (6-digit physical OTP handshake, mutual neighbour feedback, platform ID verification for sensitive tasks).
+- **Accessible Trust Explainer (`HowTrustWorksModal`)**: Explains the 3 pillars (4-digit physical OTP handshake, mutual neighbour feedback, platform ID verification for sensitive tasks).
 - **Consequence-Aware Blocking & Reporting**: Clear explanation of mutual matching exclusion and confidential safety team review prior to submission.
 - **Account Moderation Banners**: Transparent in-app standing notices for warned (`accountStatus === 'warned'`) or suspended (`accountStatus === 'suspended'`) accounts.
 

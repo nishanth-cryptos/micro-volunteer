@@ -41,7 +41,7 @@ Trust Score is clamped in `[30, 100]` and calculated server-side by `recompute-t
 
 ### The Three Pillars of Trust Explainer:
 
-1. **In-Person Handshake Verification:** 6-digit start and completion passcodes exchanged verbally in person.
+1. **In-Person Handshake Verification:** 4-digit start and completion passcodes exchanged verbally in person.
 2. **Mutual Neighbour Feedback:** Verified ratings after every completed task.
 3. **Verified Identity for Sensitive Tasks:** Mandatory ID verification for Medium risk categories.
 

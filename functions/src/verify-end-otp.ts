@@ -35,8 +35,8 @@ export const verifyEndOtp = onCall(
     if (typeof taskId !== 'string' || taskId.length === 0) {
       throw new HttpsError('invalid-argument', 'taskId is required.');
     }
-    if (typeof code !== 'string' || !/^\d{4,6}$/.test(code)) {
-      throw new HttpsError('invalid-argument', 'Enter the 6-digit code.');
+    if (typeof code !== 'string' || !/^\d{4}$/.test(code)) {
+      throw new HttpsError('invalid-argument', 'Enter the 4-digit code.');
     }
     const callerUid = request.auth.uid;
 

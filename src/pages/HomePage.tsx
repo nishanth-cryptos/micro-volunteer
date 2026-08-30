@@ -244,7 +244,7 @@ export default function HomePage() {
                   Complete with OTP
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#4f4b46]">
-                  When meeting in person, exchange verbal 6-digit passcodes to
+                  When meeting in person, exchange verbal 4-digit passcodes to
                   start and finish the task. This ensures mutual agreement and
                   verified completion.
                 </p>
@@ -350,7 +350,7 @@ export default function HomePage() {
                   In-Person Passcode Handshake
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-[#4f4b46]">
-                  A 6-digit code generated on the customer&apos;s phone must be
+                  A 4-digit code generated on the customer&apos;s phone must be
                   entered by the volunteer at arrival and upon completion,
                   preventing false confirmations.
                 </p>

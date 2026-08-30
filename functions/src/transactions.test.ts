@@ -7,7 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 // 1. OTP Generate / Verify Invariants
 test('OTP Hash & Salt Verification: matches correct OTP and rejects wrong OTP', () => {
-  const otp = '123456';
+  const otp = '1234';
   const salt = randomBytes(16).toString('hex');
   const hash = createHash('sha256')
     .update(otp + salt)
@@ -21,7 +21,7 @@ test('OTP Hash & Salt Verification: matches correct OTP and rejects wrong OTP', 
 
   // Incorrect OTP
   const testHashWrong = createHash('sha256')
-    .update('654321' + salt)
+    .update('4321' + salt)
     .digest('hex');
   assert.notEqual(testHashWrong, hash);
 });

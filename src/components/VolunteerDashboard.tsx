@@ -840,8 +840,8 @@ function DashboardScreen({
                       </h3>
                       <p className="mt-1 text-xs text-[#4f4b46]">
                         {isInProgress
-                          ? 'Task is underway. When finished, ask the customer for their 6-digit Completion Code.'
-                          : 'Coordinate arrival in chat. When you arrive, ask the customer for their 6-digit Start Code.'}
+                          ? 'Task is underway. When finished, ask the customer for their 4-digit Completion Code.'
+                          : 'Coordinate arrival in chat. When you arrive, ask the customer for their 4-digit Start Code.'}
                       </p>
                     </div>
 
@@ -1290,7 +1290,7 @@ function VolunteerProfileScreen({
       setPhoneError('Please enter a valid 10-digit mobile number.');
       return;
     }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
     setGeneratedOtp(code);
     setPhoneStep('otp');
   }
@@ -1881,7 +1881,7 @@ function VolunteerProfileScreen({
               {phoneStep === 'input' ? (
                 <div className="mt-4 space-y-4">
                   <p className="text-xs leading-relaxed text-[#4f4b46]">
-                    Enter your mobile number below. We will send a 6-digit OTP
+                    Enter your mobile number below. We will send a 4-digit OTP
                     code to verify ownership.
                   </p>
                   <div>
@@ -1934,15 +1934,15 @@ function VolunteerProfileScreen({
                       htmlFor="phone-otp-input"
                       className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8a847d] mb-1.5"
                     >
-                      Enter 6-Digit OTP
+                      Enter 4-Digit OTP
                     </label>
                     <input
                       id="phone-otp-input"
                       type="text"
-                      maxLength={6}
+                      maxLength={4}
                       value={otpInput}
                       onChange={(e) => setOtpInput(e.target.value)}
-                      placeholder="123456"
+                      placeholder="1234"
                       className="w-full text-center font-mono text-lg font-bold tracking-widest rounded-xl border border-[#ececea] bg-[#fafaf8] px-4 py-2.5 text-[#131312] focus:border-[#1f6f5c] focus:bg-white focus:outline-none"
                     />
                   </div>

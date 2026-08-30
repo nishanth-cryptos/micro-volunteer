@@ -11,11 +11,11 @@ import {
   OTP_TTL_MS,
 } from './otp';
 
-test('OTP Code Generation: produces 6-digit zero-padded string', () => {
+test('OTP Code Generation: produces 4-digit zero-padded string', () => {
   for (let i = 0; i < 50; i++) {
     const code = generateOtpCode();
-    assert.equal(code.length, 6, 'OTP code must be 6 digits long');
-    assert.match(code, /^\d{6}$/, 'OTP code must contain only numeric digits');
+    assert.equal(code.length, 4, 'OTP code must be 4 digits long');
+    assert.match(code, /^\d{4}$/, 'OTP code must contain only numeric digits');
   }
 });
 
@@ -31,8 +31,8 @@ test('OTP Salt Generation: produces unique 32-character hex string (16 bytes)', 
 });
 
 test('OTP Hash & Salt Verification: matches correct OTP and rejects wrong OTP', () => {
-  const code = '482019';
-  const wrongCode = '910284';
+  const code = '4820';
+  const wrongCode = '9102';
   const salt = generateSalt();
 
   const expectedHash = hashOtp(code, salt);

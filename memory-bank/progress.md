@@ -79,7 +79,7 @@ M8 features implemented:
   - `src/components/CrossRoleBanner.tsx`: Real-time listener alerting dual-role users to active tasks or available broadcast requests in their opposite role.
   - Documented in `docs/product-discovery/11-dual-role-experience.md`.
 
-- **6-Digit OTP Length Standardization (2026-08-30):** Synchronized volunteer-side `VolunteerOtpPanel.tsx` to accept 6-digit codes (`maxLength={6}`, `/^\d{4,6}$/`, `w-64`) matching `CustomerOtpPanel.tsx` and Cloud Functions OTP generators.
+- **4-Digit OTP Length Standardization (2026-08-30):** Synchronized all OTP generation (`functions/src/otp.ts`), verification (`verify-start-otp.ts`, `verify-end-otp.ts`), and frontend panels (`CustomerOtpPanel.tsx`, `VolunteerOtpPanel.tsx`, `VolunteerDashboard.tsx`) to strictly use fast, accessible 4-digit codes (`maxLength={4}`, `/^\d{4}$/`).
 
 - **Service Startup Automation & Seed Scripts (2026-08-30):**
   - Created `scripts/seed-all.js` (`npm run seed:all`) to sync all Admin and Test accounts in one step.

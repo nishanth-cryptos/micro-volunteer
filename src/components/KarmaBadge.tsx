@@ -179,7 +179,7 @@ export function HowTrustWorksModal({
               <span>1. In-Person Handshake Verification</span>
             </div>
             <p className="mt-1">
-              Every task start and completion requires a unique 6-digit verbal
+              Every task start and completion requires a unique 4-digit verbal
               passcode exchanged in person, preventing false or remote
               completions.
             </p>
