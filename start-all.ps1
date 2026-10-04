@@ -9,7 +9,7 @@ Start-Process cmd.exe -ArgumentList '/k "title Hey Padosi - Firebase Emulators &
 
 # 2. Wait for emulators to boot
 Write-Host "`n[2/3] Waiting 10 seconds for emulators to initialize..." -ForegroundColor Cyan
-Start-Sleep -Seconds 10
+Start-Sleep -Seconds 50
 
 # 3. Seed data
 Write-Host "`nSeeding all test accounts..." -ForegroundColor Green
