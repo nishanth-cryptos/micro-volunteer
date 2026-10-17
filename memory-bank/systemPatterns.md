@@ -76,10 +76,11 @@ idVerified, trustScore, verifiedTaskCount, verifiedHours, points, skillPoints, o
 - Rating (server-written): customerRating, customerRatingComment, customerRatedAt
 - Redispatch: lastRedispatchAt, nextCheckAt, lastNudgeStage, lastNudgeSentAt, statusMessage, nearingExpiry
 - Wait tier: expectedWaitTier (fast/normal/flexible), waitStartedAt
+- Reassignment: cancelledVolunteerIds (array of volunteer UIDs excluded from redispatch)
 
 ### offers/{volunteerId} Fields
 
-volunteerId, taskId, customerId, taskTitle, taskCategory, taskRiskLevel, displayName, photoURL, state (offered/accepted/rejected/superseded), score, scoreBreakdown, distanceM, offeredAt, respondedAt.
+volunteerId, taskId, customerId, taskTitle, taskCategory, taskRiskLevel, displayName, photoURL, state (offered/accepted/rejected/superseded/cancelled), score, scoreBreakdown, distanceM, offeredAt, respondedAt.
 
 ### chats/{taskId} Fields
 

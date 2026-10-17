@@ -176,6 +176,7 @@
 | `periodic-redispatch-offers.test.ts` | Periodic redispatch tests                  |
 | `unblock-user.test.ts`            | Unblock user tests                            |
 | `risk-validation.test.ts`         | Risk validation tests                         |
+| `redispatch-exclusions.test.ts`   | Batch 4: Volunteer redispatch exclusion tests |
 
 ## scripts/
 

@@ -290,8 +290,18 @@ export const periodicRedispatchOffers = onSchedule(
 
       const offersSnap = await taskDoc.ref.collection('offers').get();
       const alreadyOffered = new Set(offersSnap.docs.map((d) => d.id));
+      if (Array.isArray(task.cancelledVolunteerIds)) {
+        for (const uid of task.cancelledVolunteerIds) {
+          if (typeof uid === 'string' && uid.length > 0) {
+            alreadyOffered.add(uid);
+          }
+        }
+      }
 
-      const ranked = await rankForTask({ ...task, searchRadiusM: nextRadius });
+      const ranked = await rankForTask(
+        { ...task, searchRadiusM: nextRadius },
+        alreadyOffered,
+      );
       const newCandidates = ranked
         .filter((r) => !alreadyOffered.has(r.uid))
         .slice(0, MAX_NEW_OFFERS_PER_TASK);

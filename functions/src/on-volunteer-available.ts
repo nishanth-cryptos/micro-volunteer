@@ -93,6 +93,12 @@ export const onVolunteerAvailable = onDocumentUpdated(
       const expiresAtMs = (taskData as { expiresAt?: Timestamp }).expiresAt?.toMillis?.();
       if (typeof expiresAtMs === 'number' && Date.now() >= expiresAtMs) continue;
       if (!isEligible(uid, after, taskData)) continue;
+      if (
+        Array.isArray(taskData.cancelledVolunteerIds) &&
+        taskData.cancelledVolunteerIds.includes(uid)
+      ) {
+        continue;
+      }
 
       const offerRef = taskDoc.ref.collection('offers').doc(uid);
       const existing = await offerRef.get();

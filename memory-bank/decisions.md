@@ -117,3 +117,10 @@ Four states: `active` (default), `warned` (admin warning issued), `suspended` (t
 ### D-019 — App Check Integration
 
 Firebase App Check with ReCaptcha Enterprise is conditionally initialised. In emulator mode, a debug token is used. In production, requires `VITE_FIREBASE_APPCHECK_SITE_KEY` env var. Gracefully returns `null` if not configured.
+
+---
+
+### D-020 — Volunteer Redispatch Exclusion Invariant
+
+Cancelled and rejected offer documents in `tasks/{taskId}/offers/{volunteerId}` are preserved across task lifecycles and reassignments rather than deleted. Volunteers who have cancelled (tracked in `task.cancelledVolunteerIds` and offer doc with `state: 'cancelled'`) or rejected (`state: 'rejected'`) are excluded server-authoritatively from subsequent dispatch passes, periodic redispatches, radius expansions, availability sweeps, and next-task suggestions. Volunteers with active offers (`state: 'offered'`) are excluded from re-dispatch to prevent duplicate active offers. Superseded volunteers or other eligible volunteers remain eligible for dispatch upon reassignment.
+

@@ -85,6 +85,12 @@ All 8 milestones (M0–M8) are implemented. The codebase contains the full Phase
 - Evidence workbook generator script (`scripts/generate-evidence-workbook.js`)
 - Product discovery documentation suite (`docs/product-discovery/`)
 
+### Production Hardening Batches (Pre-Production Audit Fixes)
+- **Batch 1 (PB-1 & PB-2)**: Atomic failed-attempt tracking with 5-attempt lockout for Start/End OTPs (`verifyStartOtp`, `verifyEndOtp`, `generateStartOtp`, `generateEndOtp`); atomic transaction idempotency for reward points (`awardPointsOnCompletion`).
+- **Batch 2**: Firestore composite index coverage in `firestore.indexes.json` for multi-field queries across functions and client dashboards.
+- **Batch 3**: Open searching task read visibility for authenticated volunteers in `firestore.rules`; server-authoritative 24-hour task expiry enforcement in `periodicRedispatchOffers` and transactional `acceptOffer`.
+- **Batch 4**: Volunteer redispatch exclusion fix. Preserved cancelled/rejected offer documents instead of wiping subcollection on reassignment in `dispatchOffers`. Added server-authoritative exclusion of cancelled (`task.cancelledVolunteerIds`, offer `state: 'cancelled'`) and rejected (`state: 'rejected'`) volunteers across initial dispatch, periodic redispatch, radius expansion, and next-task suggestions.
+
 ## What's Next
 
 - Push notifications (FCM) — out of scope for Phase 1
