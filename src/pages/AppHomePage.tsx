@@ -12,6 +12,7 @@ import { useActiveRole } from '../lib/use-active-role';
 import { CustomerDashboard } from '../components/CustomerDashboard';
 import { VolunteerDashboard } from '../components/VolunteerDashboard';
 import { KarmaToast } from '../components/KarmaToast';
+import { Logo } from '../components/Logo';
 
 export default function AppHomePage() {
   const state = useAuthState();
@@ -111,8 +112,19 @@ function AdminHomeScreen({ name }: { name: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900">
-      <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
+    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#ececea] bg-white px-6 sm:px-10">
+        <div className="flex items-center gap-2.5">
+          <Link to="/admin" aria-label="Hey Padosi Admin" className="flex items-center">
+            <Logo size="md" />
+          </Link>
+        </div>
+        <span className="rounded-full bg-[#e3efe9] px-3 py-1 text-xs font-bold text-[#1f6f5c]">
+          Admin Portal
+        </span>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
         <h1 className="text-3xl font-semibold tracking-tight">
           Welcome, {name}.
         </h1>
@@ -148,7 +160,7 @@ function AdminHomeScreen({ name }: { name: string }) {
         >
           Sign out
         </button>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

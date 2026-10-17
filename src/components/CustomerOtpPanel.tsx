@@ -115,7 +115,39 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
             onClick={handleCopy}
             className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-[#fafaf8] px-3.5 py-1 text-xs font-medium text-[#4f4b46] transition hover:border-[#1f6f5c] hover:bg-white hover:text-[#131312] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
           >
-            {copied ? '✓ Copied to clipboard' : '📋 Copy code'}
+            {copied ? (
+              <>
+                <svg
+                  className="h-3.5 w-3.5 text-emerald-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Copied to clipboard</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  className="h-3.5 w-3.5 text-[#4f4b46]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                  />
+                </svg>
+                <span>Copy code</span>
+              </>
+            )}
           </button>
         </div>
       )}
@@ -136,9 +168,24 @@ export function CustomerOtpPanel({ taskId, phase }: Props) {
       )}
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#f3f1ec] pt-4">
-        <p className="text-xs text-[#8a847d]">
-          🛡️ Protects you by ensuring tasks only start/finish with your direct
-          confirmation.
+        <p className="inline-flex items-center gap-1.5 text-xs text-[#8a847d]">
+          <svg
+            className="h-3.5 w-3.5 shrink-0 text-[#1f6f5c]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+            />
+          </svg>
+          <span>
+            Protects you by ensuring tasks only start/finish with your direct confirmation.
+          </span>
         </p>
         <button
           type="button"

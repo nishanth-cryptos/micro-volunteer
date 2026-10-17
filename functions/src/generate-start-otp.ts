@@ -68,6 +68,7 @@ export const generateStartOtp = onCall(
       startOtpHash: hash,
       startOtpSalt: salt,
       startOtpExpiresAt: expiresAt,
+      startOtpAttempts: 0,
     });
 
     await writeAuditEvent(taskId, 'start_otp_generated', callerUid);

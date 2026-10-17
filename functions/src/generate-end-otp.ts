@@ -64,6 +64,7 @@ export const generateEndOtp = onCall(
       endOtpHash: hash,
       endOtpSalt: salt,
       endOtpExpiresAt: expiresAt,
+      endOtpAttempts: 0,
     });
 
     await writeAuditEvent(taskId, 'end_otp_generated', callerUid);

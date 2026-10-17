@@ -9,6 +9,7 @@ import {
   setTrailConsent,
   wipeAllTrailData,
 } from '../lib/trail-service/trail-store';
+import { Logo } from '../components/Logo';
 import type { CanonicalRoute } from '../lib/trail-service/types';
 
 export function YourRoutesPage() {
@@ -142,14 +143,12 @@ export function YourRoutesPage() {
                 />
               </svg>
             </Link>
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1f6f5c] text-xs font-bold text-white">
-                HP
-              </span>
+            <Link to="/app" aria-label="Hey Padosi Home" className="flex items-center gap-2.5">
+              <Logo size="sm" />
               <span className="font-bold tracking-tight text-[#131312]">
                 Your Commute Routes
               </span>
-            </div>
+            </Link>
           </div>
           <span className="rounded-full bg-[#e3efe9] px-3 py-1 text-xs font-bold text-[#1f6f5c]">
             DPDP Act Compliant

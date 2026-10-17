@@ -1,119 +1,203 @@
 # File Index
 
-> One line per source file: path → purpose → key exports / responsibilities. Update whenever a file is added, moved, or significantly changed.
+> One line per source file → purpose → key exports.
 
-## Root config
+## Root
 
-- `package.json` — frontend dependencies (pinned exact), npm scripts (`dev`, `build`, `preview`, `typecheck`, `lint`, `format`, `format:check`).
-- `tsconfig.json` — TS strict suite for `src/`. Includes `noUncheckedIndexedAccess`, `noImplicitOverride`, `exactOptionalPropertyTypes`.
-- `tsconfig.node.json` — standalone editor-awareness config for `vite.config.ts` (not referenced from root tsconfig).
-- `vite.config.ts` — React + Tailwind v4 plugins. No app logic.
-- `eslint.config.js` — flat config; type-aware lint for `src/**`, plain lint for root configs; ignores `dist/`, `functions/lib/`, `.firebase/`.
-- `.prettierrc.json` — single quotes, trailing comma all, 80 cols.
-- `.prettierignore` — node_modules, dist, build, .firebase, functions/lib, package-lock.json.
-- `.gitignore` — node_modules, dist, .env\*, Firebase debug logs, editor/OS junk.
-- `.env.example` — Firebase Web SDK env var NAMES (no values).
-- `index.html` — Vite entry HTML. Mounts `#root` and `src/main.tsx`.
-- `firebase.json` — Hosting (dist/), Firestore, Storage, Functions, Emulators (auth 9099 / firestore 8080 / functions 5001 / storage 9199 / hosting 5000 / UI 4000).
-- `firestore.rules` — deny-by-default with role/owner-scoped grants per collection (users, tasks + offers/events, reports, blocks, adminActions, moderationLog, activityLog, chats + messages). M7 chats block: participant-only read; participant create (chatId == taskId, participants == task customer+accepted volunteer, task accepted/in_progress/completed); update limited to `lastMessageAt`/`lastMessagePreview`; messages create by a participant with `system == false` and a non-blocked pair (`canPostMessage`); messages immutable for clients (system messages + `reportedBy` are Admin-SDK-only).
-- `storage.rules` — owner-scoped photo + id-image grants.
-- `firestore.indexes.json` — composite indexes: tasks (customerId/createdAt, acceptedVolunteerId/acceptedAt), offers collection-group, activityLog (eventType/createdAt), chats (participants array-contains / lastMessageAt desc — inbox).
-- `.firebaserc` — `default` project alias = `REPLACE_WITH_FIREBASE_PROJECT_ID` (set during Console step).
+| File                      | Purpose                                            | Key Exports / Notes                       |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------- |
+| `index.html`              | HTML entry point; loads fonts, favicon, meta tags   | `#root` mount point                       |
+| `package.json`            | Root dependencies and scripts                      | `volunteer-connector`                     |
+| `firebase.json`           | Firebase service config (hosting, firestore, storage, functions, emulators) | Emulator port assignments |
+| `.firebaserc`             | Firebase project binding                           | `micro---volunteer`                       |
+| `firestore.rules`         | Firestore security rules                           | Deny-by-default + explicit grants         |
+| `firestore.indexes.json`  | Composite index definitions                        | tasks: status + nextCheckAt               |
+| `storage.rules`           | Storage security rules                             | Profile photo + ID image rules            |
+| `tsconfig.json`           | Frontend TypeScript config                         | ES2022, strict, react-jsx                 |
+| `tsconfig.node.json`      | Node-side TypeScript config                        | Vite config files                         |
+| `vite.config.ts`          | Vite build config                                  | React + Tailwind v4 plugins               |
+| `eslint.config.js`        | ESLint flat config                                 | Type-aware for src; react-hooks, jsx-a11y |
+| `.prettierrc.json`        | Prettier config                                    | Formatting rules                          |
+| `.prettierignore`         | Prettier ignore patterns                           | dist, node_modules, etc.                  |
+| `.env.example`            | Environment variable template                      | VITE_FIREBASE_* vars                      |
+| `CLAUDE.md`               | AI assistant rules + memory bank index             | Rules of engagement, commands             |
+| `CHECKPOINT.md`           | Legacy entry point to memory bank                  | Points to memory-bank/                    |
+| `playwright.config.ts`    | Playwright E2E test config                         | Chromium, localhost:5173                   |
+| `start-all.bat`           | Windows batch script to start all services         | —                                         |
+| `start-all.ps1`           | PowerShell script to start all services            | —                                         |
 
-## Frontend src/
+## src/
 
-- `src/main.tsx` — React root mount. Wraps app in `<AuthProvider>` + `<RouterProvider>`. Throws if `#root` missing.
-- `src/index.css` — `@import "tailwindcss";` (Tailwind v4 model) **plus** the `vc-*` design-system animation keyframes (`vc-fade-up`, `vc-fade-in`, `vc-shimmer`, `vc-check-pop`, `vc-radar-ping`, `vc-radar-halo`, `vc-blip-in`, `vc-cell-flip`, `vc-dot-bounce`) ported from the Claude Design handoff bundle (2026-06-14). Used by CustomerDashboard, CreateTaskPage, TaskDetailPage, CustomerOtpPanel. Respects `prefers-reduced-motion`.
-- `src/vite-env.d.ts` — typed `ImportMetaEnv` for the `VITE_FIREBASE_*` vars + `VITE_USE_EMULATORS`.
-- `src/router.tsx` — `createBrowserRouter` route table. Public: `/`, `/login`, `/signup`. Protected: `/onboarding/consent`, `/onboarding/role` (allowIncomplete), `/app`.
-- `src/lib/firebase.ts` — `getFirebaseApp()` + lazy `auth()`, `db()`, `storage()`, `functions()` accessors. Connects to emulators when `VITE_USE_EMULATORS=1`. Functions region: `asia-south1`.
-- `src/lib/auth-context.tsx` — `<AuthProvider>` + `useAuthState()`. Discriminated union: `loading | signed-out | no-doc | incomplete | ready`. Subscribes to `users/{uid}` via `onSnapshot`.
-- `src/lib/protected-route.tsx` — `<ProtectedRoute requires="consent" | "role" | "ready">`. Per-step guard; redirects users at any other step.
-- `src/lib/use-redirect-when-signed-in.ts` — `useRedirectWhenSignedIn()` hook. Used by `/login` and `/signup` to forward authenticated users to the correct next step, after `AuthProvider` state has settled (avoids the auth-then-navigate race — see errors.md 2026-06-07).
-- `src/lib/auth-errors.ts` — `readableAuthError(err)` maps Firebase error codes to short user-facing strings.
-- `src/components/AuthMethodTabs.tsx` — accessible Phone / Email tab switcher (role=tablist).
-- `src/components/PhoneAuthForm.tsx` — phone → OTP form. Uses `RecaptchaVerifier` invisible mode; auto-bypassed by Auth emulator in dev.
-- `src/components/EmailAuthForm.tsx` — email + password (+ confirm on signup) form.
-- `src/components/TaskLocationPicker.tsx` — Leaflet + OSM map with a draggable marker. Geolocation on mount (5 s timeout) → fallback to Mumbai. Computes H3 cell at resolution 9 (h3-js) and surfaces lat/lng/h3Cell to the parent.
-- `src/components/OnboardingProgress.tsx` — numbered stepper used on `/signup`, `/onboarding/role`, `/onboarding/profile`, and `/onboarding/skills`. Default render is 3 steps (Account · Role · Profile); pass `includeSkills` to render the 4-step (volunteer) variant ending in "Skills". Consent gate is unnumbered.
-- `src/components/MyTasksList.tsx` — live customer-side list of own tasks via `onSnapshot(customerId == uid, orderBy createdAt desc)`. Rows show status badge, risk colour, and link to task detail.
-- `src/components/OfferInbox.tsx` — volunteer-side inbox shown on `/app`. Collection-group query on `offers` where `volunteerId == uid AND state == 'offered'`. Each row renders denormalised task info and `Accept` / `Reject` buttons calling the corresponding Cloud Functions.
-- `src/components/ReportBlockPanel.tsx` — Report/Block reason submission form overlays. Accepts `viewerRole` (Block button only renders for `customer` viewers) and `variant` (`'card'` default = full Safety & Trust panel; `'inline'` = bare buttons, used in the chat header). Shows a neutral "already reported" message when the `reportUser` callable rejects with `functions/already-exists`.
-- `src/components/ChatPanel.tsx` — M7 in-app chat. Live conversation between a task's customer and accepted volunteer (chatId === taskId). Subscribes to `chats/{taskId}/messages` (ordered by `sentAt`); sends participant messages via client-direct writes (also bumps `lastMessageAt`/`lastMessagePreview`); ensure-creates the chat doc for legacy/seeded accepted tasks. Header shows the other party + inline `ReportBlockPanel` (report user / block — gated by `canReport`). System messages render centred. Each incoming message offers a per-message Report (calls `reportUser` with `messageRef`); reported messages show a "Reported" marker. Composer disabled when read-only (completed/cancelled/expired) or when the pair is blocked. Read-only history is shown on completed tasks.
-- `src/components/BlockedUsersList.tsx` — Customer-side read-only list of users they have blocked. Subscribes to `blocks` where current uid is `userA` or `userB`, filters to those with `blockedBy == uid`, renders name + photo from denormalised snapshots on the block doc. Shown on `/app` under the customer block.
-- `src/components/KarmaBadge.tsx` — Lotus SVG symbol alongside point reward number with custom Tailwind CSS-only hover tooltip.
-- `src/components/KarmaToast.tsx` — Screen-bottom overlay notification showing earned points on task completion with auto-fade and reduced motion respect.
-- `src/components/CustomerDashboard.tsx` — Customer-facing redesign ported from Claude Design handoff bundle (2026-06-14). Two-screen layout (Tasks / Profile) with a floating bottom-nav pill. Tasks screen: greeting, full-width Leaflet/OSM map card pinned to `userDoc.lastKnownLocation` (no volunteer pins — privacy), Post-task CTA + Ongoing tasks list (filtered to `searching | accepted | in_progress`) below in a 2-col grid. Profile screen: gradient hero (Tasks posted + Completion %), Customer details (phone + email only; address + emergency contact deferred per scope Q&A), and Past tasks segmented tabs (All / Completed / Accepted / Blocked) backed by the same task subscription + the customer's `blocks` count. Rendered from `AppHomePage` whenever `roles` includes `customer` (dual-role too). Polish pass 2026-06-14: screen-switch fade-up transition, animated Verified checkmark, hover-lift on task cards, scaled active state on bottom-nav buttons.
-- `src/components/CustomerOtpPanel.tsx` — Customer-side Start/End OTP panel rendered inside TaskDetailPage. Generates plaintext via `generateStartOtp` / `generateEndOtp` callables (plaintext only ever in local state). **Re-themed 2026-06-14** to match Claude Design handoff: flip-cell reveal for each digit, gradient "Get start/end code" button, themed expired/error banners, refresh countdown in header.
-- `src/lib/catalog.ts` — typed re-export of `scripts/seed/catalog.json`. Exposes `CATEGORIES`, `SKILLS`, `getCategory()`, `getSkillLabel()`, and `deriveRisk(categoryKey)`.
-- `src/pages/CreateTaskPage.tsx` — customer creates a task. Structured chips for category + skills, numeric duration, four short textareas, map pin. Risk auto-derived from category. `addDoc` to `tasks/{auto-id}` with status='searching' and 24h expiry; navigates to `/tasks/{id}` on success.
-- `src/pages/TaskDetailPage.tsx` — task detail for both parties, live on `tasks/{id}` + offers + events. Searching: customer sees the pending-offers queue with score chips (Dist/Skill/Trust/Past) + a reassignment banner; volunteers are redirected to `/app`. Accepted/in_progress: accepted-party card, the M7 `ChatPanel` (active composer; report/block live in the chat header), and the Start/End OTP panels (`CustomerOtpPanel` / `VolunteerOtpPanel`). Completed: points/karma, read-only `ChatPanel` history, `CustomerRatingPanel`, and the standalone `ReportBlockPanel` (only within the 24h post-completion window, since the chat is then read-only).
-- `src/pages/CreateTaskPage.tsx` — customer creates a task. Same Firestore write logic (category + skills + duration + textareas + map pin → `tasks/{auto-id}` with status='searching' + 24h expiry; risk auto-derived). **Re-themed 2026-06-14** to match Claude Design handoff: sticky top progress strip with shimmer fill + live %, animated chips (single Category, multi Skills max 5 with disabled-at-cap state), time stepper with +/- buttons + preset pills, sticky bottom action bar with live summary that slides in once any field is filled.
-- `src/pages/TaskDetailPage.tsx` — customer view of a task + offers + lifecycle state. **Re-themed 2026-06-14**: when `status=='searching'` the customer sees a `RadarSearching` component (pulsing rings + fade-in volunteer blips driven by real `offers` count, live `reached / km radius / mm:ss timer` stats — no rotating sweep per design chat); when `accepted`/`in_progress` the "Task accepted" card is now a green gradient hero with animated checkmark, volunteer avatar + online dot, and a bouncing-dots chat-coming-soon hint. Score-breakdown chips for pending offers retained underneath the radar.
-- `src/pages/AdminDashboard.tsx` — Admin-only dashboard with global stats and four tabs (Pending Reports default → User Lookup → Task Audit Trail → Activity Log). Strict no-raw-UID policy throughout: reporter/reported/admin/actor identities all resolved to display names or role labels (Customer / Volunteer / System / Admin). Reports are collapsible cards (collapsed: reporter role · reported name · reason · timestamp; expanded: details + task link + unique reporter count + inline Warn/Suspend/Ban/Dismiss buttons that open the moderation modal pre-set to that action). 10-character minimum reason validation with inline error in both report and lookup moderation forms; success/error banners auto-dismiss after 3 s. Task audit entries are collapsible with role-labelled actor. Activity Log tab paginates `activityLog` (50 per page) with an event-type filter dropdown and "Load more".
-- `src/lib/use-active-role.ts` — `useActiveRole(userDoc)` pure active role resolution hook with UID-scoped `localStorage` persistence.
-- `src/components/RoleSwitcher.tsx` — Reusable accessible segmented pill switcher (`[ 🛒 Need Help ] [ 🤝 Help Others ]`) rendered in top bars for dual-role users.
-- `src/components/CrossRoleBanner.tsx` — Real-time listener alerting dual-role users on active tasks or available broadcast requests in their opposite role.
-- `src/components/VolunteerDashboard.tsx` — Volunteer dashboard with Availability toggle, departure detector modal, live task offers, active missions, and profile screen with Trust Score pill and Karma badge.
-- `src/components/KarmaBadge.tsx` — Indian-themed inline Lotus SVG alongside karma points, plus `TrustScorePill`, `getTrustTier`, and accessible `HowTrustWorksModal` explainer.
-- `src/components/ReportBlockPanel.tsx` — Consequence-aware reporting and mutual blocking panel with confidential submission feedback.
-- `src/lib/geolocation.ts` — `getCurrentLocation()` Promise wrapper over `navigator.geolocation.getCurrentPosition`, plus a `GeolocationError` class with a `userMessage` mapped from the W3C error codes.
-- `src/pages/HomePage.tsx` — public landing.
-- `src/pages/LoginPage.tsx` — sign-in page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
-- `src/pages/SignupPage.tsx` — sign-up page composing Phone + Email forms; uses `useRedirectWhenSignedIn()`.
-- `src/pages/onboarding/ConsentPage.tsx` — T&C capture; on accept writes `users/{uid}` with `consent` + base fields (`setDoc`).
-- `src/pages/onboarding/RolePage.tsx` — role picker; on continue updates `users/{uid}.roles` (`updateDoc`).
-- `src/pages/onboarding/ProfilePage.tsx` — Step 3. Name + photo (required), optional bio (everyone), optional ID image. Uploads to Storage at `users/{uid}/photo` and `users/{uid}/id-image`, then updates user doc with displayName, photoURL, bio, idImagePath. Volunteers continue to step 4 (skills); customer-only users go straight to /app.
-- `src/pages/onboarding/SkillsPage.tsx` — Step 4 (volunteers only). "What can you offer?" card grid sourced from `SKILLS` in `src/lib/catalog.ts`. Each card uses `SkillIcon`. Selecting up to 10 then Continue writes `users/{uid}.skills`; ProtectedRoute flips status to 'ready' and lands the user on /app.
-- `src/components/SkillIcon.tsx` — Per-skill 64x64 SVG icon switch. One case per skill key in `scripts/seed/catalog.json` plus a generic fallback. Simple line + accent style, not the bespoke illustrated stickperson art from the Figma reference.
-- `src/pages/AppHomePage.tsx` — authenticated home. Admins short-circuit to a minimal `AdminHomeScreen` (welcome heading, primary "Go to Admin Dashboard" button, neutral alert showing pending-report count if > 0, sign out). Volunteers/customers get the regular dashboard with dynamic dual-role routing, availability toggle, karma, blocked-users list, etc. Sign-out button on both.
+| File                      | Purpose                                            | Key Exports                               |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------- |
+| `main.tsx`                | App entry: mounts AuthProvider + RouterProvider     | —                                         |
+| `router.tsx`              | Route table with ProtectedRoute guards             | `router`                                  |
+| `index.css`               | Global styles: Tailwind import, fonts, vc-* animations | CSS animation classes                  |
+| `vite-env.d.ts`           | Vite client type declarations + env var types      | —                                         |
 
-## Scripts & Service Launchers
+## src/lib/
 
-- `scripts/dev-all.js` — Single-terminal Node supervisor with TCP socket polling for emulator readiness, automatic seeding, and Vite launching.
-- `scripts/seed-all.js` — Single-command data seeder running `seed-admin.js` and `seed-users.js`.
-- `start-all.bat` — Windows Batch multi-window launcher (`start cmd /k`).
-- `start-all.ps1` — PowerShell multi-window launcher (`Start-Process cmd.exe`).
+| File                         | Purpose                                         | Key Exports                               |
+| ---------------------------- | ----------------------------------------------- | ----------------------------------------- |
+| `firebase.ts`                | Firebase SDK init + emulator wiring              | `getFirebaseApp`, `auth`, `db`, `storage`, `functions`, `appCheck` |
+| `auth-context.tsx`           | Auth state provider (discriminated union)        | `AuthProvider`, `useAuthState`, `UserDoc`, `AuthState`, `Role` |
+| `protected-route.tsx`        | Route guard + banned/suspended/frozen screens    | `ProtectedRoute`, `RequiredStep`          |
+| `auth-errors.ts`             | Firebase Auth error → user message mapping       | `readableAuthError`                       |
+| `catalog.ts`                 | Typed access to seed catalog JSON                | `CATEGORIES`, `SKILLS`, `getCategory`, `getSkillLabel`, `deriveRisk` |
+| `geolocation.ts`             | Browser geolocation wrapper (promise-based)      | `getCurrentLocation`, `BrowserLocation`, `GeolocationError` |
+| `use-active-role.ts`         | Hook: active role for dual-role users            | `useActiveRole`, `ActiveRole`             |
+| `use-redirect-when-signed-in.ts` | Hook: redirect to correct step on sign-in   | `useRedirectWhenSignedIn`                 |
 
-## Scripts / seed
+## src/lib/trail-service/
 
-- `scripts/seed/catalog.json` — starter seed for `catalog/categories` and `catalog/skills`. Reviewed pre-launch; loaded into Firestore by an admin-only callable in M1. Replaced by the M8 admin UI for live edits.
-- `scripts/seed-admin.js` — root redirect wrapper that executes the Admin SDK seed script to create the local administrator.
-- `scripts/seed-users.js` — root redirect wrapper that executes the Admin SDK seed script to create test volunteer + customer accounts.
-- `functions/scripts/seed-admin.js` — Admin SDK seed: 2 admins (admin@example.org, admin2@example.org / `admin123`) with `isAdmin: true` + full volunteer-shape fields. Idempotent — re-syncs password + displayName on existing accounts.
-- `functions/scripts/seed-users.js` — Admin SDK seed: 3 volunteer-only + 3 customer-only + 3 dual-role test users (all Kalewadi-centred, `pass123`). Same idempotent password resync as seed-admin.
+| File                       | Purpose                                          | Key Exports                               |
+| -------------------------- | ------------------------------------------------ | ----------------------------------------- |
+| `types.ts`                 | TrailService data models and constants            | `StayPoint`, `Trip`, `CanonicalRoute`, `DepartureEvent`, `TaskSuggestion`, `TrailConsent`, `LocationPing`, `TRAIL_CONSTANTS` |
+| `trail-store.ts`           | Firestore persistence for trail data + consent    | Trail CRUD functions, consent management  |
+| `stay-point-detector.ts`   | Detect stay points from location pings            | Stay-point detection logic                |
+| `trip-segmenter.ts`        | Segment trips between stay points                 | Trip segmentation logic                   |
+| `route-clusterer.ts`       | Cluster trips into canonical routes               | Route clustering logic                    |
+| `departure-detector.ts`    | Detect departures from stay points                | Departure detection logic                 |
+| `corridor-matcher.ts`      | Match tasks to route corridors                    | Corridor matching logic                   |
 
-## Cloud Functions
+## src/pages/
 
-- `functions/package.json` — `firebase-functions@7.2.5`, `firebase-admin@13.10.0`, Node 22 runtime.
-- `functions/tsconfig.json` — TS strict; `module: node16`, `moduleResolution: node16`, `rootDir: src`, `outDir: lib`.
-- `functions/src/index.ts` — re-exports every concrete Cloud Function from its own file so the emulator + deploy pipeline can find them.
-- `functions/src/chat.ts` — M7 chat server helpers (not callable). `ensureChatForTask(db, taskId, customerId, volunteerId)` idempotently creates `chats/{taskId}` and, if the task was reassigned to a different volunteer, `recursiveDelete`s the prior conversation first so the new volunteer never inherits old messages. `appendSystemMessage(db, taskId, text)` adds a `system: true` message + refreshes the inbox preview (best-effort; skipped if the chat doesn't exist). Admin SDK writes bypass the participant-only rules.
-- `functions/src/scoring.ts` — shared matching/scoring code: `TaskDoc`, `UserDoc`, `isEligible`, `score`, `haversineM`, `rankForTask`. Both `rankNearbyVolunteers` (callable preview) and `dispatchOffers` (trigger) call into this.
-- `functions/src/rank-nearby-volunteers.ts` — HTTPS callable (region asia-south1) wrapping `rankForTask`. Customer-only preview.
-- `functions/src/dispatch-offers.ts` — Firestore onCreate trigger on `tasks/{taskId}`. Scores eligible volunteers and writes per-volunteer offer documents at `tasks/{taskId}/offers/{volunteerId}` with denormalised `taskTitle` / `taskCategory` / `taskRiskLevel` / `customerId` so the volunteer inbox renders without a parent-task fetch. Idempotent (skips if subcollection already has docs). Top batch capped at 10.
-- `functions/src/accept-offer.ts` — HTTPS callable. Race-safe Firestore transaction flips `tasks/{id}.status` from 'searching' to 'accepted' and the corresponding offer to 'accepted'. Outside the transaction, marks sibling 'offered' offers as 'superseded', appends the activity-log entry, and (best-effort, M7) opens the chat via `ensureChatForTask` + a "you're connected" system message.
-- `functions/src/reject-offer.ts` — HTTPS callable. Marks one offer 'rejected'.
-- `functions/src/award-points-on-completion.ts` — Triggers on task completion to award points to volunteer and customer, log audit event, and run trust score recomputation.
-- `functions/src/recompute-trust-score.ts` — Recalculates user trust score based on completed rated tasks, ID verification status, and report penalties. Clamped to `[30, 100]`.
-- `functions/src/report-user.ts` — Reporting HTTPS callable. Enforces: reporter must be the customer or accepted volunteer of the task; task must be `accepted` / `in_progress` / `completed` (and if completed, within 24h of `completedAt`); volunteers can't report while status is `accepted` (Start OTP must be verified first); same reporter cannot file twice against the same target on the same task (`already-exists`). Computes `uniqueReporterCount` for the (reportedUid, taskId) pair inside a transaction and updates sibling docs so the count stays consistent. Accepts an optional M7 `messageRef` (must be `chats/{taskId}/messages/{id}`) — stored on the report doc and `arrayUnion`-marked onto the message's `reportedBy` (Admin SDK, best-effort).
-- `functions/src/block-user.ts` — Mutual block creation HTTPS callable. Writes `blockedBy` (initiator uid) plus `userANameSnapshot` / `userAPhotoSnapshot` / `userBNameSnapshot` / `userBPhotoSnapshot` on the block doc so client-side "Blocked users" lists can render without a privileged read on the other party.
-- `functions/src/apply-moderation-action.ts` — Admin-only action (warn/suspend/ban/unban) HTTPS callable. Sets `bannedAt` on ban and clears it on dismiss; on dismiss-from-banned, `recursiveDelete`s every in-flight task the user posted as customer (`searching` / `accepted` / `in_progress`) so nothing is left dangling. Completed/cancelled tasks and their audit events are preserved. Appends a `moderation_action` entry to `activityLog`.
-- `functions/src/activity-log.ts` — Shared helper for the top-level `activityLog/{id}` site-wide audit feed surfaced in the admin dashboard. Exports `appendActivityLog(db, entry)` (event type, denormalised description string, userId, optional taskId) and `safeDisplayName(db, uid, fallback)` for looking up display names without crashing the parent function on a missing user doc. Descriptions are always built without raw UIDs — name substitution happens at write time.
-- `functions/src/log-user-registered.ts` — Firestore `onDocumentCreated('users/{uid}')` trigger. Appends a `user_registered` activity-log entry the first time a user doc lands (typically right after T&C consent). Falls back to "A new user" when displayName hasn't been set yet.
-- `functions/src/scheduled-purge-banned-users.ts` — Daily cron (`every 24 hours`, region `asia-south1`). For any `users/{uid}` with `accountStatus == 'banned'` and `bannedAt` older than 30 days: deletes the Firebase Auth account, removes Storage `/users/{uid}/photo` + `/users/{uid}/id-image`, and `recursiveDelete`s the user doc + subcollections (moderationLog, deviceTokens, notifications). Tasks, reports, blocks, adminActions are deliberately preserved — dangling UID refs are tolerated by UI fallbacks.
-- `functions/src/on-volunteer-available.ts` — Firestore `onDocumentUpdated` trigger on `users/{uid}`. Fires when `availableNow` flips `false → true`. For every `searching` task the volunteer is eligible for (per `isEligible` in scoring.ts) and doesn't already have an offer doc on, writes one. Caps at 50 tasks per flip. Mutual-block aware. Plugs the "volunteer came online after the initial dispatch already ran" gap.
-- `functions/src/periodic-redispatch-offers.ts` — Scheduled function (`every 1 minutes`, region `asia-south1`) implementing the `expandRadius` slot from systemPatterns.md. For each `searching` task older than 30s whose `lastRedispatchAt` is ≥ 60s ago: bumps `searchRadiusM` by 1000 m (cap 10 000 m), re-runs `rankForTask`, writes offer docs for up to 10 newly-eligible volunteers per cycle, and appends a `radius_expanded` audit event. Stamps `lastRedispatchAt` on the task doc to throttle re-runs.
-- `functions/src/moderation-helper.ts` — Shared helpers for enforcing suspension/ban checks across all callable functions.
+| File                      | Purpose                                            | Key Exports                               |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------- |
+| `HomePage.tsx`            | Public landing page (brand, features, CTA)         | `default` export                          |
+| `LoginPage.tsx`           | Login page (phone + email auth tabs)               | `default` export                          |
+| `SignupPage.tsx`          | Signup page (phone + email auth tabs)              | `default` export                          |
+| `AppHomePage.tsx`         | Main app hub: renders Customer or Volunteer dashboard | `default` export                       |
+| `CreateTaskPage.tsx`      | Task creation form (category, skills, location, description) | `default` export                |
+| `TaskDetailPage.tsx`      | Task detail: lifecycle view for both roles         | `default` export                          |
+| `AdminDashboard.tsx`      | Admin panel: reports, user lookup, moderation, activity log | `default` export                 |
+| `YourRoutesPage.tsx`      | View/manage saved commute routes                   | `YourRoutesPage`                          |
 
-## Documentation
+## src/pages/onboarding/
 
-- `CHECKPOINT.md` — thin pointer to `memory-bank/`.
-- `CLAUDE.md` — agent rules summary + pointer to `memory-bank/`.
-- `memory-bank/projectbrief.md` — scope source of truth (12 features + out-of-scope).
-- `memory-bank/techContext.md` — stack, versions, env vars, commands.
-- `memory-bank/systemPatterns.md` — architecture, Firestore model (pending approval), security rules summary, Cloud Function inventory, PII inventory, matching formula, UI patterns.
-- `memory-bank/decisions.md` — append-only decision log.
-- `memory-bank/errors.md` — append-only error/issue log.
-- `memory-bank/progress.md` — current milestone, done/in-progress/blocked, mocks.
-- `memory-bank/fileIndex.md` — this file.
+| File                      | Purpose                                            | Key Exports                               |
+| ------------------------- | -------------------------------------------------- | ----------------------------------------- |
+| `ConsentPage.tsx`         | T&C consent with version + timestamp               | `default` export                          |
+| `RolePage.tsx`            | Role selection (customer/volunteer/both)            | `default` export                          |
+| `ProfilePage.tsx`         | Profile setup (name, photo, optional ID image, bio) | `default` export                         |
+| `SkillsPage.tsx`          | Skills selection (volunteers only)                 | `default` export                          |
+
+## src/components/
+
+| File                            | Purpose                                      | Key Exports                               |
+| ------------------------------- | -------------------------------------------- | ----------------------------------------- |
+| `CustomerDashboard.tsx`         | Customer home: my tasks, create, lifecycle   | `default` export                          |
+| `VolunteerDashboard.tsx`        | Volunteer home: offer inbox, accepted tasks  | `default` export                          |
+| `ChatPanel.tsx`                 | In-app chat UI with message list + input     | `default` export                          |
+| `OfferInbox.tsx`                | Volunteer's pending offers list              | `default` export                          |
+| `AcceptedTasksList.tsx`         | Volunteer's accepted tasks list              | `default` export                          |
+| `MyTasksList.tsx`               | Customer's posted tasks list                 | `default` export                          |
+| `RoleSwitcher.tsx`              | Dual-role toggle (customer ↔ volunteer)      | `default` export                          |
+| `CrossRoleBanner.tsx`           | Banner for dual-role context switching       | `default` export                          |
+| `AuthMethodTabs.tsx`            | Phone/Email auth method selector tabs        | `default` export                          |
+| `PhoneAuthForm.tsx`             | Phone number + OTP verification form         | `default` export                          |
+| `EmailAuthForm.tsx`             | Email/password sign-in/up form               | `default` export                          |
+| `TaskLocationPicker.tsx`        | Leaflet map-based location picker + H3       | `default` export                          |
+| `CustomerOtpPanel.tsx`          | Customer's OTP generation UI                 | `default` export                          |
+| `VolunteerOtpPanel.tsx`         | Volunteer's OTP entry/verification UI        | `default` export                          |
+| `CustomerRatingPanel.tsx`       | Post-completion volunteer rating form        | `default` export                          |
+| `ReportBlockPanel.tsx`          | Report/block user UI (in chat and task)      | `default` export                          |
+| `BlockedUsersList.tsx`          | View/unblock blocked users                   | `default` export                          |
+| `KarmaBadge.tsx`                | Karma/trust score display badge              | `default` export                          |
+| `KarmaToast.tsx`                | Points earned toast notification             | `default` export                          |
+| `SkillIcon.tsx`                 | SVG icons for all 25 skills                  | `default` export                          |
+| `Logo.tsx`                      | App logo component                           | `default` export                          |
+| `OnboardingProgress.tsx`        | Step progress indicator for onboarding       | `default` export                          |
+| `ReasonBottomSheet.tsx`         | Bottom sheet for cancel/delete reason selection | `default` export                        |
+| `ScheduleTaskBottomSheet.tsx`   | Bottom sheet for scheduling a task           | `default` export                          |
+| `PostCompletionSuggestionCard.tsx` | Post-completion nearby task suggestion card | `default` export                         |
+| `DeparturePromptModal.tsx`      | Modal for trail-based departure prompts      | `default` export                          |
+
+## src/assets/
+
+| File                      | Purpose                                            |
+| ------------------------- | -------------------------------------------------- |
+| `hey-padosi-logo.png`     | App logo image (also in public/)                   |
+
+## functions/src/
+
+| File                              | Purpose                                      | Key Exports                               |
+| --------------------------------- | -------------------------------------------- | ----------------------------------------- |
+| `index.ts`                        | Functions entry point; re-exports all functions | All 24 exported functions                |
+| `scoring.ts`                      | Matching formula, eligibility, ranking        | `rankForTask`, `rankForCorridor`, `isEligible`, `score`, `haversineM`, `ScoreBreakdown`, `RankedVolunteer`, `TaskDoc`, `UserDoc` |
+| `dispatch-offers.ts`              | Firestore trigger: fan out offers on task create | `dispatchOffers`                        |
+| `accept-offer.ts`                 | Callable: volunteer accepts task              | `acceptOffer`                             |
+| `reject-offer.ts`                 | Callable: volunteer rejects offer             | `rejectOffer`                             |
+| `generate-start-otp.ts`           | Callable: customer generates start OTP        | `generateStartOtp`                        |
+| `verify-start-otp.ts`             | Callable: volunteer verifies start OTP        | `verifyStartOtp`                          |
+| `generate-end-otp.ts`             | Callable: customer generates end OTP          | `generateEndOtp`                          |
+| `verify-end-otp.ts`               | Callable: volunteer verifies end OTP          | `verifyEndOtp`                            |
+| `submit-customer-rating.ts`       | Callable: customer rates volunteer            | `submitCustomerRating`                    |
+| `award-points-on-completion.ts`   | Trigger: award points on task completion      | `awardPointsOnCompletion`                 |
+| `recompute-trust-score.ts`        | Shared: trust score computation               | `recomputeTrustScore`, `computeTrustScorePure` |
+| `report-user.ts`                  | Callable: submit user report                  | `reportUser`                              |
+| `block-user.ts`                   | Callable: block another user                  | `blockUser`                               |
+| `unblock-user.ts`                 | Callable: unblock a user                      | `unblockUser`                             |
+| `apply-moderation-action.ts`      | Callable: admin moderation (warn/suspend/ban/dismiss) | `applyModerationAction`          |
+| `on-volunteer-available.ts`       | Trigger: dispatch offers when volunteer goes online | `onVolunteerAvailable`              |
+| `periodic-redispatch-offers.ts`   | Scheduled: re-dispatch + radius expansion     | `periodicRedispatchOffers`, `computeNudgeUpdate`, `computeNextCheckAt` |
+| `suggest-next-tasks.ts`           | Callable: post-completion task suggestions    | `suggestNextTasks`                        |
+| `cancel-accepted-task.ts`         | Callable: volunteer cancels accepted task     | `cancelAcceptedTask`                      |
+| `delete-task.ts`                  | Callable: customer deletes own task           | `deleteTask`                              |
+| `unfreeze-account.ts`             | Callable: acknowledge warning freeze          | `unfreezeAccount`                         |
+| `activate-scheduled-tasks.ts`     | Scheduled: flip scheduled tasks to searching  | `activateScheduledTasks`, `SCHEDULING_CONFIG` |
+| `update-scheduled-task.ts`        | Callable: update scheduled task time          | `updateScheduledTask`, `validateScheduledTime` |
+| `scheduled-purge-banned-users.ts` | Scheduled: purge banned users after 30 days   | `scheduledPurgeBannedUsers`               |
+| `rank-nearby-volunteers.ts`       | Callable: customer previews volunteer ranking | `rankNearbyVolunteers`                    |
+| `otp.ts`                          | Shared: OTP generation, hashing, comparison   | `generateOtpCode`, `generateSalt`, `hashOtp`, `constantTimeEquals`, `OTP_TTL_MS` |
+| `chat.ts`                         | Shared: chat creation + system messages       | `ensureChatForTask`, `appendSystemMessage` |
+| `audit.ts`                        | Shared: task audit trail writer               | `writeAuditEvent`, `AuditEventType`       |
+| `activity-log.ts`                 | Shared: site-wide activity log writer         | `appendActivityLog`, `safeDisplayName`, `ActivityEventType` |
+| `abuse-detector.ts`               | Shared: violation tracking + escalation       | `recordViolationAndCheckAbuse`, `VIOLATION_WINDOW_DAYS`, `VIOLATION_FREEZE_THRESHOLD` |
+| `moderation-helper.ts`            | Shared: active status check guard             | `checkActiveStatus`                       |
+| `nudge-copy-bank.ts`              | Shared: wait-tier config + nudge copy         | `WAIT_TIER_CONFIG`, `NUDGE_COPY_BANK`, `NEARING_EXPIRY_COPY`, `WaitTier` |
+| `log-user-registered.ts`          | Shared: log user registration event           | —                                         |
+
+## functions/src/ (Test Files)
+
+| File                              | Purpose                                      |
+| --------------------------------- | -------------------------------------------- |
+| `scoring.test.ts`                 | Tests for matching formula and eligibility    |
+| `otp-helpers.test.ts`             | Tests for OTP generation and hashing          |
+| `abuse-detector.test.ts`          | Tests for abuse detection logic               |
+| `security-rules.test.ts`          | Firestore security rules unit tests           |
+| `transactions.test.ts`            | Transaction-related tests                     |
+| `trust-scoring.test.ts`           | Trust score computation tests                 |
+| `points.test.ts`                  | Points awarding tests                         |
+| `batch3-batch4.test.ts`           | Batch test suite (M3–M4 features)             |
+| `batch5-batch7.test.ts`           | Batch test suite (M5–M7 features)             |
+| `scheduled-tasks.test.ts`         | Scheduled task activation tests               |
+| `suggest-next-tasks.test.ts`      | Post-completion suggestion tests              |
+| `periodic-redispatch-offers.test.ts` | Periodic redispatch tests                  |
+| `unblock-user.test.ts`            | Unblock user tests                            |
+| `risk-validation.test.ts`         | Risk validation tests                         |
+
+## scripts/
+
+| File                                | Purpose                                    |
+| ----------------------------------- | ------------------------------------------ |
+| `dev-all.js`                        | Orchestrates functions build:watch + emulators + vite dev |
+| `start-emulators.js`               | Starts Firebase emulators with import/export |
+| `seed-all.js`                       | Seeds admin + users into emulators          |
+| `seed-admin.js`                     | Seeds admin user                            |
+| `seed-users.js`                     | Seeds test users                            |
+| `generate-evidence-workbook.js`     | Generates test evidence Excel workbook      |
+| `seed/catalog.json`                 | Starter catalog: 7 categories, 25 skills    |
+
+## e2e/
+
+| File                      | Purpose                                            |
+| ------------------------- | -------------------------------------------------- |
+| `phase1b-e2e.spec.ts`    | Playwright E2E test spec for Phase 1B              |
+
+## docs/
+
+| Directory            | Purpose                                             |
+| -------------------- | --------------------------------------------------- |
+| `product-discovery/` | 12+ product discovery documents (audit, competitive analysis, roadmap, UX improvements) |
+| `testing/`           | Test evidence workbook (`phase1b-test-evidence.xlsx`) |

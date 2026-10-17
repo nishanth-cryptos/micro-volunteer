@@ -13,7 +13,7 @@ const SENTIMENT_LABELS: Record<number, string> = {
   2: 'Fair',
   3: 'Good & helpful',
   4: 'Great neighbour',
-  5: 'Exceptional help! ★★★★★',
+  5: 'Exceptional help!',
 };
 
 const COMPLIMENT_TAGS = [
@@ -117,7 +117,9 @@ export function CustomerRatingPanel({
     <section className="vc-fade-up mt-8 rounded-3xl border border-[#ececea] bg-white p-7 shadow-xs">
       <div className="flex items-center gap-3">
         <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[#fef3c7] text-[#b45309]">
-          ★
+          <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+          </svg>
         </span>
         <div>
           <h2 className="text-base font-bold text-[#131312]">

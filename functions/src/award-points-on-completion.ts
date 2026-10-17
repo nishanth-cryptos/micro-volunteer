@@ -23,7 +23,9 @@ export const awardPointsOnCompletion = onDocumentUpdated(
       return;
     }
 
-    const beforeData = change.before.data() as { status?: string } | undefined;
+    const beforeData = change.before.data() as
+      | { status?: string; pointsAwarded?: boolean }
+      | undefined;
     const afterData = change.after.data() as
       | {
           status?: string;
@@ -31,6 +33,7 @@ export const awardPointsOnCompletion = onDocumentUpdated(
           customerId?: string;
           estimatedMinutes?: number;
           requiredSkills?: string[];
+          pointsAwarded?: boolean;
         }
       | undefined;
 
@@ -39,10 +42,11 @@ export const awardPointsOnCompletion = onDocumentUpdated(
       return;
     }
 
-    // Trigger only when task flips to 'completed'
+    // Trigger only when task flips to 'completed' and points have not already been marked awarded
     if (
       afterData.status !== 'completed' ||
-      beforeData?.status === 'completed'
+      beforeData?.status === 'completed' ||
+      afterData.pointsAwarded === true
     ) {
       return;
     }
@@ -74,7 +78,7 @@ export const awardPointsOnCompletion = onDocumentUpdated(
     );
     const volunteerPointsAwarded = BASE_VOLUNTEER_POINTS + durationBonus;
 
-    logger.info('awardPointsOnCompletion: Awarding points', {
+    logger.info('awardPointsOnCompletion: Preparing to award points', {
       taskId,
       volunteerId,
       customerId,
@@ -84,6 +88,7 @@ export const awardPointsOnCompletion = onDocumentUpdated(
       customerPoints: CUSTOMER_POINTS_REWARD,
     });
 
+    const taskRef = db.collection('tasks').doc(taskId);
     const volunteerRef = db.collection('users').doc(volunteerId);
     const customerRef = db.collection('users').doc(customerId);
 
@@ -93,11 +98,34 @@ export const awardPointsOnCompletion = onDocumentUpdated(
       skillPointUpdate[`skillPoints.${skill}`] = FieldValue.increment(1);
     }
 
+    let alreadyAwarded = false;
     let shouldAwardCustomer = false;
 
     await db.runTransaction(async (transaction) => {
+      // 1. READ PHASE — All reads must precede writes in a Firestore transaction
+      const taskSnap = await transaction.get(taskRef);
       const volunteerSnap = await transaction.get(volunteerRef);
       const customerSnap = await transaction.get(customerRef);
+
+      if (!taskSnap.exists) {
+        logger.warn(`awardPointsOnCompletion: Task ${taskId} not found in transaction`);
+        return;
+      }
+
+      const taskDoc = taskSnap.data() as {
+        status?: string;
+        pointsAwarded?: boolean;
+      };
+
+      // Idempotency guard: abort if already awarded or task not in completed status
+      if (taskDoc.pointsAwarded === true || taskDoc.status !== 'completed') {
+        alreadyAwarded = true;
+        logger.info(`awardPointsOnCompletion: Task ${taskId} already awarded or not completed`, {
+          pointsAwarded: taskDoc.pointsAwarded,
+          status: taskDoc.status,
+        });
+        return;
+      }
 
       if (!volunteerSnap.exists) {
         logger.error(
@@ -106,6 +134,20 @@ export const awardPointsOnCompletion = onDocumentUpdated(
         return;
       }
 
+      if (customerSnap.exists) {
+        const customerRoles = customerSnap.data()?.roles as
+          | string[]
+          | undefined;
+        shouldAwardCustomer =
+          customerRoles?.includes('volunteer') ?? false;
+      }
+
+      // 2. WRITE PHASE — Atomically commit task marker + user point updates
+      transaction.update(taskRef, {
+        pointsAwarded: true,
+        pointsAwardedAt: FieldValue.serverTimestamp(),
+      });
+
       transaction.update(volunteerRef, {
         points: FieldValue.increment(volunteerPointsAwarded),
         verifiedTaskCount: FieldValue.increment(1),
@@ -113,38 +155,56 @@ export const awardPointsOnCompletion = onDocumentUpdated(
         ...skillPointUpdate,
       });
 
-      if (customerSnap.exists) {
-        const customerRoles = customerSnap.data()?.roles as
-          | string[]
-          | undefined;
-        const customerIsVolunteer =
-          customerRoles?.includes('volunteer') ?? false;
-        if (customerIsVolunteer) {
-          transaction.update(customerRef, {
-            points: FieldValue.increment(CUSTOMER_POINTS_REWARD),
-          });
-          shouldAwardCustomer = true;
-        }
+      if (shouldAwardCustomer) {
+        transaction.update(customerRef, {
+          points: FieldValue.increment(CUSTOMER_POINTS_REWARD),
+        });
       }
     });
 
-    // Log the award event in the audit trail
-    await writeAuditEvent(taskId, 'completed', volunteerId, {
-      pointsAwarded: volunteerPointsAwarded,
-      durationBonus,
+    if (alreadyAwarded) {
+      return;
+    }
+
+    logger.info('awardPointsOnCompletion: Points awarded successfully', {
+      taskId,
+      volunteerId,
+      customerId,
+      volunteerPointsAwarded,
       customerPointsAwarded: shouldAwardCustomer ? CUSTOMER_POINTS_REWARD : 0,
-      skillsCredited: requiredSkills,
     });
 
-    // Recompute trust score for the volunteer
-    await recomputeTrustScore(db, volunteerId);
+    // Downstream follow-up tasks: audit logging + trust score recomputation.
+    // Wrapped in try/catch so transient failures cannot crash the handler or cause duplicate retries.
+    try {
+      await writeAuditEvent(taskId, 'completed', volunteerId, {
+        pointsAwarded: volunteerPointsAwarded,
+        durationBonus,
+        customerPointsAwarded: shouldAwardCustomer ? CUSTOMER_POINTS_REWARD : 0,
+        skillsCredited: requiredSkills,
+      });
+    } catch (auditErr) {
+      logger.warn('awardPointsOnCompletion: Failed to write audit event (non-fatal)', {
+        taskId,
+        err: auditErr instanceof Error ? auditErr.message : String(auditErr),
+      });
+    }
+
+    try {
+      await recomputeTrustScore(db, volunteerId);
+    } catch (trustErr) {
+      logger.error('awardPointsOnCompletion: Failed to recompute trust score (non-fatal)', {
+        volunteerId,
+        err: trustErr instanceof Error ? trustErr.message : String(trustErr),
+      });
+    }
   },
 );
 
 export function calculatePointsAwardPure(params: {
-  estimatedMinutes?: number;
-  customerRoles?: string[];
-  requiredSkills?: string[];
+  estimatedMinutes?: number | undefined;
+  customerRoles?: string[] | undefined;
+  requiredSkills?: string[] | undefined;
 }): {
   durationBonus: number;
   volunteerPointsAwarded: number;
@@ -174,5 +234,66 @@ export function calculatePointsAwardPure(params: {
     customerPointsAwarded,
     verifiedHoursIncrement,
     skillsCredited: requiredSkills,
+  };
+}
+
+export function evaluatePointsAwardTransactionPure(params: {
+  task: { status?: string | undefined; pointsAwarded?: boolean | undefined };
+  volunteerExists: boolean;
+  customerRoles?: string[] | undefined;
+  estimatedMinutes?: number | undefined;
+  requiredSkills?: string[] | undefined;
+}): {
+  shouldAward: boolean;
+  alreadyAwarded: boolean;
+  taskUpdate?: { pointsAwarded: boolean };
+  volunteerAward?: {
+    points: number;
+    verifiedTaskCount: number;
+    verifiedHours: number;
+    skillPoints: Record<string, number>;
+  };
+  customerPointsAwarded?: number;
+} {
+  const { task, volunteerExists, customerRoles, estimatedMinutes, requiredSkills } = params;
+
+  if (task.pointsAwarded === true || task.status !== 'completed') {
+    return {
+      shouldAward: false,
+      alreadyAwarded: task.pointsAwarded === true,
+    };
+  }
+
+  if (!volunteerExists) {
+    return {
+      shouldAward: false,
+      alreadyAwarded: false,
+    };
+  }
+
+  const calculation = calculatePointsAwardPure({
+    estimatedMinutes,
+    customerRoles,
+    requiredSkills,
+  });
+
+  const skillPoints: Record<string, number> = {};
+  for (const skill of calculation.skillsCredited) {
+    skillPoints[skill] = 1;
+  }
+
+  return {
+    shouldAward: true,
+    alreadyAwarded: false,
+    taskUpdate: {
+      pointsAwarded: true,
+    },
+    volunteerAward: {
+      points: calculation.volunteerPointsAwarded,
+      verifiedTaskCount: 1,
+      verifiedHours: calculation.verifiedHoursIncrement,
+      skillPoints,
+    },
+    customerPointsAwarded: calculation.customerPointsAwarded,
   };
 }

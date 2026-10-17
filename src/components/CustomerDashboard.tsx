@@ -92,13 +92,13 @@ interface TaskRow {
   acceptedVolunteerId?: string | null | undefined;
   customerRating?: number | undefined;
   description?:
-    | {
-        meetingPoint: string;
-        whatToBring?: string | undefined;
-        preference?: string | undefined;
-        safetyNote?: string | undefined;
-      }
-    | undefined;
+  | {
+    meetingPoint: string;
+    whatToBring?: string | undefined;
+    preference?: string | undefined;
+    safetyNote?: string | undefined;
+  }
+  | undefined;
   requiredSkills?: string[] | undefined;
   estimatedMinutes?: number | undefined;
   location?: { lat: number; lng: number; h3Cell: string } | undefined;
@@ -139,7 +139,7 @@ export function CustomerDashboard({
   uid,
   userDoc,
   activeRole = 'customer',
-  onSwitchRole = () => {},
+  onSwitchRole = () => { },
   isDualRole = false,
 }: Props) {
   const navigate = useNavigate();
@@ -328,7 +328,20 @@ export function CustomerDashboard({
         <div className="mx-auto max-w-7xl px-8 pt-4">
           {userDoc.accountStatus === 'warned' ? (
             <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-xs">
-              <span className="text-base flex-shrink-0">⚠️</span>
+              <svg
+                className="h-5 w-5 text-amber-600 shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
               <div>
                 <strong className="font-bold text-amber-950">
                   Community Guidelines Notice (Strike{' '}
@@ -345,7 +358,17 @@ export function CustomerDashboard({
             </div>
           ) : userDoc.accountStatus === 'suspended' ? (
             <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 shadow-xs">
-              <span className="text-base flex-shrink-0">🚫</span>
+              <svg
+                className="h-5 w-5 text-red-600 shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.7 5.7l12.6 12.6" />
+              </svg>
               <div>
                 <strong className="font-bold text-red-950">
                   Account Temporarily Suspended
@@ -450,7 +473,9 @@ function TopBar({
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#ececea] bg-white px-6 sm:px-7">
       <div className="flex items-center gap-3 font-bold tracking-tight">
-        <Logo size="md" />
+        <Link to="/app" aria-label="Hey Padosi Home">
+          <Logo size="md" />
+        </Link>
       </div>
       <div className="flex items-center gap-3">
         <RoleSwitcher
@@ -567,10 +592,7 @@ function TasksScreen({
             Get safe, verified help from neighbours nearby.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full bg-[#e3efe9] px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.06em] text-[#1f6f5c]">
-          <LiveDot />
-          Live Network
-        </div>
+
       </div>
 
       <MapCard userDoc={userDoc} />
@@ -653,17 +675,7 @@ function TasksScreen({
   );
 }
 
-function LiveDot() {
-  return (
-    <span className="relative inline-block h-2 w-2">
-      <span className="absolute inset-0 rounded-full bg-[#1f6f5c]" />
-      <span
-        className="absolute inset-[-4px] animate-ping rounded-full bg-[#1f6f5c] opacity-25"
-        aria-hidden="true"
-      />
-    </span>
-  );
-}
+
 
 function MapCard({ userDoc }: { userDoc: UserDoc }) {
   const loc = userDoc.lastKnownLocation;
@@ -711,7 +723,7 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
           setPlaceName(name);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
@@ -789,7 +801,7 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
           });
         }
       },
-      () => {},
+      () => { },
       { timeout: 10000, maximumAge: 60_000 },
     );
     return () => {
@@ -836,8 +848,26 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
                   opacity={1}
                   permanent
                 >
-                  <span className="font-sans text-xs font-semibold text-[#131312]">
-                    📍{' '}
+                  <span className="font-sans text-xs font-semibold text-[#131312] inline-flex items-center gap-1">
+                    <svg
+                      className="h-3.5 w-3.5 text-[#1f6f5c] shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
                     {placeName
                       ? placeName
                       : `${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`}
@@ -884,7 +914,7 @@ function MapCard({ userDoc }: { userDoc: UserDoc }) {
           </span>
           {hasPin && (
             <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-[11px] font-semibold text-[#1f6f5c]">
-              2.5 km coverage preview
+              2.5 km radius preview
             </span>
           )}
         </div>
@@ -1493,13 +1523,13 @@ function HistoryList({
     let badge = badgeForHistoryStatus(status);
     if (isUnrated) {
       badge = {
-        label: '★ Rate now',
+        label: 'Rate now',
         bg: 'bg-[#fef3c7]',
         ink: 'text-[#b45309]',
       };
     } else if (isCompleted && typeof task.customerRating === 'number') {
       badge = {
-        label: `★ ${task.customerRating}/5 Rated`,
+        label: `${task.customerRating}/5 Rated`,
         bg: 'bg-[#e3efe9]',
         ink: 'text-[#1f6f5c]',
       };
@@ -1917,12 +1947,12 @@ function ScheduledTaskCard({ task }: { task: TaskRow }) {
 
   const formattedTime = task.scheduledFor
     ? task.scheduledFor.toDate().toLocaleString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
     : 'Pending activation';
 
   const handleCancel = async (reasonId: string) => {
@@ -1967,7 +1997,20 @@ function ScheduledTaskCard({ task }: { task: TaskRow }) {
             {task.title}
           </h3>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-[#4f4b46]">
-            <span>🗓</span>
+            <svg
+              className="h-3.5 w-3.5 text-[#4338ca] shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
             <span>
               Task scheduled at{' '}
               <span className="font-semibold text-[#4338ca]">

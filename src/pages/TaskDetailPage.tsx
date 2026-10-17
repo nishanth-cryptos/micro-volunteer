@@ -26,6 +26,7 @@ import { CustomerRatingPanel } from '../components/CustomerRatingPanel';
 import { ReportBlockPanel } from '../components/ReportBlockPanel';
 import { ChatPanel } from '../components/ChatPanel';
 import { KarmaToast } from '../components/KarmaToast';
+import { Logo } from '../components/Logo';
 import {
   ReasonBottomSheet,
   type ReasonOption,
@@ -324,25 +325,38 @@ export default function TaskDetailPage() {
 
   return (
     <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
-      <div className="mx-auto max-w-3xl px-6 py-10 sm:py-14">
-        <Link
-          to="/app"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-3.5 w-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          Back to dashboard
-        </Link>
+      <header className="sticky top-0 z-40 border-b border-[#ececea] bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1f6f5c]"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              <span>Back</span>
+            </Link>
+            <Link to="/app" aria-label="Hey Padosi Home" className="flex items-center">
+              <Logo size="sm" />
+            </Link>
+          </div>
+          <span className="text-xs font-medium text-[#8a847d] hidden sm:inline-block">
+            Task Overview
+          </span>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-3xl px-6 py-8 sm:py-10">
 
         {loading && (
           <div className="mt-8 space-y-4" aria-label="Loading task details">
@@ -582,14 +596,45 @@ function TaskSummary({ task }: { task: TaskDoc }) {
             <span>·</span>
             <span
               className={
-                task.riskLevel === 'medium'
+                'inline-flex items-center gap-1 ' +
+                (task.riskLevel === 'medium'
                   ? 'rounded-full bg-[#fef3c7] px-2.5 py-0.5 text-xs font-semibold text-[#b45309]'
-                  : 'rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-semibold text-[#1f6f5c]'
+                  : 'rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-semibold text-[#1f6f5c]')
               }
             >
-              {task.riskLevel === 'medium'
-                ? '🛡️ Verified Volunteer Category'
-                : '✓ Standard Task'}
+              {task.riskLevel === 'medium' ? (
+                <>
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
+                  </svg>
+                  <span>Verified Volunteer Category</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Standard Task</span>
+                </>
+              )}
             </span>
             <span>·</span>
             <span>{task.estimatedMinutes} min</span>
@@ -598,32 +643,26 @@ function TaskSummary({ task }: { task: TaskDoc }) {
       </div>
 
       <div className="mt-5 space-y-2.5 rounded-2xl bg-[#fafaf8] border border-[#ececea] p-4 text-xs sm:text-sm text-[#4f4b46]">
-        <p>
-          <strong className="font-semibold text-[#131312]">
-            📍 Meeting point:{' '}
-          </strong>
-          {task.description.meetingPoint}
+        <p className="flex items-start gap-1.5">
+          <span className="font-semibold text-[#131312] shrink-0">Meeting point:</span>{' '}
+          <span>{task.description.meetingPoint}</span>
         </p>
         {task.description.whatToBring && (
-          <p>
-            <strong className="font-semibold text-[#131312]">
-              🎒 To bring:{' '}
-            </strong>
-            {task.description.whatToBring}
+          <p className="flex items-start gap-1.5">
+            <span className="font-semibold text-[#131312] shrink-0">To bring:</span>{' '}
+            <span>{task.description.whatToBring}</span>
           </p>
         )}
         {task.description.preference && (
-          <p>
-            <strong className="font-semibold text-[#131312]">
-              💬 Preference:{' '}
-            </strong>
-            {task.description.preference}
+          <p className="flex items-start gap-1.5">
+            <span className="font-semibold text-[#131312] shrink-0">Preference:</span>{' '}
+            <span>{task.description.preference}</span>
           </p>
         )}
         {task.description.safetyNote && (
-          <p>
-            <strong className="font-semibold text-[#131312]">⚠️ Note: </strong>
-            {task.description.safetyNote}
+          <p className="flex items-start gap-1.5 text-amber-900">
+            <span className="font-semibold text-[#131312] shrink-0">Note:</span>{' '}
+            <span>{task.description.safetyNote}</span>
           </p>
         )}
       </div>
@@ -746,7 +785,20 @@ function OffersSection({
             </div>
           </div>
           <div className="relative mt-4 flex items-center gap-2 rounded-xl bg-white/10 px-3.5 py-2 text-xs text-white/90 backdrop-blur-xs">
-            <span className="text-sm">🔒</span>
+            <svg
+              className="h-3.5 w-3.5 shrink-0 text-white/90"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
             <span>
               Privacy protected · Contact info stays private. Coordinate safely
               in chat.
@@ -1065,15 +1117,49 @@ function OffersSection({
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-[#131312]">{name}</p>
                     <div className="mt-2.5 flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 font-semibold text-[#1f6f5c]">
-                        📍 {formatDistance(o.distanceM)} away
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#e3efe9] px-2.5 py-0.5 font-semibold text-[#1f6f5c]">
+                        <svg
+                          className="h-3 w-3 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                        </svg>
+                        <span>{formatDistance(o.distanceM)} away</span>
                       </span>
-                      <span className="rounded-full bg-[#f3f1ec] px-2.5 py-0.5 font-medium text-[#4f4b46]">
-                        ✓ Community Volunteer
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#f3f1ec] px-2.5 py-0.5 font-medium text-[#4f4b46]">
+                        <svg
+                          className="h-3 w-3 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Community Volunteer</span>
                       </span>
                       {o.scoreBreakdown.skill > 0.5 && (
-                        <span className="rounded-full bg-[#e8effb] px-2.5 py-0.5 font-semibold text-[#1f4baa]">
-                          ★ Skill Matched
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#e8effb] px-2.5 py-0.5 font-semibold text-[#1f4baa]">
+                          <svg
+                            className="h-3 w-3 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Skill Matched</span>
                         </span>
                       )}
                     </div>

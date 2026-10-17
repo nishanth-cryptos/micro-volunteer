@@ -133,9 +133,11 @@ export const applyModerationAction = onCall(
           startOtpHash: FieldValue.delete(),
           startOtpSalt: FieldValue.delete(),
           startOtpExpiresAt: FieldValue.delete(),
+          startOtpAttempts: FieldValue.delete(),
           endOtpHash: FieldValue.delete(),
           endOtpSalt: FieldValue.delete(),
           endOtpExpiresAt: FieldValue.delete(),
+          endOtpAttempts: FieldValue.delete(),
         });
 
         // Log audit event for task update

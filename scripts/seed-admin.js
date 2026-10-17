@@ -1,4 +1,5 @@
-// Redirect wrapper to run the Admin SDK-based seed script in the functions directory context.
+// Root redirect wrapper — delegates to the Admin SDK seed script in functions/.
+// Run via: npm run seed:users  (from project root)
 import { execSync } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -12,6 +13,6 @@ try {
     cwd: projectRoot,
     stdio: 'inherit',
   });
-} catch (err) {
+} catch {
   process.exit(1);
 }

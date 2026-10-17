@@ -2,106 +2,118 @@
 
 ## Stack
 
-| Layer                   | Choice                                             | Version (pinned)                 |
-| ----------------------- | -------------------------------------------------- | -------------------------------- |
-| Build tool              | Vite                                               | 8.0.16                           |
-| Vite React plugin       | @vitejs/plugin-react                               | 6.0.2                            |
-| Vite Tailwind plugin    | @tailwindcss/vite                                  | 4.3.0                            |
-| Framework               | React                                              | 19.2.7                           |
-| Language                | TypeScript (strict)                                | 6.0.3                            |
-| Styling                 | Tailwind CSS v4                                    | 4.3.0                            |
-| Accessible primitives   | @headlessui/react                                  | 2.2.10                           |
-| BaaS                    | Firebase Web SDK                                   | 12.14.0                          |
-| Cloud Functions runtime | firebase-functions v2                              | 7.2.5                            |
-| Admin SDK               | firebase-admin                                     | 13.10.0                          |
-| Map UI                  | Leaflet + OpenStreetMap                            | TBD M3                           |
-| Geo indexing            | h3-js                                              | TBD M4                           |
-| Lint                    | ESLint flat config                                 | 9.39.4 (NOT 10 — see errors.md)  |
-| Lint plugins            | typescript-eslint, react-hooks, jsx-a11y, prettier | 8.60.1 / 7.1.1 / 6.10.2 / 10.1.8 |
-| Format                  | Prettier                                           | 3.8.3                            |
-| Hosting                 | Firebase Hosting                                   | (CLI) firebase-tools 15.19.1     |
+| Layer              | Technology                         | Version    |
+| ------------------ | ---------------------------------- | ---------- |
+| Runtime            | Node.js                            | 22         |
+| Language           | TypeScript                         | 6.0.3      |
+| Frontend framework | React                              | 19.2.7     |
+| Router             | react-router-dom                   | 7.17.0     |
+| Build tool         | Vite                               | 8.0.16     |
+| Vite React plugin  | @vitejs/plugin-react               | 6.0.2      |
+| CSS framework      | Tailwind CSS v4 (via @tailwindcss/vite) | 4.3.0  |
+| UI components      | @headlessui/react                  | 2.2.10     |
+| Maps               | Leaflet + react-leaflet            | 1.9.4 / 5.0.0 |
+| Geospatial index   | h3-js                              | 4.4.0      |
+| Backend            | Firebase (Auth, Firestore, Storage, Functions, Hosting) | 12.14.0 (client SDK) |
+| Cloud Functions    | firebase-functions v2              | 7.2.5      |
+| Admin SDK          | firebase-admin                     | 13.10.0    |
+| App Check          | Firebase App Check (ReCaptcha Enterprise) | via firebase SDK |
+| Linter             | ESLint 9 (flat config)             | 9.39.4     |
+| Formatter          | Prettier                           | 3.8.3      |
+| A11y lint          | eslint-plugin-jsx-a11y             | 6.10.2     |
+| E2E testing        | Playwright                         | ^1.62.1    |
+| Rules testing      | @firebase/rules-unit-testing       | ^5.0.2     |
 
-## Node toolchain
+## Fonts
 
-- Node v26.0.0
-- npm 11.12.1
-- Functions runtime declared in `functions/package.json` engines: **Node 22**
+- **Body**: Inter (400, 500, 600, 700) — loaded from Google Fonts
+- **Headings**: Outfit (500, 600, 700, 800) — loaded from Google Fonts
 
-## Environment variables (NAMES ONLY — never commit values)
+## Color Palette
 
-Frontend reads from `import.meta.env` (typed in `src/vite-env.d.ts`):
+- Background: `#fafaf8`
+- Text: `#131312`
+- Primary green: `#1f6f5c` (buttons, accents)
+- Primary green hover: `#185845`
+- Neutral tones via Tailwind `neutral-*`
+- Error accents: red/amber Tailwind palettes
 
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_FIREBASE_MEASUREMENT_ID` (optional)
-- `VITE_USE_EMULATORS` — set to `1` in `.env.local` to point the frontend at the local emulator suite (Auth 9099 / Firestore 8080 / Functions 5001 / Storage 9199 / Hosting 5002 / UI 4000). Leave blank for production. Hosting uses 5002 not 5000 — macOS AirPlay Receiver squats on :5000.
+## Firebase Project
 
-Copy `.env.example` → `.env.local`, fill from Firebase Console.
+- Project ID: `micro---volunteer`
+- Functions region: `asia-south1`
 
-## Plan tier
+## Environment Variables
 
-**Spark (free)** for all of Phase 1 dev. Cloud Functions deploy is gated on Blaze upgrade — deferred until pre-launch. Until then, Functions run only inside the emulator. See `decisions.md` 2026-06-07 entry "Spark plan + emulators".
+All prefixed `VITE_` for Vite client injection.
+
+| Variable                             | Required | Description                                    |
+| ------------------------------------ | -------- | ---------------------------------------------- |
+| `VITE_FIREBASE_API_KEY`              | ✅       | Firebase Web SDK API key                       |
+| `VITE_FIREBASE_AUTH_DOMAIN`          | ✅       | Firebase Auth domain                           |
+| `VITE_FIREBASE_PROJECT_ID`           | ✅       | Firebase project ID                            |
+| `VITE_FIREBASE_STORAGE_BUCKET`       | ✅       | Firebase Storage bucket                        |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID`  | ✅       | Firebase messaging sender ID                   |
+| `VITE_FIREBASE_APP_ID`              | ✅       | Firebase app ID                                |
+| `VITE_FIREBASE_MEASUREMENT_ID`       | ❌       | GA measurement ID (optional)                   |
+| `VITE_USE_EMULATORS`                | ❌       | Set to `"1"` to connect to local emulators     |
+| `VITE_FIREBASE_APPCHECK_SITE_KEY`   | ❌       | ReCaptcha Enterprise site key for App Check    |
+
+Copy `.env.example` → `.env.local` and fill values from Firebase Console. Never commit `.env.local`.
 
 ## Commands
 
+### Frontend
+
 ```bash
-# All-In-One Startup & Service Automation (Windows)
-start-all.bat                # Launch Emulators, Seed Data, and Vite in separate cmd windows
-.\start-all.ps1              # PowerShell multi-window launcher
-npm run dev:all              # Single-terminal Node orchestrator with socket readiness polling
-npm start                    # Alias for dev:all
-
-# Seeding Data
-npm run seed:all             # Seed all Admins, Volunteers, Customers, Dual-Role test accounts
-npm run seed:admin           # Seed default administrator accounts
-npm run seed:users           # Seed test users (volunteers, customers, dual-role)
-
-# Frontend Development
-npm install                  # install root deps
-npm run dev                  # Vite dev server (http://localhost:5173)
-npm run build                # tsc --noEmit && vite build
-npm run preview              # preview built bundle
-npm run typecheck            # tsc --noEmit
-npm run lint                 # eslint .
-npm run format               # prettier --write .
-npm run format:check         # prettier --check .
-
-# Cloud Functions
-npm --prefix functions install
-npm --prefix functions run typecheck
-npm --prefix functions run build
-npm --prefix functions run serve   # build + emulators
-
-# Firebase Emulators
-npm run emulators            # Run Firebase emulators with Java check
+npm install
+npm run dev          # Vite dev server (:5173)
+npm run build        # tsc --noEmit && vite build
+npm run typecheck    # tsc --noEmit
+npm run lint         # eslint .
+npm run format       # prettier --write .
+npm run format:check # prettier --check .
 ```
 
-## Seeded Test Accounts
+### Cloud Functions
 
-All test accounts are password: `pass123` (Admins: `admin123`):
+```bash
+npm --prefix functions install
+npm --prefix functions run typecheck   # tsc --noEmit
+npm --prefix functions run build       # tsc
+npm --prefix functions run test        # build && node --test (sequential)
+```
 
-- **Customer**: `cus@example.com` (Sunita), `cus1@example.com` (Deepak), `cus2@example.com` (Rekha)
-- **Volunteer**: `vol@example.com` (Priya), `vol1@example.com` (Ravi), `vol2@example.com` (Arjun)
-- **Dual-Role (Ask & Help)**: `both@example.com` (Meena), `both1@example.com` (Anil), `both2@example.com` (Kavita)
-- **Admin Console**: `admin@example.org` (Admin User), `admin2@example.org` (Mod Two)
+### Firebase Emulators
 
-## External services
+```bash
+npm run emulators           # persistent — imports + exports data
+npm run dev:all             # runs functions build:watch + emulators + vite dev simultaneously
+npm run start               # alias for dev:all (node scripts/dev-all.js)
+```
 
-- **Firebase Auth** — Phone (SMS) + Email Link/Password. SMS quota = real-money concern; use emulator in dev.
-- **Cloud Firestore** — primary datastore (Port 8080).
-- **Cloud Storage** — profile photos, ID images (Port 9199).
-- **Cloud Functions (2nd gen)** — server-authoritative logic (Port 5001).
-- **Firebase Emulator UI** — local inspection console (Port 4000).
-- **Firebase Hosting** — static hosting for the SPA (Port 5002).
+Emulator ports: Auth `:9099` · Firestore `:8080` · Functions `:5001` · Storage `:9199` · Hosting `:5002` · UI `:4000`.
 
-## Setup steps for fresh checkout
+### Seeding
 
-1. `npm install`
-2. `npm --prefix functions install`
-3. Copy `.env.example` → `.env.local`.
-4. Run `start-all.bat` (or `.\start-all.ps1`) to boot emulators, seed all accounts, and launch Vite.
-5. Open **http://localhost:5173** to test!
+```bash
+npm run seed:all      # seeds admin + users into emulators
+npm run seed:admin    # seeds admin user only
+npm run seed:users    # seeds test users only
+```
+
+### E2E Tests
+
+```bash
+npx playwright test   # runs e2e/ specs against localhost:5173 + emulators
+```
+
+## TypeScript Configuration
+
+- Frontend: `tsconfig.json` — ES2022, strict, noEmit, jsx react-jsx, bundler module resolution.
+- Functions: `functions/tsconfig.json` — ES2022, strict, node16 module, outDir `lib/`.
+- Both enforce: `strictNullChecks`, `noImplicitAny`, `noUnusedLocals`, `noUnusedParameters`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
+
+## ESLint Configuration
+
+Flat config (`eslint.config.js`): type-aware lint for `src/**/*.{ts,tsx}` with react-hooks + jsx-a11y plugins; non-type-aware for root config files. Prettier integration via `eslint-config-prettier`.

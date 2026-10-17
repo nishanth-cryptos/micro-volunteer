@@ -1,39 +1,46 @@
-# Project Brief — Volunteer Connector (Phase 1 MVP)
+# Project Brief — Hey Padosi (Volunteer Connector)
 
-> **Source of truth for scope.** If a feature is not on the must-have list below, it is not built in Phase 1.
+## Vision
 
-## One-line definition
+Hyperlocal micro-volunteering web app connecting neighbours who need help with nearby volunteers who can give it. Phase 1 MVP.
 
-A verified hyperlocal platform where requesters post safe low/medium-risk tasks, nearby available volunteers are matched by location + skills + trust score + availability, and completion is verified via app-generated Start/End OTP, with points and skill points awarded after completion.
+## Product Name
 
-## Phase 1 must-have features (build exactly these 12, in milestone order)
+**Hey Padosi** (brand name on landing page, index.html `<title>`, logo, and meta tags).
+Package name: `volunteer-connector`.
 
-1. **Auth & signup** — Firebase Phone OTP (SMS) + email verification, T&C consent capture.
-2. **Roles** — volunteer, customer, or both; drives UI and Firestore access.
-3. **Profile** — name, photo (required), optional ID image, basic bio.
-4. **Volunteer availability toggle** — ON/OFF; only ON volunteers matchable.
-5. **Task posting** — category, required skill(s), location pin, estimated duration, structured instructions (where to meet / what to bring / preference / safety note).
-6. **Risk classification** — Low or Medium only. Medium requires verified ID. High/prohibited blocked.
-7. **H3-based nearby matching** — H3 cell + surrounding rings, 2–5 km coverage.
-8. **Volunteer ranking** — score = Distance 30% + Skill 25% + Trust 20% + Availability 15% + Past completion 10%, minus report penalty. New volunteers must still be reachable.
-9. **Notifications & accept/reject** — FCM push to a first batch; if no acceptance in 60–90s, expand radius.
-10. **In-app chat** — opens only after acceptance; report message, block user.
-11. **Start/End OTP task verification** — app-generated codes (Section 6 of kickoff), server-side, never shown to volunteer, never logged.
-12. **Points + trust/safety + admin** — points & skill points on completion; verified task count; verified hours; report user; block user; warnings → suspension → ban; admin dashboard; immutable task audit trail.
+## Core Features (12)
 
-## Explicitly OUT of scope (do NOT build in Phase 1)
+1. **Phone + Email authentication** — Firebase Auth with SMS OTP and email/password flows; dual-method support via `AuthMethodTabs` component.
+2. **Onboarding flow** — four-step guided setup: T&C consent (with version + timestamp), role selection (customer / volunteer / both), profile (name + photo + optional ID image), skills selection (volunteers only).
+3. **Role system** — `customer`, `volunteer`, and `admin` roles. Dual-role users can switch via `RoleSwitcher` (persisted in localStorage). Admin is a separate `isAdmin` boolean flag.
+4. **Task catalog** — 7 categories (errands, tutoring, tech-help, digital-help, mobility-assist, conversation-companionship, community-delivery) and 25 skills from `scripts/seed/catalog.json`. Risk levels: `low` and `medium`; high/prohibited rejected at creation.
+5. **Task posting** — customer creates a task with title, category, required skills, location (Leaflet map picker with H3 cell), description fields (meetingPoint, whatToBring, optional preference/safetyNote), estimated minutes (5–480), search radius (500–10,000 m), and expected wait tier (fast/normal/flexible). Supports scheduled tasks with `scheduledFor` timestamp.
+6. **Matching engine** — server-authoritative scoring formula: `0.30*distance + 0.25*skill + 0.20*trust + 0.15*availability + 0.10*pastCompletion - reportPenalty`. H3 grid distance, haversine distance filtering, skill overlap, trust score, verified task count, and open report penalty. Block-aware (mutual blocks excluded). Initial dispatch (top 10), periodic re-dispatch with radius expansion, and volunteer-comes-online matching.
+7. **Task lifecycle** — statuses: `scheduled → searching → accepted → in_progress → completed` (also: `cancelled`, `deleted`, `expired`). Volunteer cancel after accept, customer delete before in_progress.
+8. **OTP proof of work** — two distinct OTP systems:
+   - **Auth OTP**: Firebase SMS for phone sign-in.
+   - **Task Start/End OTP**: server-generated 4-digit codes, SHA-256 hashed with random salt, 10-minute TTL. Start OTP: customer generates, reads aloud to volunteer. End OTP: customer generates, volunteer enters to confirm completion. Plaintext returned ONCE to customer; never stored in Firestore; never sent to volunteer's client; never logged.
+9. **In-app chat** — per-task chat (`chats/{taskId}`) with participant-only access, system messages for lifecycle events, mutual-block enforcement, message reporting. 1000-char message limit. Chat created on acceptance.
+10. **Points & karma** — volunteer earns base 10 pts + duration bonus (1 pt per 15 min, max +8). Dual-role customers earn 2 pts per completed task. Skill-specific point tracking. Karma badge and toast components.
+11. **Trust & safety** — trust score (0–100, floor 30), moderation actions (warn/suspend/ban/dismiss), abuse detection (3 violations in 7 days triggers freeze, then 3-day suspension), account states (active/warned/suspended/banned/frozen), frozen account acknowledgement flow. Admin report queue. Block/unblock users. 24-hour post-completion reporting window. Scheduled purge of banned users (30-day retention). Activity log (admin-only).
+12. **Post-completion suggestions** — `suggestNextTasks` callable suggests up to 2 nearby open tasks to volunteers after completing a task, using proxy location from completed task.
 
-Cafe vouchers · Aadhaar verification · insurance · masked calling · AI/LLM content review · deposits for risky tasks · advanced certificates · leaderboards · IP-ban-as-primary-control · any high-risk or prohibited task type.
+## Out of Scope (Phase 1)
 
-If tempted to add any of these, **stop and ask Nishanth first.**
+- Push notifications / FCM
+- Payment / tipping
+- In-app voice/video calls
+- Background location tracking for volunteers
+- Multi-language UI (i18n)
+- Native mobile apps (iOS/Android)
+- Social login (Google/Facebook)
+- Public volunteer leaderboards
+- Gamification beyond basic points
+- Advanced analytics dashboard
+- Task scheduling recurring patterns (only one-shot scheduled tasks supported)
+- Corridor matching for trail-based tasks (data model exists; matching logic is a passthrough stub)
 
-## Two OTP systems — keep separate
+## Target Region
 
-- **Auth OTP** — Firebase Phone Auth SMS, standard flow, for login/signup.
-- **Task Start/End OTP** — App-generated 4–6 digit codes, NOT SMS. Generated by Cloud Function, shown only on customer's screen, given verbally to volunteer, verified server-side. Never returned to volunteer's client. Never logged.
-
-## Risk levels
-
-- **Low** — open to any verified volunteer.
-- **Medium** — volunteer must have verified ID image.
-- **High / prohibited** — blocked at creation (home visits, personal care, late-night, cash transfer, child pickup, medical responsibility).
+India (asia-south1 GCP region; `+91` phone format referenced in auth error messages).

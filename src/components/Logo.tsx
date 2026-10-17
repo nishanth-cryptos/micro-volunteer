@@ -5,22 +5,23 @@ import logoAsset from '../assets/hey-padosi-logo.png';
 
 export interface LogoProps {
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export function Logo({ className = '', size = 'md' }: LogoProps) {
   const sizeClasses = {
-    sm: 'h-9 sm:h-10',
-    md: 'h-11 sm:h-12',
-    lg: 'h-14 sm:h-16',
-    xl: 'h-20 sm:h-24',
+    xs: 'h-6 sm:h-7',
+    sm: 'h-8 sm:h-9',
+    md: 'h-9 sm:h-11',
+    lg: 'h-12 sm:h-14 md:h-16',
+    xl: 'h-16 sm:h-20 md:h-24',
   }[size];
 
   return (
     <img
       src={logoAsset}
       alt="Hey Padosi"
-      className={`w-auto object-contain select-none transition-transform ${sizeClasses} ${className}`}
+      className={`w-auto shrink-0 max-w-full object-contain select-none transition-transform ${sizeClasses} ${className}`}
       loading="eager"
     />
   );

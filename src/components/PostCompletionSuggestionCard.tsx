@@ -136,7 +136,7 @@ export function PostCompletionSuggestionCard({ taskId, volunteerUid }: Props) {
           </h2>
           <p className="mt-1 text-sm text-neutral-600">
             {isMultiple
-              ? 'You’re on a roll 🙂 A couple of neighbors nearby could use your help.'
+              ? 'You’re on a roll! A couple of neighbors nearby could use your help.'
               : 'Here is a nearby task that matches what you do best.'}
           </p>
         </div>

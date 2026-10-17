@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   collection,
@@ -124,13 +125,29 @@ export default function AdminDashboard() {
       <header className="sticky top-0 z-40 border-b border-[#ececea] bg-white px-6 py-4 shadow-xs">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3.5">
-            <Logo size="md" />
+            <Link to="/app" aria-label="Hey Padosi Home" className="flex items-center">
+              <Logo size="md" />
+            </Link>
             <span className="hidden sm:inline-block text-[#ececea] font-light">
               |
             </span>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-bold text-[#1f6f5c]">
-                🛡️ Safety &amp; Moderation
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e3efe9] px-2.5 py-0.5 text-xs font-bold text-[#1f6f5c]">
+                <svg
+                  className="h-3.5 w-3.5 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                  />
+                </svg>
+                <span>Safety &amp; Moderation</span>
               </span>
             </div>
           </div>

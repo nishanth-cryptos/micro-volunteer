@@ -20,6 +20,7 @@ import { useAuthState } from '../lib/auth-context';
 import { CATEGORIES, SKILLS, deriveRisk, type Category } from '../lib/catalog';
 import { TaskLocationPicker } from '../components/TaskLocationPicker';
 import { ScheduleTaskBottomSheet } from '../components/ScheduleTaskBottomSheet';
+import { Logo } from '../components/Logo';
 
 const INITIAL_SEARCH_RADIUS_M = 2000;
 const TASK_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -297,30 +298,35 @@ export default function CreateTaskPage() {
   return (
     <main className="min-h-screen bg-[#fafaf8] text-[#131312]">
       <div className="sticky top-0 z-30 border-b border-[#ececea] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-3">
-          <Link
-            to="/app"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec]"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-3.5 w-3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/app"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#ececea] px-3 py-1.5 text-[12px] font-medium text-[#4f4b46] transition hover:border-[#d8d4cc] hover:bg-[#f3f1ec]"
             >
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-            Back
-          </Link>
-          <div className="min-w-0 flex-1">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              <span>Back</span>
+            </Link>
+            <Link to="/app" aria-label="Hey Padosi Home" className="flex items-center">
+              <Logo size="sm" />
+            </Link>
+          </div>
+          <div className="min-w-0 text-right sm:text-left">
             <h1 className="truncate text-[15px] font-semibold text-[#131312]">
               Need a hand?
             </h1>
-            <p className="truncate text-[12px] text-[#8a847d]">
+            <p className="hidden truncate text-[12px] text-[#8a847d] sm:block">
               Describe what you need — local volunteers respond fast.
             </p>
           </div>
@@ -543,7 +549,22 @@ function ContentBody(p: BodyProps) {
             <div className="vc-fade-in mt-3 rounded-2xl border border-[#ececea] bg-[#fafaf8] p-4 text-xs leading-relaxed shadow-xs">
               {p.derivedRisk === 'medium' ? (
                 <div className="flex items-start gap-2.5 text-[#713f12]">
-                  <span className="text-base flex-shrink-0">🛡️</span>
+                  <span className="flex-shrink-0 mt-0.5">
+                    <svg
+                      className="h-4 w-4 text-amber-700"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    </svg>
+                  </span>
                   <div>
                     <strong className="font-bold text-[#5a2900]">
                       ID-Verified Task:
@@ -557,7 +578,18 @@ function ContentBody(p: BodyProps) {
                 </div>
               ) : (
                 <div className="flex items-start gap-2.5 text-[#1f6f5c]">
-                  <span className="text-base flex-shrink-0">✓</span>
+                  <span className="flex-shrink-0 mt-0.5">
+                    <svg
+                      className="h-4 w-4 text-[#1f6f5c]"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
                   <div>
                     <strong className="font-bold text-[#185845]">
                       Everyday Community Task:

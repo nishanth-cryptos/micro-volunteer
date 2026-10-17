@@ -10,7 +10,7 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { checkActiveStatus } from './moderation-helper';
-import { constantTimeEquals, hashOtp } from './otp';
+import { constantTimeEquals, hashOtp, MAX_OTP_ATTEMPTS } from './otp';
 import { appendActivityLog, safeDisplayName } from './activity-log';
 import { appendSystemMessage } from './chat';
 import { logger } from 'firebase-functions/v2';
@@ -57,6 +57,7 @@ export const verifyEndOtp = onCall(
         endOtpHash?: string;
         endOtpSalt?: string;
         endOtpExpiresAt?: { toMillis: () => number };
+        endOtpAttempts?: number;
       };
       if (task.acceptedVolunteerId !== callerUid) {
         throw new HttpsError(
@@ -68,6 +69,13 @@ export const verifyEndOtp = onCall(
         throw new HttpsError(
           'failed-precondition',
           'This task is not waiting on an end code.',
+        );
+      }
+      const currentAttempts = task.endOtpAttempts ?? 0;
+      if (currentAttempts >= MAX_OTP_ATTEMPTS) {
+        throw new HttpsError(
+          'resource-exhausted',
+          'Too many failed attempts. Ask the customer to generate a new code.',
         );
       }
       if (!task.endOtpHash || !task.endOtpSalt || !task.endOtpExpiresAt) {
@@ -84,10 +92,28 @@ export const verifyEndOtp = onCall(
       }
       const inputHash = hashOtp(code, task.endOtpSalt);
       if (!constantTimeEquals(inputHash, task.endOtpHash)) {
-        throw new HttpsError(
-          'invalid-argument',
-          'That code is wrong. Try again.',
-        );
+        const nextAttempts = currentAttempts + 1;
+        if (nextAttempts >= MAX_OTP_ATTEMPTS) {
+          tx.update(taskRef, {
+            endOtpAttempts: nextAttempts,
+            endOtpHash: FieldValue.delete(),
+            endOtpSalt: FieldValue.delete(),
+            endOtpExpiresAt: FieldValue.delete(),
+          });
+          throw new HttpsError(
+            'resource-exhausted',
+            'Too many failed attempts. Ask the customer to generate a new code.',
+          );
+        } else {
+          tx.update(taskRef, {
+            endOtpAttempts: nextAttempts,
+          });
+          const remaining = MAX_OTP_ATTEMPTS - nextAttempts;
+          throw new HttpsError(
+            'invalid-argument',
+            `That code is wrong. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+          );
+        }
       }
 
       tx.update(taskRef, {
@@ -96,6 +122,7 @@ export const verifyEndOtp = onCall(
         endOtpHash: FieldValue.delete(),
         endOtpSalt: FieldValue.delete(),
         endOtpExpiresAt: FieldValue.delete(),
+        endOtpAttempts: FieldValue.delete(),
       });
     });
 

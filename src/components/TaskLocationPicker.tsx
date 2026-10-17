@@ -362,8 +362,26 @@ function DraggablePin({
       eventHandlers={{ dragend: handleDragEnd }}
     >
       <Tooltip direction="top" offset={[0, -20]} opacity={1} permanent>
-        <span className="font-sans text-xs font-semibold text-[#131312]">
-          📍{' '}
+        <span className="font-sans text-xs font-semibold text-[#131312] inline-flex items-center gap-1">
+          <svg
+            className="h-3.5 w-3.5 text-[#1f6f5c] shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+          </svg>
           {placeName
             ? placeName
             : `${position.lat.toFixed(4)}, ${position.lng.toFixed(4)}`}

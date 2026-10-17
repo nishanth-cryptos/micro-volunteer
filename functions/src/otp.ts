@@ -12,6 +12,7 @@
 import { createHash, randomBytes, randomInt } from 'crypto';
 
 export const OTP_TTL_MS = 10 * 60 * 1000;
+export const MAX_OTP_ATTEMPTS = 5;
 
 export function generateOtpCode(): string {
   return randomInt(0, 10_000).toString().padStart(4, '0');
@@ -32,4 +33,75 @@ export function constantTimeEquals(a: string, b: string): boolean {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
+}
+
+export function evaluateOtpVerificationAttemptPure(params: {
+  code: string;
+  expectedHash: string;
+  salt: string;
+  expiresAtMs: number;
+  nowMs: number;
+  currentAttempts: number;
+}): {
+  success: boolean;
+  exhausted: boolean;
+  expired: boolean;
+  nextAttempts: number;
+  remainingAttempts: number;
+  invalidateOtp: boolean;
+  error?: string;
+} {
+  const { code, expectedHash, salt, expiresAtMs, nowMs, currentAttempts } =
+    params;
+
+  if (currentAttempts >= MAX_OTP_ATTEMPTS) {
+    return {
+      success: false,
+      exhausted: true,
+      expired: false,
+      nextAttempts: currentAttempts,
+      remainingAttempts: 0,
+      invalidateOtp: true,
+      error: 'Too many failed attempts. Ask the customer to generate a new code.',
+    };
+  }
+
+  if (nowMs > expiresAtMs) {
+    return {
+      success: false,
+      exhausted: false,
+      expired: true,
+      nextAttempts: currentAttempts,
+      remainingAttempts: Math.max(0, MAX_OTP_ATTEMPTS - currentAttempts),
+      invalidateOtp: false,
+      error: 'This code has expired. Ask the customer to generate a new one.',
+    };
+  }
+
+  const inputHash = hashOtp(code, salt);
+  if (!constantTimeEquals(inputHash, expectedHash)) {
+    const nextAttempts = currentAttempts + 1;
+    const exhausted = nextAttempts >= MAX_OTP_ATTEMPTS;
+    const remaining = Math.max(0, MAX_OTP_ATTEMPTS - nextAttempts);
+    return {
+      success: false,
+      exhausted,
+      expired: false,
+      nextAttempts,
+      remainingAttempts: remaining,
+      invalidateOtp: exhausted,
+      error: exhausted
+        ? 'Too many failed attempts. Ask the customer to generate a new code.'
+        : `That code is wrong. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+    };
+  }
+
+  return {
+    success: true,
+    exhausted: false,
+    expired: false,
+    nextAttempts: 0,
+    remainingAttempts: MAX_OTP_ATTEMPTS,
+    invalidateOtp: true,
+  };
 }

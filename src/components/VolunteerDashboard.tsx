@@ -413,7 +413,20 @@ export function VolunteerDashboard({
         <div className="mx-auto max-w-7xl px-8 pt-4">
           {userDoc.accountStatus === 'warned' ? (
             <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-xs">
-              <span className="text-base flex-shrink-0">⚠️</span>
+              <svg
+                className="h-5 w-5 text-amber-600 shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
               <div>
                 <strong className="font-bold text-amber-950">
                   Community Guidelines Notice (Strike{' '}
@@ -430,7 +443,17 @@ export function VolunteerDashboard({
             </div>
           ) : userDoc.accountStatus === 'suspended' ? (
             <div className="vc-fade-up flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 shadow-xs">
-              <span className="text-base flex-shrink-0">🚫</span>
+              <svg
+                className="h-5 w-5 text-red-600 shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.7 5.7l12.6 12.6" />
+              </svg>
               <div>
                 <strong className="font-bold text-red-950">
                   Account Temporarily Suspended
@@ -568,7 +591,9 @@ function TopBar({
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#ececea] bg-white px-6 sm:px-7">
       <div className="flex items-center gap-3 font-bold tracking-tight">
-        <Logo size="md" />
+        <Link to="/app" aria-label="Hey Padosi Home">
+          <Logo size="md" />
+        </Link>
       </div>
       <div className="flex items-center gap-3">
         <RoleSwitcher
@@ -923,15 +948,45 @@ function DashboardScreen({
                         </span>
                         <span
                           className={
-                            'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' +
+                            'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' +
                             (row.taskRiskLevel === 'medium'
                               ? 'bg-amber-100 text-amber-800'
                               : 'bg-[#fafaf8] text-[#4f4b46] border border-[#ececea]')
                           }
                         >
-                          {row.taskRiskLevel === 'medium'
-                            ? '🛡️ Verified ID Required'
-                            : '✓ Standard Task'}
+                          {row.taskRiskLevel === 'medium' ? (
+                            <>
+                              <svg
+                                className="h-3 w-3 shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                aria-hidden="true"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                />
+                              </svg>
+                              <span>Verified ID Required</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="h-3 w-3 shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                aria-hidden="true"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Standard Task</span>
+                            </>
+                          )}
                         </span>
                       </div>
 
@@ -942,15 +997,50 @@ function DashboardScreen({
                       {/* Humanized Decision Chips (No raw math scores!) */}
                       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#4f4b46]">
                         <span className="inline-flex items-center gap-1.5 font-medium">
-                          <span>📍</span> {formatDistance(row.distanceM)} away
+                          <svg
+                            className="h-3 w-3 text-[#1f6f5c]"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                            />
+                          </svg>
+                          <span>{formatDistance(row.distanceM)} away</span>
                         </span>
                         <span className="text-[#ececea]">|</span>
                         <span className="inline-flex items-center gap-1.5 font-medium">
-                          <span>⏱️</span> ~{row.estimatedMinutes ?? 30} mins
+                          <svg
+                            className="h-3 w-3 text-[#4f4b46]"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                          </svg>
+                          <span>~{row.estimatedMinutes ?? 30} mins</span>
                         </span>
                         <span className="text-[#ececea]">|</span>
                         <span className="inline-flex items-center gap-1.5 font-medium text-[#1f6f5c]">
-                          <span>★</span> Matches your skills
+                          <svg
+                            className="h-3 w-3"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Matches your skills</span>
                         </span>
                       </div>
                     </div>
@@ -1045,8 +1135,22 @@ function DashboardScreen({
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-[11px] text-[#8a847d]">
-              🔒 Exact location is never shared
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#8a847d]">
+              <svg
+                className="h-3 w-3 shrink-0 text-[#8a847d]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+              <span>Exact location is never shared</span>
             </span>
             <button
               type="button"
@@ -1181,13 +1285,45 @@ function DashboardScreen({
                   </span>
                   <span
                     className={
-                      'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' +
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' +
                       (t.riskLevel === 'medium'
                         ? 'bg-amber-100 text-amber-800'
                         : 'bg-[#e3efe9] text-[#1f6f5c]')
                     }
                   >
-                    {t.riskLevel === 'medium' ? '🛡️ ID Needed' : '✓ Community'}
+                    {t.riskLevel === 'medium' ? (
+                      <>
+                        <svg
+                          className="h-3 w-3 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                          />
+                        </svg>
+                        <span>ID Needed</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="h-3 w-3 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Community</span>
+                      </>
+                    )}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-[#8a847d]">
@@ -1420,11 +1556,35 @@ function VolunteerProfileScreen({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {userDoc.idVerified ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/25 border border-emerald-300/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-100">
-                    🛡️ ID Verified
+                    <svg
+                      className="h-3 w-3 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    </svg>
+                    <span>ID Verified</span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white/90">
-                    ✓ Verified Neighbour
+                    <svg
+                      className="h-3 w-3 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Verified Neighbour</span>
                   </span>
                 )}
                 <TrustScorePill
