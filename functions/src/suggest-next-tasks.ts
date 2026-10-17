@@ -145,7 +145,12 @@ export const suggestNextTasks = onCall(
 
       const candidate = docSnap.data() as TaskDoc & {
         createdAt?: Timestamp;
+        expiresAt?: Timestamp;
       };
+
+      // Expiry check: exclude tasks whose expiry window has elapsed
+      const expiresAtMs = candidate.expiresAt?.toMillis?.();
+      if (typeof expiresAtMs === 'number' && Date.now() >= expiresAtMs) continue;
 
       // Dual-role check (§6.2): volunteer cannot be customer of suggested task
       if (candidate.customerId === volunteerUid) continue;
