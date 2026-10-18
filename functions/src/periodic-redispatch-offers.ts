@@ -228,6 +228,7 @@ export const periodicRedispatchOffers = onSchedule(
             statusMessage: 'Task expired without an assigned volunteer.',
             nextCheckAt: FieldValue.delete(),
           });
+          tx.delete(db.collection('openTasks').doc(taskDoc.id));
           transitioned = true;
         });
 

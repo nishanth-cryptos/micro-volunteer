@@ -92,6 +92,7 @@ interface NearbyTaskRow {
   riskLevel: 'low' | 'medium';
   createdAt: Timestamp | null;
   estimatedMinutes?: number | undefined;
+  requiredSkills?: string[] | undefined;
 }
 
 interface AcceptedTaskRow {
@@ -153,7 +154,7 @@ export function VolunteerDashboard({
               id: t.id,
               title: t.title,
               category: t.category,
-              requiredSkills: [],
+              requiredSkills: t.requiredSkills ?? [],
               riskLevel: t.riskLevel,
               location: {
                 lat: userDoc.lastKnownLocation?.lat ?? 19.076,
@@ -224,11 +225,10 @@ export function VolunteerDashboard({
     return unsub;
   }, [uid]);
 
-  // 2. Subscribe to open tasks in the neighborhood ('searching' status)
+  // 2. Subscribe to open tasks in the neighborhood (openTasks discovery projection)
   useEffect(() => {
     const q = query(
-      collection(db(), 'tasks'),
-      where('status', '==', 'searching'),
+      collection(db(), 'openTasks'),
       orderBy('createdAt', 'desc'),
       limit(10),
     );
@@ -243,6 +243,7 @@ export function VolunteerDashboard({
               riskLevel: 'low' | 'medium';
               createdAt: Timestamp | null;
               estimatedMinutes?: number;
+              requiredSkills?: string[];
             };
             return {
               id: d.id,
@@ -251,6 +252,7 @@ export function VolunteerDashboard({
               riskLevel: data.riskLevel,
               createdAt: data.createdAt,
               estimatedMinutes: data.estimatedMinutes,
+              requiredSkills: data.requiredSkills,
             };
           }),
         );

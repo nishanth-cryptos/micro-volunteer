@@ -43,6 +43,48 @@ export function computeDispatchExclusionsPure(
   return excluded;
 }
 
+export interface OpenTaskProjection {
+  taskId: string;
+  title: string;
+  category: string;
+  requiredSkills: string[];
+  riskLevel: 'low' | 'medium';
+  estimatedMinutes?: number | undefined;
+  searchRadiusM: number;
+  location: { h3Cell: string };
+  status: 'searching';
+  createdAt?: unknown;
+  expiresAt?: unknown;
+}
+
+export function createOpenTaskProjectionPure(
+  taskId: string,
+  task: Partial<TaskDoc> & {
+    estimatedMinutes?: number | undefined;
+    createdAt?: unknown;
+    expiresAt?: unknown;
+  },
+): OpenTaskProjection {
+  return {
+    taskId,
+    title: task.title || '',
+    category: task.category || '',
+    requiredSkills: Array.isArray(task.requiredSkills) ? task.requiredSkills : [],
+    riskLevel: task.riskLevel === 'medium' ? 'medium' : 'low',
+    ...(typeof task.estimatedMinutes === 'number'
+      ? { estimatedMinutes: task.estimatedMinutes }
+      : {}),
+    searchRadiusM:
+      typeof task.searchRadiusM === 'number' ? task.searchRadiusM : 2000,
+    location: {
+      h3Cell: task.location?.h3Cell || '',
+    },
+    status: 'searching',
+    ...(task.createdAt !== undefined ? { createdAt: task.createdAt } : {}),
+    ...(task.expiresAt !== undefined ? { expiresAt: task.expiresAt } : {}),
+  };
+}
+
 export const dispatchOffers = onDocumentWritten(
   { document: 'tasks/{taskId}', region: REGION },
   async (event) => {
@@ -53,13 +95,31 @@ export const dispatchOffers = onDocumentWritten(
     }
     const beforeData = change.before?.data() as TaskDoc | undefined;
     const afterData = change.after?.data() as TaskDoc | undefined;
-    if (!afterData) {
-      // Document was deleted
-      return;
-    }
     const taskId = event.params.taskId;
+    const db = getFirestore();
 
-    // We only proceed if:
+    // 1. Maintain openTasks discovery projection for volunteers.
+    // Clean up projection if task is deleted or no longer searching.
+    if (!afterData || afterData.status !== 'searching') {
+      try {
+        await db.collection('openTasks').doc(taskId).delete();
+      } catch (err) {
+        logger.warn('Failed to delete openTasks projection', { taskId, err });
+      }
+      if (!afterData) {
+        // Document was deleted
+        return;
+      }
+    } else if (afterData.status === 'searching') {
+      try {
+        const projection = createOpenTaskProjectionPure(taskId, afterData);
+        await db.collection('openTasks').doc(taskId).set(projection);
+      } catch (err) {
+        logger.warn('Failed to upsert openTasks projection', { taskId, err });
+      }
+    }
+
+    // We only proceed with matching dispatch if:
     // 1. Task was newly created with status == 'searching'
     // OR
     // 2. Task status transitioned from another state back to 'searching'
@@ -73,7 +133,6 @@ export const dispatchOffers = onDocumentWritten(
       return;
     }
 
-    const db = getFirestore();
     const offersRef = db.collection('tasks').doc(taskId).collection('offers');
 
     // Activity log: only on initial task creation, not on the

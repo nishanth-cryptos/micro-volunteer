@@ -123,6 +123,7 @@ export const acceptOffer = onCall(
         acceptedVolunteerId: volunteerId,
         acceptedAt: now,
       });
+      tx.delete(db.collection('openTasks').doc(taskId));
       tx.update(offerRef, {
         state: 'accepted',
         respondedAt: now,

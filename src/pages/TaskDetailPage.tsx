@@ -210,7 +210,14 @@ export default function TaskDetailPage() {
         setLoading(false);
       },
       (err) => {
-        setError(err.message);
+        const isVolunteer = state.userDoc.roles?.includes('volunteer') ?? false;
+        if (isVolunteer) {
+          setError(
+            'This task is not assigned to you or is currently matching volunteers.',
+          );
+        } else {
+          setError(err.message);
+        }
         setLoading(false);
       },
     );
@@ -261,7 +268,7 @@ export default function TaskDetailPage() {
       offersUnsub();
       eventsUnsub();
     };
-  }, [taskId, state.status]);
+  }, [taskId, state]);
 
   // Hook to watch task status transitions and trigger toast alerts
   useEffect(() => {

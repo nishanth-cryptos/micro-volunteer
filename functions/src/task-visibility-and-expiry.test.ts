@@ -23,10 +23,20 @@ test('PB-3 Rules Invariant: firestore.rules gates open searching tasks to active
     'isVolunteer() must verify volunteer role membership',
   );
 
-  // Verify task read rule allows active volunteers for searching tasks
+  // Batch 7 Hardening: Verify full tasks read rule does NOT expose searching tasks to volunteers
   assert.ok(
-    rules.includes("resource.data.status == 'searching' && isVolunteer()"),
-    "tasks read rule must include (resource.data.status == 'searching' && isVolunteer())",
+    !rules.includes("resource.data.status == 'searching' && isVolunteer()"),
+    "tasks read rule must NOT expose full requester task documents via (resource.data.status == 'searching' && isVolunteer())",
+  );
+
+  // Batch 7 Hardening: Verify openTasks discovery projection exists and is gated to volunteers
+  assert.ok(
+    rules.includes('match /openTasks/{taskId}'),
+    'firestore.rules must define openTasks discovery projection collection',
+  );
+  assert.ok(
+    rules.includes('!isSuspendedOrBanned(request.auth.uid) && isVolunteer()'),
+    'openTasks read rule must gate access to active non-suspended volunteers',
   );
 
   // Verify suspended/banned barrier protects reads

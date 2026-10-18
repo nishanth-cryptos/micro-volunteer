@@ -20,7 +20,9 @@ let testEnv: RulesTestEnvironment;
 const nowTimestamp = new Date();
 
 before(async () => {
-  const rulesPath = path.resolve(process.cwd(), '../firestore.rules');
+  const rulesPath = fs.existsSync(path.resolve(process.cwd(), 'firestore.rules'))
+    ? path.resolve(process.cwd(), 'firestore.rules')
+    : path.resolve(process.cwd(), '../firestore.rules');
   const rules = fs.readFileSync(rulesPath, 'utf8');
 
   testEnv = await initializeTestEnvironment({
@@ -241,7 +243,7 @@ test('Tasks Security: read access allowed only to customer, assigned volunteer, 
   await assertFails(getDoc(doc(strangerDb, 'tasks/task-assigned')));
 });
 
-test('Tasks Security: authenticated active volunteer can read open searching tasks, but customer-only or stranger on active task is denied', async () => {
+test('Tasks Security: volunteers cannot read full requester task before acceptance, but active volunteers can read openTasks discovery', async () => {
   await testEnv.withSecurityRulesDisabled(async (adminContext) => {
     const db = adminContext.firestore();
     await setDoc(doc(db, 'users/vol-reader'), {
@@ -259,7 +261,16 @@ test('Tasks Security: authenticated active volunteer can read open searching tas
     });
     await setDoc(doc(db, 'tasks/task-open-searching'), {
       customerId: 'other-customer',
+      customerName: 'Secret Requester',
       title: 'Open grocery run',
+      status: 'searching',
+    });
+    await setDoc(doc(db, 'openTasks/task-open-searching'), {
+      taskId: 'task-open-searching',
+      title: 'Open grocery run',
+      category: 'groceries',
+      requiredSkills: [],
+      riskLevel: 'low',
       status: 'searching',
     });
   });
@@ -269,17 +280,28 @@ test('Tasks Security: authenticated active volunteer can read open searching tas
   const suspendedVolDb = testEnv.authenticatedContext('vol-suspended').firestore();
   const unauthedDb = testEnv.unauthenticatedContext().firestore();
 
-  // Active volunteer can read open searching task
-  await assertSucceeds(getDoc(doc(volDb, 'tasks/task-open-searching')));
+  // 1. Full requester task document: Pre-acceptance volunteer CANNOT read
+  await assertFails(getDoc(doc(volDb, 'tasks/task-open-searching')));
 
-  // Customer-only user without volunteer role is denied
-  await assertFails(getDoc(doc(custDb, 'tasks/task-open-searching')));
+  // 2. OpenTasks projection: Active volunteer can read
+  await assertSucceeds(getDoc(doc(volDb, 'openTasks/task-open-searching')));
 
-  // Suspended volunteer is denied
-  await assertFails(getDoc(doc(suspendedVolDb, 'tasks/task-open-searching')));
+  // 3. OpenTasks projection: Customer-only user without volunteer role is denied
+  await assertFails(getDoc(doc(custDb, 'openTasks/task-open-searching')));
 
-  // Unauthenticated caller is denied
-  await assertFails(getDoc(doc(unauthedDb, 'tasks/task-open-searching')));
+  // 4. OpenTasks projection: Suspended volunteer is denied
+  await assertFails(getDoc(doc(suspendedVolDb, 'openTasks/task-open-searching')));
+
+  // 5. OpenTasks projection: Unauthenticated caller is denied
+  await assertFails(getDoc(doc(unauthedDb, 'openTasks/task-open-searching')));
+
+  // 6. OpenTasks projection: Client direct create/update is strictly DENIED
+  await assertFails(
+    setDoc(doc(volDb, 'openTasks/task-client-forged'), {
+      title: 'Forged Task',
+      status: 'searching',
+    }),
+  );
 });
 
 test('Tasks Security: suspended or banned user cannot create or read active tasks', async () => {

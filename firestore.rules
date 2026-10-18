@@ -195,14 +195,13 @@ service cloud.firestore {
       //   - the task's customer always
       //   - the accepted volunteer (after they accept)
       //   - administrators
-      //   - active, authenticated volunteers for open searching tasks
       // Restricted: suspended/banned users cannot read active task assignments.
+      // Pre-acceptance volunteers cannot read the full requester task document.
       allow read: if isSignedIn() && (
         isAdmin() || (
           !isSuspendedOrBanned(request.auth.uid) && (
             request.auth.uid == resource.data.customerId
             || request.auth.uid == resource.data.acceptedVolunteerId
-            || (resource.data.status == 'searching' && isVolunteer())
           )
         )
       );
@@ -245,6 +244,18 @@ service cloud.firestore {
         );
         allow write: if false;
       }
+    }
+
+    // Discovery projection collection: server-maintained minimal public summary
+    // for active volunteers to discover open tasks without exposing requester
+    // private data (names, photos, exact coordinates, meeting points).
+    match /openTasks/{taskId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || (
+          !isSuspendedOrBanned(request.auth.uid) && isVolunteer()
+        )
+      );
+      allow write: if false;
     }
 
     // Volunteer reading their own offers via collection-group query.

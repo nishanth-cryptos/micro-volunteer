@@ -90,6 +90,7 @@ export const deleteTask = onCall(
         cancelledAt: FieldValue.serverTimestamp(),
         cancellationReason: reason,
       });
+      transaction.delete(db.collection('openTasks').doc(taskId));
 
       // Audit event
       const eventRef = taskRef.collection('events').doc();
