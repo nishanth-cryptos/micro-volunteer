@@ -36,6 +36,7 @@ export interface UserDoc {
   availableNow?: boolean;
   lastKnownLocation?: { lat: number; lng: number; h3Cell: string };
   idVerified?: boolean;
+  idImagePath?: string;
   trustScore?: number;
   verifiedTaskCount?: number;
   openReportsCount?: number;
@@ -43,6 +44,7 @@ export interface UserDoc {
   banned?: boolean;
   suspendedUntil?: Timestamp;
   accountStatus?: string;
+  idVerificationStatus?: string;
 }
 
 export interface ScoreBreakdown {

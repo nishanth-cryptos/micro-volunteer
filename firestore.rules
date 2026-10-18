@@ -76,6 +76,12 @@ service cloud.firestore {
     function userServerOnlyKeys() {
       return [
         'idVerified',
+        'idVerificationStatus',
+        'idVerificationSubmittedAt',
+        'idVerificationReviewedAt',
+        'idVerificationReviewedBy',
+        'idVerificationRejectionReason',
+        'idVerifiedAt',
         'trustScore',
         'verifiedTaskCount',
         'verifiedHours',
