@@ -348,24 +348,36 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
     }
 
+    // Chat is only active for live communication during 'accepted' and 'in_progress' states.
+    // Tasks in 'completed', 'cancelled', 'expired', 'searching', or 'scheduled'
+    // are read-only (or not yet created) and reject new messages and preview updates.
+    function isTaskChatActive(chatId) {
+      let taskDoc = get(/databases/$(database)/documents/tasks/$(chatId));
+      return taskDoc != null
+        && 'status' in taskDoc.data
+        && taskDoc.data.status in ['accepted', 'in_progress'];
+    }
+
     // May the caller post a new message? Binds the chat doc once (one get)
     // and probes both orderings of the mutual-block doc id (blocks are keyed
     // `${min}_${max}` with sorted UIDs, which rules can't reproduce).
+    // Caller must be an authorized participant on an active task with no active block.
     function canPostMessage(chatId) {
       let parts = get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       return request.auth.uid in parts
+        && isTaskChatActive(chatId)
         && !(exists(/databases/$(database)/documents/blocks/$(parts[0] + '_' + parts[1]))
              || exists(/databases/$(database)/documents/blocks/$(parts[1] + '_' + parts[0])));
     }
 
-    // A participant of an accepted/in-progress/completed task may open its
+    // A participant of an accepted or in-progress task may open its
     // chat. Participants must be exactly the task's customer + accepted
     // volunteer; chatId must equal the taskId.
     function validChatCreate(chatId) {
       let task = get(/databases/$(database)/documents/tasks/$(chatId)).data;
       return chatId == request.resource.data.taskId
         && 'acceptedVolunteerId' in task.keys()
-        && task.status in ['accepted', 'in_progress', 'completed']
+        && task.status in ['accepted', 'in_progress']
         && request.resource.data.participants
              .hasOnly([task.customerId, task.acceptedVolunteerId])
         && request.resource.data.participants
@@ -389,10 +401,11 @@ service cloud.firestore {
         && request.resource.data.lastMessagePreview is string
         && validChatCreate(chatId);
 
-      // Participants may only bump the inbox preview fields.
+      // Participants may only bump the inbox preview fields while task is active.
       allow update: if isSignedIn()
         && !isSuspendedOrBanned(request.auth.uid)
         && request.auth.uid in resource.data.participants
+        && isTaskChatActive(chatId)
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['lastMessageAt', 'lastMessagePreview'])
         && request.resource.data.lastMessageAt is timestamp

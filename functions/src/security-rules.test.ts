@@ -477,20 +477,26 @@ test('Chats Security: client create fails if caller is not a task participant or
   );
 });
 
-test('Chat Messages Security: participant can send non-system message; messages immutable for clients', async () => {
+test('Chat Messages Security: participant can send non-system message on accepted/in_progress task; messages immutable for clients', async () => {
   await testEnv.withSecurityRulesDisabled(async (adminContext) => {
     const db = adminContext.firestore();
-    await setDoc(doc(db, 'chats/chat-100'), {
+    await setDoc(doc(db, 'tasks/task-100'), {
+      customerId: 'customer-1',
+      acceptedVolunteerId: 'vol-1',
+      status: 'accepted',
+    });
+    await setDoc(doc(db, 'chats/task-100'), {
       taskId: 'task-100',
       participants: ['customer-1', 'vol-1'],
     });
   });
 
   const volDb = testEnv.authenticatedContext('vol-1').firestore();
+  const customerDb = testEnv.authenticatedContext('customer-1').firestore();
 
-  // Valid message create
+  // Valid message create by volunteer
   await assertSucceeds(
-    setDoc(doc(volDb, 'chats/chat-100/messages/msg-1'), {
+    setDoc(doc(volDb, 'chats/task-100/messages/msg-1'), {
       senderUid: 'vol-1',
       text: 'Hello customer!',
       sentAt: nowTimestamp,
@@ -498,9 +504,19 @@ test('Chat Messages Security: participant can send non-system message; messages 
     }),
   );
 
+  // Valid message create by customer
+  await assertSucceeds(
+    setDoc(doc(customerDb, 'chats/task-100/messages/msg-2'), {
+      senderUid: 'customer-1',
+      text: 'Hello volunteer!',
+      sentAt: nowTimestamp,
+      system: false,
+    }),
+  );
+
   // Forging system message DENIED
   await assertFails(
-    setDoc(doc(volDb, 'chats/chat-100/messages/msg-system-forge'), {
+    setDoc(doc(volDb, 'chats/task-100/messages/msg-system-forge'), {
       senderUid: 'vol-1',
       text: 'System message',
       sentAt: nowTimestamp,
@@ -510,14 +526,134 @@ test('Chat Messages Security: participant can send non-system message; messages 
 
   // Message update or delete DENIED
   await assertFails(
-    updateDoc(doc(volDb, 'chats/chat-100/messages/msg-1'), { text: 'Edited' }),
+    updateDoc(doc(volDb, 'chats/task-100/messages/msg-1'), { text: 'Edited' }),
   );
-  await assertFails(deleteDoc(doc(volDb, 'chats/chat-100/messages/msg-1')));
+  await assertFails(deleteDoc(doc(volDb, 'chats/task-100/messages/msg-1')));
+});
+
+test('Chat Lifecycle Security: message writes DENIED on completed, cancelled, expired, or searching tasks', async () => {
+  await testEnv.withSecurityRulesDisabled(async (adminContext) => {
+    const db = adminContext.firestore();
+    // 1. Completed task
+    await setDoc(doc(db, 'tasks/task-completed'), {
+      customerId: 'customer-1',
+      acceptedVolunteerId: 'vol-1',
+      status: 'completed',
+    });
+    await setDoc(doc(db, 'chats/task-completed'), {
+      taskId: 'task-completed',
+      participants: ['customer-1', 'vol-1'],
+    });
+    await setDoc(doc(db, 'chats/task-completed/messages/msg-history'), {
+      senderUid: 'vol-1',
+      text: 'Past message before completion',
+      sentAt: nowTimestamp,
+      system: false,
+    });
+
+    // 2. Cancelled task
+    await setDoc(doc(db, 'tasks/task-cancelled'), {
+      customerId: 'customer-1',
+      acceptedVolunteerId: 'vol-1',
+      status: 'cancelled',
+    });
+    await setDoc(doc(db, 'chats/task-cancelled'), {
+      taskId: 'task-cancelled',
+      participants: ['customer-1', 'vol-1'],
+    });
+
+    // 3. In-progress task (supported)
+    await setDoc(doc(db, 'tasks/task-inprogress'), {
+      customerId: 'customer-1',
+      acceptedVolunteerId: 'vol-1',
+      status: 'in_progress',
+    });
+    await setDoc(doc(db, 'chats/task-inprogress'), {
+      taskId: 'task-inprogress',
+      participants: ['customer-1', 'vol-1'],
+    });
+  });
+
+  const volDb = testEnv.authenticatedContext('vol-1').firestore();
+  const customerDb = testEnv.authenticatedContext('customer-1').firestore();
+  const strangerDb = testEnv.authenticatedContext('stranger').firestore();
+
+  // 1. In-progress task permits messages
+  await assertSucceeds(
+    setDoc(doc(volDb, 'chats/task-inprogress/messages/msg-act'), {
+      senderUid: 'vol-1',
+      text: 'On my way!',
+      sentAt: nowTimestamp,
+      system: false,
+    }),
+  );
+
+  // 2. Completed task DENIES new message writes from volunteer & customer
+  await assertFails(
+    setDoc(doc(volDb, 'chats/task-completed/messages/msg-new-fail'), {
+      senderUid: 'vol-1',
+      text: 'Trying to chat after completion',
+      sentAt: nowTimestamp,
+      system: false,
+    }),
+  );
+  await assertFails(
+    setDoc(doc(customerDb, 'chats/task-completed/messages/msg-new-fail-cust'), {
+      senderUid: 'customer-1',
+      text: 'Customer trying to chat after completion',
+      sentAt: nowTimestamp,
+      system: false,
+    }),
+  );
+
+  // 3. Completed task DENIES bumping inbox preview
+  await assertFails(
+    updateDoc(doc(volDb, 'chats/task-completed'), {
+      lastMessageAt: nowTimestamp,
+      lastMessagePreview: 'Tampered preview',
+    }),
+  );
+
+  // 4. Completed task STILL ALLOWS reading existing messages for participants
+  await assertSucceeds(
+    getDoc(doc(volDb, 'chats/task-completed/messages/msg-history')),
+  );
+  await assertSucceeds(
+    getDoc(doc(customerDb, 'chats/task-completed/messages/msg-history')),
+  );
+
+  // 5. Non-participant (stranger) is DENIED reading and writing
+  await assertFails(
+    getDoc(doc(strangerDb, 'chats/task-completed/messages/msg-history')),
+  );
+  await assertFails(
+    setDoc(doc(strangerDb, 'chats/task-inprogress/messages/msg-stranger'), {
+      senderUid: 'stranger',
+      text: 'I am a stranger',
+      sentAt: nowTimestamp,
+      system: false,
+    }),
+  );
+
+  // 6. Cancelled task DENIES new message writes
+  await assertFails(
+    setDoc(doc(volDb, 'chats/task-cancelled/messages/msg-cancel-fail'), {
+      senderUid: 'vol-1',
+      text: 'Trying to chat after cancel',
+      sentAt: nowTimestamp,
+      system: false,
+    }),
+  );
 });
 
 test('Chat Messages Security: message creation DENIED if mutual block document exists', async () => {
   await testEnv.withSecurityRulesDisabled(async (adminContext) => {
     const db = adminContext.firestore();
+    await setDoc(doc(db, 'tasks/chat-blocked'), {
+      customerId: 'customer-1',
+      acceptedVolunteerId: 'vol-blocked',
+      status: 'accepted',
+    });
     await setDoc(doc(db, 'chats/chat-blocked'), {
       taskId: 'chat-blocked',
       participants: ['customer-1', 'vol-blocked'],

@@ -215,7 +215,7 @@ export function ChatPanel({
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || sending) return;
+    if (!text || sending || readOnly) return;
     setSendError(null);
     setSending(true);
     try {
